@@ -17,14 +17,17 @@ config/icon="res://icon.svg"
 
 [display]
 
-window/stretch/mode="canvas_items"
-window/stretch/aspect="expand"
 window/size/viewport_width=540
 window/size/viewport_height=960
 window/size/window_width_override=405
 window/size/window_height_override=720
-window/size/resizable=false
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
 window/handheld/orientation=1
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0.034, 0.18, 0.16, 1)
 
 [dotnet]
 

@@ -4,6 +4,7 @@ namespace SwampFrog;
 
 public enum GameState
 {
+	Menu,
 	Playing,
 	GameOver,
 }
@@ -27,7 +28,7 @@ public partial class Main : Node2D
 	private int _score;
 	private int _lives = MaxLives;
 	private int _highScore;
-	private GameState _state = GameState.Playing;
+	private GameState _state = GameState.Menu;
 
 	public GameState State => _state;
 	public int Score => _score;
@@ -39,6 +40,7 @@ public partial class Main : Node2D
 
 		_frog = GetNode<Frog>("Frog");
 		_frog.Game = this;
+		_frog.SyncUiScale(ScreenScale);
 		_items = GetNode<Node2D>("Items");
 		_hud = GetNode<HUD>("HUD");
 
@@ -48,7 +50,7 @@ public partial class Main : Node2D
 		AddChild(_spawnTimer);
 		_spawnTimer.WaitTime = InitialSpawnInterval;
 		_spawnTimer.Timeout += OnSpawnTimerTimeout;
-		_spawnTimer.Start();
+		// Не запускаем: ждём первого касания на стартовом экране.
 
 		GetViewport().SizeChanged += OnViewportResized;
 
@@ -56,12 +58,14 @@ public partial class Main : Node2D
 		_hud.SetScore(0);
 		_hud.SetLives(_lives);
 		_hud.HideGameOver();
+		_hud.ShowStart();
 	}
 
 	private void OnViewportResized()
 	{
 		QueueRedraw();
 		PositionFrog();
+		_frog?.SyncUiScale(ScreenScale);
 	}
 
 	private void PositionFrog()
@@ -71,8 +75,28 @@ public partial class Main : Node2D
 			return;
 		}
 		Vector2 size = GetViewportRect().Size;
-		_frog.Position = new Vector2(Mathf.Min(180f, size.X * 0.30f), size.Y * 0.56f);
+		_frog.Position = new Vector2(Mathf.Min(180f * ScreenScale, size.X * 0.30f), size.Y * 0.56f);
 	}
+
+	/// <summary>
+	/// База для UI/игрового мира: во сколько раз видимая область больше или меньше
+	/// эталонного портретного разрешения 540×960. Кламп по соображениям разумных границ.
+	/// </summary>
+	public float ScreenScale
+	{
+		get
+		{
+			Vector2 size = GetViewportRect().Size;
+			if (size.X <= 0f || size.Y <= 0f)
+			{
+				return 1f;
+			}
+			return Mathf.Clamp(Mathf.Min(size.X / 540f, size.Y / 960f), 0.85f, 2.2f);
+		}
+	}
+
+	/// <summary>Размер видимой области (в координатах сцены).</summary>
+	public Vector2 ViewSize => GetViewportRect().Size;
 
 	public override void _Process(double delta)
 	{
@@ -91,8 +115,14 @@ public partial class Main : Node2D
 				continue;
 			}
 
-			if (item.Position.Y > viewSize.Y + 130f)
+			// Упал за нижнюю границу — штраф за фрукт/золотой, мусор просто пропадает.
+			if (item.Position.Y > viewSize.Y + 30f)
 			{
+				if (item.ItemType == ItemType.Fruit || item.ItemType == ItemType.GoldenFruit)
+				{
+					_hud?.SpawnPopup(new Vector2(item.Position.X, viewSize.Y - 60f), "Мимо!");
+					TakeDamage();
+				}
 				item.QueueFree();
 				continue;
 			}
@@ -102,9 +132,11 @@ public partial class Main : Node2D
 				continue;
 			}
 
+			float itemScale = item.Scale.X;
 			foreach (Vector2 hand in hands)
 			{
-				if (item.GlobalPosition.DistanceTo(hand) <= item.CatchRadius)
+				// Радиус зависит от масштаба предмета и лягушки.
+				if (item.GlobalPosition.DistanceTo(hand) <= item.CatchRadius * itemScale + _frog.CatchRadiusWorld)
 				{
 					CatchItem(item);
 					break;
@@ -188,6 +220,7 @@ public partial class Main : Node2D
 		item.ItemType = type;
 		item.FallSpeed = speed;
 		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), -70f);
+		item.Scale = Vector2.One * (ScreenScale * _rng.RandfRange(0.85f, 1.08f));
 		_items!.AddChild(item);
 	}
 
@@ -205,9 +238,33 @@ public partial class Main : Node2D
 
 	public override void _UnhandledInput(InputEvent @event)
 	{
-		if (_state == GameState.GameOver && @event is InputEventScreenTouch { Pressed: true })
+		if (@event is not InputEventScreenTouch { Pressed: true })
 		{
-			Restart();
+			return;
+		}
+
+		switch (_state)
+		{
+			case GameState.Menu:
+				StartGame();
+				break;
+			case GameState.GameOver:
+				Restart();
+				break;
+		}
+	}
+
+	/// <summary>Запуск игры со стартового экрана.</summary>
+	private void StartGame()
+	{
+		_state = GameState.Playing;
+		_hud?.HideStart();
+		_hud?.ShowHint();
+
+		if (_spawnTimer != null)
+		{
+			_spawnTimer.WaitTime = InitialSpawnInterval;
+			_spawnTimer.Start();
 		}
 	}
 
@@ -290,6 +347,8 @@ public partial class Main : Node2D
 			DrawRect(new Rect2(0f, i * strip, size.X, strip + 1f), top.Lerp(bottom, t));
 		}
 
+		float s = ScreenScale;
+
 		// Мягкие блики света на воде.
 		float[][] spots =
 		{
@@ -299,16 +358,16 @@ public partial class Main : Node2D
 			new[] { 0.30f, 0.75f, 30f },
 			new[] { 0.62f, 0.38f, 26f },
 		};
-		foreach (float[] s in spots)
+		foreach (float[] sp in spots)
 		{
-			DrawCircle(new Vector2(size.X * s[0], size.Y * s[1]), s[2], new Color(1f, 1f, 1f, 0.05f));
+			DrawCircle(new Vector2(size.X * sp[0], size.Y * sp[1]), sp[2] * s, new Color(1f, 1f, 1f, 0.05f));
 		}
 
-		// Кувшинки у дна.
-		DrawLilyPad(new Vector2(size.X * 0.25f, size.Y * 0.88f), 34f);
-		DrawLilyPad(new Vector2(size.X * 0.80f, size.Y * 0.82f), 26f);
-		DrawLilyPad(new Vector2(size.X * 0.58f, size.Y * 0.93f), 30f);
-		DrawLilyPad(new Vector2(size.X * 0.10f, size.Y * 0.70f), 22f);
+		// Кувшинки у дна (размер пропорционален экрану).
+		DrawLilyPad(new Vector2(size.X * 0.25f, size.Y * 0.88f), 34f * s);
+		DrawLilyPad(new Vector2(size.X * 0.80f, size.Y * 0.82f), 26f * s);
+		DrawLilyPad(new Vector2(size.X * 0.58f, size.Y * 0.93f), 30f * s);
+		DrawLilyPad(new Vector2(size.X * 0.10f, size.Y * 0.70f), 22f * s);
 	}
 
 	private void DrawLilyPad(Vector2 center, float radius)

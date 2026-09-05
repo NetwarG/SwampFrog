@@ -14,35 +14,151 @@ public partial class HUD : CanvasLayer
 	private HeartsIndicator? _hearts;
 	private FlashOverlay? _flash;
 	private Control? _gameOverRoot;
+	private Control? _startRoot;
 	private Label? _finalScore;
 	private Label? _finalHigh;
+
+	/// <summary>
+	/// Адаптивный масштаб HUD: кламп min(видимая/540, видимая/960) так же, как в Main.
+	/// Нужен, чтобы элементы не становились крошечными на больших экранах.
+	/// </summary>
+	public float UiScale
+	{
+		get
+		{
+			Vector2 vp = GetViewport().GetVisibleRect().Size;
+			if (vp.X <= 0f || vp.Y <= 0f)
+			{
+				return 1f;
+			}
+			return Mathf.Clamp(Mathf.Min(vp.X / 540f, vp.Y / 960f), 0.85f, 2f);
+		}
+	}
 
 	public override void _Ready()
 	{
 		BuildUI();
+		GetViewport().SizeChanged += OnViewportResized;
+	}
+
+	private void OnViewportResized()
+	{
+		RecenterOverlays();
+
+		// Обновляем адаптивные размеры HUD-элементов.
+		float ui = UiScale;
+		if (_scoreLabel != null)
+		{
+			_scoreLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(44f * ui));
+		}
+		_hearts?.SetUiScale(ui);
+	}
+
+	/// <summary>Перецентрирует все видимые оверлеи после изменения размера окна.</summary>
+	public void RecenterOverlays()
+	{
+		RecenterBoxIfVisible(_gameOverRoot);
+		RecenterBoxIfVisible(_startRoot);
+	}
+
+	// Переименованный хелпер: центрирует контейнер внутри родителя, если тот видим.
+	private void RecenterBoxIfVisible(Control? root)
+	{
+		if (root == null || !root.Visible)
+		{
+			return;
+		}
+		RecenterBox(root);
+	}
+
+	private void RecenterBox(Control parent)
+	{
+		foreach (Node child in parent.GetChildren())
+		{
+			if (child is VBoxContainer box)
+			{
+				Vector2 vp = GetViewport().GetVisibleRect().Size;
+				box.ResetSize();
+				box.Position = new Vector2(vp.X * 0.5f - box.Size.X * 0.5f, vp.Y * 0.5f - box.Size.Y * 0.5f);
+			}
+		}
 	}
 
 	private void BuildUI()
 	{
+		float ui = UiScale;
+
 		_scoreLabel = new Label();
 		_scoreLabel.Text = "0";
 		_scoreLabel.Position = new Vector2(18f, 12f);
-		_scoreLabel.AddThemeFontSizeOverride("font_size", 44);
+		_scoreLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(44f * ui));
 		_scoreLabel.AddThemeColorOverride("font_color", new Color("ffffff"));
 		_scoreLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
-		_scoreLabel.AddThemeConstantOverride("shadow_offset_x", 3);
-		_scoreLabel.AddThemeConstantOverride("shadow_offset_y", 3);
+		_scoreLabel.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(3f * ui));
+		_scoreLabel.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(3f * ui));
 		AddChild(_scoreLabel);
 
 		_hearts = new HeartsIndicator();
+		_hearts.SetUiScale(ui);
 		AddChild(_hearts);
 
 		_flash = new FlashOverlay();
 		AddChild(_flash);
 
 		BuildGameOver();
+		BuildStart();
+	}
 
-		ShowHint();
+	private void BuildStart()
+	{
+		_startRoot = new Control();
+		_startRoot.Visible = true;
+		_startRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_startRoot.MouseFilter = Control.MouseFilterEnum.Ignore;
+		AddChild(_startRoot);
+
+		var backdrop = new ColorRect();
+		backdrop.Color = new Color(0.02f, 0.12f, 0.09f, 0.55f);
+		backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		backdrop.MouseFilter = Control.MouseFilterEnum.Ignore;
+		_startRoot.AddChild(backdrop);
+
+		var box = new VBoxContainer();
+		box.Alignment = BoxContainer.AlignmentMode.Center;
+		box.AddThemeConstantOverride("separation", 20);
+		_startRoot.AddChild(box);
+
+		float ui = UiScale;
+
+		Label title = MakeLabel("Лягушка-охотница", (int)Mathf.Round(50f * ui), new Color("ffe066"));
+		Label sub = MakeLabel("Собирай фрукты, не лови мусор!", (int)Mathf.Round(24f * ui), new Color("ffffff"));
+		Label sub2 = MakeLabel("Упустишь фрукт — потеряешь жизнь.", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
+		Label tap = MakeLabel("Нажми, чтобы начать", (int)Mathf.Round(27f * ui), new Color("b4e863"));
+
+		box.AddChild(title);
+		box.AddChild(sub);
+		box.AddChild(sub2);
+		box.AddChild(tap);
+
+		RecenterBox(_startRoot);
+	}
+
+	/// <summary>Показывает стартовый экран «нажми, чтобы начать».</summary>
+	public void ShowStart()
+	{
+		if (_startRoot != null)
+		{
+			_startRoot.Visible = true;
+		}
+	}
+
+	/// <summary>Скрывает стартовый экран в начале игры.</summary>
+	public void HideStart()
+	{
+		if (_startRoot != null)
+		{
+			_startRoot.Visible = false;
+		}
 	}
 
 	private void BuildGameOver()
@@ -64,19 +180,19 @@ public partial class HUD : CanvasLayer
 		box.AddThemeConstantOverride("separation", 16);
 		_gameOverRoot.AddChild(box);
 
-		Label title = MakeLabel("Игра окончена!", 48, new Color("ffd45e"));
-		_finalScore = MakeLabel("Счёт: 0", 32, new Color("ffffff"));
-		_finalHigh = MakeLabel("Рекорд: 0", 32, new Color("cfe9c2"));
-		Label hint = MakeLabel("Нажми, чтобы начать заново", 22, new Color(1f, 1f, 1f, 0.85f));
+		float ui = UiScale;
+
+		Label title = MakeLabel("Игра окончена!", (int)Mathf.Round(48f * ui), new Color("ffd45e"));
+		_finalScore = MakeLabel("Счёт: 0", (int)Mathf.Round(32f * ui), new Color("ffffff"));
+		_finalHigh = MakeLabel("Рекорд: 0", (int)Mathf.Round(32f * ui), new Color("cfe9c2"));
+		Label hint = MakeLabel("Нажми, чтобы начать заново", (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.85f));
 
 		box.AddChild(title);
 		box.AddChild(_finalScore);
 		box.AddChild(_finalHigh);
 		box.AddChild(hint);
 
-		box.ResetSize();
-		Vector2 vp = GetViewport().GetVisibleRect().Size;
-		box.Position = new Vector2(vp.X * 0.5f - box.Size.X * 0.5f, vp.Y * 0.5f - box.Size.Y * 0.5f);
+		RecenterBox(_gameOverRoot);
 	}
 
 	private static Label MakeLabel(string text, int fontSize, Color color)
@@ -89,24 +205,26 @@ public partial class HUD : CanvasLayer
 		return label;
 	}
 
-	private void ShowHint()
+	/// <summary>Мимолётная подсказка «держи палец» после старта.</summary>
+	public void ShowHint()
 	{
+		float ui = UiScale;
 		var hint = new Label();
 		hint.Text = "Держи палец на экране — руки растут";
 		hint.AnchorLeft = 0.5f;
 		hint.AnchorRight = 0.5f;
 		hint.AnchorTop = 1f;
 		hint.AnchorBottom = 1f;
-		hint.OffsetLeft = -240f;
-		hint.OffsetRight = 240f;
-		hint.OffsetTop = -46f;
-		hint.OffsetBottom = -14f;
+		hint.OffsetLeft = -240f * ui;
+		hint.OffsetRight = 240f * ui;
+		hint.OffsetTop = -46f * ui;
+		hint.OffsetBottom = -14f * ui;
 		hint.HorizontalAlignment = HorizontalAlignment.Center;
-		hint.AddThemeFontSizeOverride("font_size", 18);
+		hint.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(18f * ui));
 		hint.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 0.9f));
 		hint.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
-		hint.AddThemeConstantOverride("shadow_offset_x", 2);
-		hint.AddThemeConstantOverride("shadow_offset_y", 2);
+		hint.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
+		hint.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(2f * ui));
 		AddChild(hint);
 
 		Tween tween = CreateTween();
@@ -154,14 +272,15 @@ public partial class HUD : CanvasLayer
 	/// <summary>Всплывающая надпись «+10» в точке поимки.</summary>
 	public void SpawnPopup(Vector2 globalPos, string text)
 	{
+		float ui = UiScale;
 		var popup = new Label();
 		popup.Text = text;
 		popup.GlobalPosition = globalPos;
-		popup.AddThemeFontSizeOverride("font_size", 30);
+		popup.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(30f * ui));
 		popup.AddThemeColorOverride("font_color", new Color("fff45e"));
 		popup.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
-		popup.AddThemeConstantOverride("shadow_offset_x", 2);
-		popup.AddThemeConstantOverride("shadow_offset_y", 2);
+		popup.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
+		popup.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(2f * ui));
 		popup.ZIndex = 50;
 		AddChild(popup);
 
@@ -179,18 +298,12 @@ public partial class HeartsIndicator : Control
 	private static readonly Color EmptyHeart = new Color(1f, 1f, 1f, 0.22f);
 
 	private int _lives = 3;
+	private float _uiScale = 1f;
 
 	public override void _Ready()
 	{
 		MouseFilter = MouseFilterEnum.Ignore;
-		AnchorLeft = 1f;
-		AnchorRight = 1f;
-		AnchorTop = 0f;
-		AnchorBottom = 0f;
-		OffsetLeft = -118f;
-		OffsetRight = -14f;
-		OffsetTop = 14f;
-		OffsetBottom = 78f;
+		UpdateLayout();
 	}
 
 	public void SetLives(int lives)
@@ -199,13 +312,35 @@ public partial class HeartsIndicator : Control
 		QueueRedraw();
 	}
 
+	/// <summary>Обновляет масштаб сердечек (вызывается при ресайзе).</summary>
+	public void SetUiScale(float uiScale)
+	{
+		_uiScale = uiScale;
+		UpdateLayout();
+		QueueRedraw();
+	}
+
+	private void UpdateLayout()
+	{
+		AnchorLeft = 1f;
+		AnchorRight = 1f;
+		AnchorTop = 0f;
+		AnchorBottom = 0f;
+		OffsetLeft = -118f * _uiScale;
+		OffsetRight = -14f * _uiScale;
+		OffsetTop = 14f * _uiScale;
+		OffsetBottom = 78f * _uiScale;
+		Size = new Vector2(104f * _uiScale, 64f * _uiScale);
+	}
+
 	public override void _Draw()
 	{
-		const float s = 30f;
+		const float sBase = 30f;
+		float s = sBase * _uiScale;
 		for (int i = 0; i < 3; i++)
 		{
 			Color color = i < _lives ? FullHeart : EmptyHeart;
-			Vector2 c = new(12f + i * s * 0.98f, 22f);
+			Vector2 c = new(12f + i * s * 0.98f, 22f * _uiScale);
 
 			DrawCircle(c + new Vector2(-s * 0.26f, -s * 0.22f), s * 0.32f, color);
 			DrawCircle(c + new Vector2(s * 0.26f, -s * 0.22f), s * 0.32f, color);
