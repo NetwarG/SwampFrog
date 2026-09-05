@@ -12,6 +12,6 @@ public partial class Icon : Sprite2D
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double delta)
 	{
-		this.MoveLocalX(1);
+		MoveLocalX(1);
 	}
 }

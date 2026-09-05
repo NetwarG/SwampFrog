@@ -1,6 +1,6 @@
 ﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwampFrog", "SwampFrog.csproj", "{894B9DA0-B297-435D-9B56-8801B5A02EF8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwampFrog", "SwampFrog.csproj", "{05B8E6D9-739E-4FB5-9E09-5460136D0632}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -9,11 +9,11 @@ Global
 	ExportRelease|Any CPU = ExportRelease|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{894B9DA0-B297-435D-9B56-8801B5A02EF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{894B9DA0-B297-435D-9B56-8801B5A02EF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{894B9DA0-B297-435D-9B56-8801B5A02EF8}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
-		{894B9DA0-B297-435D-9B56-8801B5A02EF8}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
-		{894B9DA0-B297-435D-9B56-8801B5A02EF8}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
-		{894B9DA0-B297-435D-9B56-8801B5A02EF8}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+		{05B8E6D9-739E-4FB5-9E09-5460136D0632}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05B8E6D9-739E-4FB5-9E09-5460136D0632}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05B8E6D9-739E-4FB5-9E09-5460136D0632}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{05B8E6D9-739E-4FB5-9E09-5460136D0632}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{05B8E6D9-739E-4FB5-9E09-5460136D0632}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{05B8E6D9-739E-4FB5-9E09-5460136D0632}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
 	EndGlobalSection
 EndGlobal
