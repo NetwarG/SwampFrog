@@ -1,6 +1,6 @@
 using Godot;
 
-namespace NewGameProject;
+namespace SwampFrog;
 
 public partial class Icon : Sprite2D
 {
