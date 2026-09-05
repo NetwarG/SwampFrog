@@ -1,0 +1,16 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://Game/Main.cs" id="1_main"]
+[ext_resource type="Script" path="res://Game/Frog.cs" id="2_frog"]
+[ext_resource type="Script" path="res://Game/HUD.cs" id="3_hud"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Frog" type="Node2D" parent="."]
+script = ExtResource("2_frog")
+
+[node name="Items" type="Node2D" parent="."]
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("3_hud")
