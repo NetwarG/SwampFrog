@@ -1,5 +1,6 @@
 using Godot;
-using System;
+
+namespace NewGameProject;
 
 public partial class Icon : Sprite2D
 {
