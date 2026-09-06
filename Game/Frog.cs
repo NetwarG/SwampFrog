@@ -24,6 +24,9 @@ public partial class Frog : Node2D
 	private const float HandSpreadDeg = 13f;
 	private const float MinCatchLengthPx = 50f;
 
+	/// <summary>Отступ ладони от края экрана (в базовых единицах, затем умножается на UiScale).</summary>
+	private const float HandScreenMargin = 24f;
+
 	private static readonly Color Skin = new("55a82e");
 	private static readonly Color SkinDark = new("2f7d2f");
 	private static readonly Color Belly = new("eaf3a6");
@@ -70,23 +73,33 @@ public partial class Frog : Node2D
 		_currentUiScale = uiScale;
 	}
 
-	/// <summary>Идёт ли ловля прямо сейчас (палец зажат и руки достаточно вытянуты).</summary>
-	public bool IsCatching => _holding && _armLengthWorld >= MinCatchLengthPx * _currentUiScale;
+	/// <summary>Идёт ли ловля прямо сейчас: руки достаточно вытянуты (во время роста, удержания или втягивания).</summary>
+	public bool IsCatching => _armLengthWorld >= MinCatchLengthPx * _currentUiScale;
 
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
 
-		// Пересчитываем длины рук под текущее разрешение экрана.
+		// Пересчитываем длины рук под текущее разрешение экрана (скорости — от глобального максимума).
 		UpdateArmLengths(ComputeMaxArmLength(Game.ViewSize));
+
+		// Максимальная длина в текущем направлении, чтобы ладони не выходили за пределы экрана.
+		float maxForDir = ComputeMaxArmLengthInDirection(Game.ViewSize);
 
 		if (_holding && CanAct)
 		{
-			_armLengthWorld = Mathf.Min(ComputeMaxArmLength(Game.ViewSize), _armLengthWorld + _armGrowSpeedWorld * dt);
+			_armLengthWorld = Mathf.Min(maxForDir, _armLengthWorld + _armGrowSpeedWorld * dt);
 		}
 		else if (_armLengthWorld > 0f)
 		{
 			_armLengthWorld = Mathf.Max(0f, _armLengthWorld - _armRetractSpeedWorld * dt);
+		}
+
+		// Ограничение по границе экрана: если длина оказалась больше допустимой для текущего
+		// направления (например, направление резко сменилось), плавно втягиваем её до границы.
+		if (_armLengthWorld > maxForDir)
+		{
+			_armLengthWorld = Mathf.Max(maxForDir, _armLengthWorld - _armRetractSpeedWorld * dt);
 		}
 
 		// Пока руки не вернулись до конца — пойманный фрукт едет за ладонью.
@@ -150,6 +163,43 @@ public partial class Frog : Node2D
 		maxViewDist = Mathf.Max(maxViewDist, GlobalPosition.DistanceTo(new Vector2(0f, viewSize.Y)));
 		maxViewDist = Mathf.Max(maxViewDist, GlobalPosition.DistanceTo(new Vector2(viewSize.X, viewSize.Y)));
 		return Mathf.Max(MinReach, maxViewDist * ReachMargin);
+	}
+
+	/// <summary>
+	/// Максимальная длина рук в текущем направлении при условии, что обе ладони
+	/// (включая разброс пальцев по HandSpreadDeg) остаются внутри видимой области —
+	/// с отступом HandScreenMargin от каждого края. Возвращает >= 0.
+	/// </summary>
+	private float ComputeMaxArmLengthInDirection(Vector2 viewSize)
+	{
+		float margin = HandScreenMargin * _currentUiScale;
+		Vector2 o = GlobalPosition;
+		float spread = Mathf.DegToRad(HandSpreadDeg);
+		float maxLen = float.PositiveInfinity;
+
+		// Берём обе руки (верхнюю и нижнюю), чтобы ни одна не вышла за экран.
+		foreach (Vector2 dir in new[] { _direction.Rotated(spread), _direction.Rotated(-spread) })
+		{
+			if (dir.X > 0.0001f)
+			{
+				maxLen = Mathf.Min(maxLen, (viewSize.X - margin - o.X) / dir.X);
+			}
+			else if (dir.X < -0.0001f)
+			{
+				maxLen = Mathf.Min(maxLen, (margin - o.X) / dir.X);
+			}
+
+			if (dir.Y > 0.0001f)
+			{
+				maxLen = Mathf.Min(maxLen, (viewSize.Y - margin - o.Y) / dir.Y);
+			}
+			else if (dir.Y < -0.0001f)
+			{
+				maxLen = Mathf.Min(maxLen, (margin - o.Y) / dir.Y);
+			}
+		}
+
+		return Mathf.Max(0f, maxLen);
 	}
 
 	/// <summary>Мировые позиции обеих ладоней (в координатах сцены).</summary>
