@@ -12,14 +12,18 @@ public partial class FallingItem : Node2D
 	public float FallSpeed { get; set; } = 160f;
 	public float CatchRadius { get; set; } = 40f;
 
-	/// <summary>Пойман ли предмет: боле не падает, а едет за ладонью лягушкі.</summary>
+	/// <summary>Пойманный предмет больше не падает, а следует за ладонью лягушки.</summary>
 	public bool IsCaught { get; set; }
 
+	/// <summary>Текущая скорость движения в мировых единицах в секунду.</summary>
+	public Vector2 Velocity { get; set; }
+
+	/// <summary>Радиус коллизии (учитывает масштаб): используется для отталкивания от стен и других предметов.</summary>
+	public float Radius { get; set; }
+
+	private const float WallRestitution = 0.85f;
+
 	private float _rotationSpeed;
-	private float _swayAmp;
-	private float _swayPhase;
-	private float _baseX;
-	private float _life;
 	private Color _fruitColor;
 
 	private static readonly Color Leaf = new("57a74a");
@@ -32,34 +36,53 @@ public partial class FallingItem : Node2D
 	public override void _Ready()
 	{
 		_rng.Randomize();
-		_baseX = Position.X;
 
 		_fruitColor = _rng.Randf() < 0.5f ? new Color("e84a35") : new Color("f09a2a");
 
 		_rotationSpeed = _rng.RandfRange(-1.3f, 1.3f);
-		bool sway = ItemType != ItemType.Trash;
-		_swayAmp = sway ? _rng.RandfRange(5f, 16f) : 0f;
-		_swayPhase = _rng.RandfRange(0f, Mathf.Tau);
 
 		float scale = _rng.RandfRange(0.85f, 1.08f);
 		Scale = new Vector2(scale, scale);
+
+		// Начальная скорость: падение вниз + случайный горизонтальный дрейф,
+		// чтобы предметы сами «гуляли» по экрану и сталкивались друг с другом.
+		Velocity = new Vector2(_rng.RandfRange(-60f, 60f), FallSpeed);
+
+		// Радиус коллизии совпадает с прорисовкой предмета.
+		Radius = BaseRadius * scale;
 	}
+
+	/// <summary>Базовый радиус предмета без учёта масштаба.</summary>
+	private float BaseRadius => ItemType switch
+	{
+		ItemType.GoldenFruit => 25f,
+		ItemType.Trash => 23f,
+		_ => 22f,
+	};
 
 	public override void _Process(double delta)
 	{
-		// Пойманный предмет управляется лягушкой: не падает, не качается и не вращается.
+		// Пойманный предмет управляется лягушкой: не падает и не вращается.
 		if (IsCaught)
 		{
 			return;
 		}
 
 		float dt = (float)delta;
-		_life += dt;
 
-		Position += new Vector2(0f, FallSpeed * dt);
-		if (_swayAmp > 0f)
+		Position += Velocity * dt;
+
+		// Отталкивание от боковых стен экрана: ладонь полностью в границах, скорость разворачиваем.
+		float viewWidth = GetViewportRect().Size.X;
+		if (Position.X < Radius)
 		{
-			Position = new Vector2(_baseX + Mathf.Sin(_life * 2.6f + _swayPhase) * _swayAmp, Position.Y);
+			Position = new Vector2(Radius, Position.Y);
+			Velocity = new Vector2(Mathf.Abs(Velocity.X) * WallRestitution, Velocity.Y);
+		}
+		else if (Position.X > viewWidth - Radius)
+		{
+			Position = new Vector2(viewWidth - Radius, Position.Y);
+			Velocity = new Vector2(-Mathf.Abs(Velocity.X) * WallRestitution, Velocity.Y);
 		}
 
 		Rotation += _rotationSpeed * dt;

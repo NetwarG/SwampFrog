@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace SwampFrog;
@@ -153,6 +154,59 @@ public partial class Main : Node2D
 				{
 					CatchItem(item, i);
 					break;
+				}
+			}
+		}
+
+		// Падающие предметы отталкиваются друг от друга.
+		ResolveItemCollisions();
+	}
+
+	/// <summary>
+	/// Попарное отталкивание падающих предметов: раздвигает пересекающиеся объекты
+	/// и разворачивает их скорости вдоль нормали (мягкий рикошет). Пойманные не участвуют.
+	/// </summary>
+	private void ResolveItemCollisions()
+	{
+		var moving = new List<FallingItem>();
+		foreach (Node child in _items!.GetChildren())
+		{
+			if (child is FallingItem fi && !fi.IsCaught)
+			{
+				moving.Add(fi);
+			}
+		}
+
+		const float restitution = 0.6f;
+		for (int i = 0; i < moving.Count; i++)
+		{
+			for (int j = i + 1; j < moving.Count; j++)
+			{
+				FallingItem a = moving[i];
+				FallingItem b = moving[j];
+				Vector2 delta = a.GlobalPosition - b.GlobalPosition;
+				float minDist = a.Radius + b.Radius;
+				float distSq = delta.LengthSquared();
+				if (distSq > minDist * minDist || distSq <= 0.0001f)
+				{
+					continue;
+				}
+
+				float dist = Mathf.Sqrt(distSq);
+				Vector2 n = delta / dist;
+
+				// Раздвигаем, чтобы предметы не проникали друг в друга.
+				float overlap = minDist - dist;
+				a.GlobalPosition += n * (overlap * 0.5f);
+				b.GlobalPosition -= n * (overlap * 0.5f);
+
+				// Импульс вдоль нормали (равные массы): отталкиваем, только если сближаются.
+				float relN = (a.Velocity - b.Velocity).Dot(n);
+				if (relN < 0f)
+				{
+					float impulse = -(1f + restitution) * relN * 0.5f;
+					a.Velocity += n * impulse;
+					b.Velocity -= n * impulse;
 				}
 			}
 		}
