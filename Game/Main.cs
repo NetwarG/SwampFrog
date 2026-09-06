@@ -20,6 +20,9 @@ public partial class Main : Node2D
 	private const float InitialSpawnInterval = 0.95f;
 	private const float MinSpawnInterval = 0.34f;
 
+	/// <summary>Очень маленький шанс выпадения хилки при неполном HP.</summary>
+	private const float HealSpawnChance = 0.05f;
+
 	private Frog? _frog;
 	private Node2D? _items;
 	private HUD? _hud;
@@ -247,6 +250,14 @@ public partial class Main : Node2D
 			return;
 		}
 
+		// Хилка тоже не несётся в руках: мгновенно восстанавливает жизнь.
+		if (item.ItemType == ItemType.Healing)
+		{
+			RestoreLife(item.GlobalPosition);
+			item.QueueFree();
+			return;
+		}
+
 		// Фрукт берётся в ладонь; очки начислятся позже — после полного возврата рук.
 		if (_frog?.AttachCaughtItem(item, handIndex) == true)
 		{
@@ -293,6 +304,18 @@ public partial class Main : Node2D
 		}
 	}
 
+	/// <summary>Восстанавливает одну жизнь (не превышая максимум).</summary>
+	private void RestoreLife(Vector2 atGlobalPos)
+	{
+		if (_lives >= MaxLives)
+		{
+			return;
+		}
+		_lives++;
+		_hud?.SetLives(_lives);
+		_hud?.SpawnPopup(atGlobalPos, "+1");
+	}
+
 	// ---------- Спавн ----------
 
 	private void OnSpawnTimerTimeout()
@@ -314,7 +337,12 @@ public partial class Main : Node2D
 		float roll = _rng.Randf();
 
 		ItemType type;
-		if (roll < trashWeight)
+		// Хилка выпадает только при неполных жизнях и с очень маленьким шансом.
+		if (_lives < MaxLives && _rng.Randf() < HealSpawnChance)
+		{
+			type = ItemType.Healing;
+		}
+		else if (roll < trashWeight)
 		{
 			type = ItemType.Trash;
 		}
@@ -325,6 +353,8 @@ public partial class Main : Node2D
 		else
 		{
 			type = ItemType.Fruit;
+			// В классическом режиме попадаются только «мелкие» фрукты (первые 6 из каталога).
+			item.Kind = FruitCatalog.PickClassic(_rng);
 		}
 
 		float difficulty = Mathf.Clamp(_score / 500f, 0f, 1f);
