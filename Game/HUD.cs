@@ -90,10 +90,12 @@ public partial class HUD : CanvasLayer
 	{
 		float ui = UiScale;
 
-		_scoreLabel = new Label();
-		_scoreLabel.Text = "0";
-		_scoreLabel.Position = new Vector2(18f, 12f);
-		_scoreLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(44f * ui));
+        _scoreLabel = new Label
+        {
+            Text = "0",
+            Position = new Vector2(18f, 12f)
+        };
+        _scoreLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(44f * ui));
 		_scoreLabel.AddThemeColorOverride("font_color", new Color("ffffff"));
 		_scoreLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
 		_scoreLabel.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(3f * ui));
@@ -117,20 +119,26 @@ public partial class HUD : CanvasLayer
 
 	private void BuildStart()
 	{
-		_startRoot = new Control();
-		_startRoot.Visible = true;
+		_startRoot = new Control
+		{
+			Visible = true,
+			MouseFilter = Control.MouseFilterEnum.Ignore
+		};
 		_startRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		_startRoot.MouseFilter = Control.MouseFilterEnum.Ignore;
 		AddChild(_startRoot);
 
-		var backdrop = new ColorRect();
-		backdrop.Color = new Color(0.02f, 0.12f, 0.09f, 0.55f);
+		var backdrop = new ColorRect
+		{
+			Color = new Color(0.02f, 0.12f, 0.09f, 0.55f),
+			MouseFilter = Control.MouseFilterEnum.Ignore
+		};
 		backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		backdrop.MouseFilter = Control.MouseFilterEnum.Ignore;
 		_startRoot.AddChild(backdrop);
 
-		var box = new VBoxContainer();
-		box.Alignment = BoxContainer.AlignmentMode.Center;
+		var box = new VBoxContainer
+		{
+			Alignment = BoxContainer.AlignmentMode.Center
+		};
 		box.AddThemeConstantOverride("separation", 20);
 		_startRoot.AddChild(box);
 
@@ -145,6 +153,16 @@ public partial class HUD : CanvasLayer
 		box.AddChild(sub);
 		box.AddChild(sub2);
 		box.AddChild(tap);
+
+		var madeByText = MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
+		// Текст по центру в самом низу стартового экрана (вне центрируемого меню).
+		madeByText.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
+		madeByText.AnchorTop = 1f;
+		madeByText.AnchorBottom = 1f;
+		madeByText.OffsetTop = -(int)Mathf.Round(26f * ui);
+		madeByText.OffsetBottom = -(int)Mathf.Round(6f * ui);
+		madeByText.HorizontalAlignment = HorizontalAlignment.Center;
+		_startRoot.AddChild(madeByText);
 
 		RecenterBox(_startRoot);
 	}
@@ -169,21 +187,27 @@ public partial class HUD : CanvasLayer
 
 	private void BuildGameOver()
 	{
-		_gameOverRoot = new Control();
-		_gameOverRoot.Visible = false;
-		_gameOverRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		_gameOverRoot.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _gameOverRoot = new Control
+        {
+            Visible = false,
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        _gameOverRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_gameOverRoot);
 
-		var backdrop = new ColorRect();
-		backdrop.Color = new Color(0.02f, 0.12f, 0.09f, 0.62f);
-		backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		backdrop.MouseFilter = Control.MouseFilterEnum.Ignore;
+        var backdrop = new ColorRect
+        {
+            Color = new Color(0.02f, 0.12f, 0.09f, 0.62f),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		_gameOverRoot.AddChild(backdrop);
 
-		var box = new VBoxContainer();
-		box.Alignment = BoxContainer.AlignmentMode.Center;
-		box.AddThemeConstantOverride("separation", 16);
+        var box = new VBoxContainer
+        {
+            Alignment = BoxContainer.AlignmentMode.Center
+        };
+        box.AddThemeConstantOverride("separation", 16);
 		_gameOverRoot.AddChild(box);
 
 		float ui = UiScale;
@@ -203,10 +227,12 @@ public partial class HUD : CanvasLayer
 
 	private static Label MakeLabel(string text, int fontSize, Color color)
 	{
-		var label = new Label();
-		label.Text = text;
-		label.HorizontalAlignment = HorizontalAlignment.Center;
-		label.AddThemeFontSizeOverride("font_size", fontSize);
+        var label = new Label
+        {
+            Text = text,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        label.AddThemeFontSizeOverride("font_size", fontSize);
 		label.AddThemeColorOverride("font_color", color);
 		return label;
 	}
@@ -215,18 +241,20 @@ public partial class HUD : CanvasLayer
 	public void ShowHint()
 	{
 		float ui = UiScale;
-		var hint = new Label();
-		hint.Text = "Держи палец на экране — руки растут";
-		hint.AnchorLeft = 0.5f;
-		hint.AnchorRight = 0.5f;
-		hint.AnchorTop = 1f;
-		hint.AnchorBottom = 1f;
-		hint.OffsetLeft = -240f * ui;
-		hint.OffsetRight = 240f * ui;
-		hint.OffsetTop = -46f * ui;
-		hint.OffsetBottom = -14f * ui;
-		hint.HorizontalAlignment = HorizontalAlignment.Center;
-		hint.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(18f * ui));
+        var hint = new Label
+        {
+            Text = "Держи палец на экране — руки растут",
+            AnchorLeft = 0.5f,
+            AnchorRight = 0.5f,
+            AnchorTop = 1f,
+            AnchorBottom = 1f,
+            OffsetLeft = -240f * ui,
+            OffsetRight = 240f * ui,
+            OffsetTop = -46f * ui,
+            OffsetBottom = -14f * ui,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        hint.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(18f * ui));
 		hint.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 0.9f));
 		hint.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
 		hint.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
@@ -279,10 +307,12 @@ public partial class HUD : CanvasLayer
 	public void SpawnPopup(Vector2 globalPos, string text)
 	{
 		float ui = UiScale;
-		var popup = new Label();
-		popup.Text = text;
-		popup.GlobalPosition = globalPos;
-		popup.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(30f * ui));
+        var popup = new Label
+        {
+            Text = text,
+            GlobalPosition = globalPos
+        };
+        popup.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(30f * ui));
 		popup.AddThemeColorOverride("font_color", new Color("fff45e"));
 		popup.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
 		popup.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
@@ -337,18 +367,22 @@ public partial class XpBar : Control
 	{
 		MouseFilter = MouseFilterEnum.Ignore;
 
-		_levelLabel = new Label();
-		_levelLabel.HorizontalAlignment = HorizontalAlignment.Center;
-		_levelLabel.MouseFilter = MouseFilterEnum.Ignore;
-		_levelLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 0.55f));
+        _levelLabel = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _levelLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 0.55f));
 		_levelLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.5f));
 		AddChild(_levelLabel);
 
-		_levelUpLabel = new Label();
-		_levelUpLabel.HorizontalAlignment = HorizontalAlignment.Center;
-		_levelUpLabel.Visible = false;
-		_levelUpLabel.MouseFilter = MouseFilterEnum.Ignore;
-		_levelUpLabel.AddThemeColorOverride("font_color", new Color("ffd32e"));
+        _levelUpLabel = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Visible = false,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _levelUpLabel.AddThemeColorOverride("font_color", new Color("ffd32e"));
 		_levelUpLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
 		AddChild(_levelUpLabel);
 
