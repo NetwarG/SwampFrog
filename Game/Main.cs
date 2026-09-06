@@ -126,6 +126,13 @@ public partial class Main : Node2D
 				continue;
 			}
 
+			// Предмет уже помечен на удаление (например, остался после Game Over
+			// в кадре рестарта) — не обрабатываем, чтобы не наносил урон новой попытке.
+			if (item.IsQueuedForDeletion())
+			{
+				continue;
+			}
+
 			// Упал за нижнюю границу — штраф за фрукт/золотой, мусор просто пропадает.
 			if (item.Position.Y > viewSize.Y + 30f)
 			{
@@ -189,7 +196,7 @@ public partial class Main : Node2D
 		var moving = new List<FallingItem>();
 		foreach (Node child in _items!.GetChildren())
 		{
-			if (child is FallingItem fi && !fi.IsCaught)
+			if (child is FallingItem fi && !fi.IsCaught && !fi.IsQueuedForDeletion())
 			{
 				moving.Add(fi);
 			}
