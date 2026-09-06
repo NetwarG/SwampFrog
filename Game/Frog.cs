@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace SwampFrog;
@@ -43,6 +44,18 @@ public partial class Frog : Node2D
 	private float _pulseT;
 	private float _currentUiScale = 1f;
 
+	/// <summary>Пойманный предмет, зажатый в ладони (с индексом держащей руки).</summary>
+	private struct CaughtItem
+	{
+		public FallingItem Item;
+		public int HandIndex;
+	}
+
+	private readonly List<CaughtItem> _caughtItems = new();
+
+	/// <summary>Предмет «доехал» до лягушки — после полного возврата рук.</summary>
+	public event Action<FallingItem>? CaughtItemReturned;
+
 	private bool CanAct => Game.State == GameState.Playing;
 
 	/// <summary>Текущий коэффициент масштаба UI/мира, чтобы лягушка не «худела» на больших экранах.</summary>
@@ -75,6 +88,9 @@ public partial class Frog : Node2D
 		{
 			_armLengthWorld = Mathf.Max(0f, _armLengthWorld - _armRetractSpeedWorld * dt);
 		}
+
+		// Пока руки не вернулись до конца — пойманный фрукт едет за ладонью.
+		UpdateCaughtItems();
 
 		_flash = Mathf.Max(0f, _flash - dt);
 
@@ -144,14 +160,19 @@ public partial class Frog : Node2D
 			return Array.Empty<Vector2>();
 		}
 
-		float spread = Mathf.DegToRad(HandSpreadDeg);
-		Vector2 upper = _direction.Rotated(spread);
-		Vector2 lower = _direction.Rotated(-spread);
 		return new[]
 		{
-			GlobalPosition + upper * _armLengthWorld,
-			GlobalPosition + lower * _armLengthWorld,
+			HandPositionWorld(0),
+			HandPositionWorld(1),
 		};
+	}
+
+	/// <summary>Мировая позиция ладони (0 — верхняя, 1 — нижняя). Общая для ловли и для «прилипших» фруктов.</summary>
+	private Vector2 HandPositionWorld(int handIndex)
+	{
+		float spread = Mathf.DegToRad(HandSpreadDeg);
+		Vector2 dir = handIndex == 0 ? _direction.Rotated(spread) : _direction.Rotated(-spread);
+		return GlobalPosition + dir * _armLengthWorld;
 	}
 
 	/// <summary>Белый «всполох» при попадании мусором.</summary>
@@ -162,6 +183,69 @@ public partial class Frog : Node2D
 	{
 		_pulsing = true;
 		_pulseT = 0f;
+	}
+
+	/// <summary>Взять фрукт в ладонь: предмет перестаёт падать и следует за рукой.</summary>
+	/// <returns>true, если предмет взят; false, если ладонь уже занята.</returns>
+	public bool AttachCaughtItem(FallingItem item, int handIndex)
+	{
+		if (item == null || !CanHold(handIndex))
+		{
+			return false;
+		}
+		item.IsCaught = true;
+		_caughtItems.Add(new CaughtItem { Item = item, HandIndex = handIndex });
+		return true;
+	}
+
+	/// <summary>Свободна ли ладонь (в каждой руке не более одного предмета).</summary>
+	public bool CanHold(int handIndex)
+	{
+		if (handIndex < 0 || handIndex >= 2)
+		{
+			return false;
+		}
+		foreach (CaughtItem held in _caughtItems)
+		{
+			if (held.HandIndex == handIndex)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/// <summary>Сбрасывает список пойманных предметов (например, при рестарте).</summary>
+	public void ClearCaughtItems() => _caughtItems.Clear();
+
+	/// <summary>
+	/// Пока руки не вернулись полностью — пойманный предмет следует за своей ладонью.
+	/// Как только длина рук стала нулевой — фрукт «сдан» лягушке (событие начисляет очки и удаляет предмет).
+	/// </summary>
+	private void UpdateCaughtItems()
+	{
+		if (_armLengthWorld <= 0f)
+		{
+			if (_caughtItems.Count == 0)
+			{
+				return;
+			}
+			CaughtItem[] held = _caughtItems.ToArray();
+			_caughtItems.Clear();
+			foreach (CaughtItem entry in held)
+			{
+				CaughtItemReturned?.Invoke(entry.Item);
+			}
+			return;
+		}
+
+		foreach (CaughtItem entry in _caughtItems)
+		{
+			if (IsInstanceValid(entry.Item))
+			{
+				entry.Item.GlobalPosition = HandPositionWorld(entry.HandIndex);
+			}
+		}
 	}
 
 	private void UpdateArmLengths(float maxWorld)

@@ -12,6 +12,9 @@ public partial class FallingItem : Node2D
 	public float FallSpeed { get; set; } = 160f;
 	public float CatchRadius { get; set; } = 40f;
 
+	/// <summary>Пойман ли предмет: боле не падает, а едет за ладонью лягушкі.</summary>
+	public bool IsCaught { get; set; }
+
 	private float _rotationSpeed;
 	private float _swayAmp;
 	private float _swayPhase;
@@ -44,6 +47,12 @@ public partial class FallingItem : Node2D
 
 	public override void _Process(double delta)
 	{
+		// Пойманный предмет управляется лягушкой: не падает, не качается и не вращается.
+		if (IsCaught)
+		{
+			return;
+		}
+
 		float dt = (float)delta;
 		_life += dt;
 

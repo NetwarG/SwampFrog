@@ -41,6 +41,7 @@ public partial class Main : Node2D
 		_frog = GetNode<Frog>("Frog");
 		_frog.Game = this;
 		_frog.SyncUiScale(ScreenScale);
+		_frog.CaughtItemReturned += OnCaughtItemReturned;
 		_items = GetNode<Node2D>("Items");
 		_hud = GetNode<HUD>("HUD");
 
@@ -115,6 +116,12 @@ public partial class Main : Node2D
 				continue;
 			}
 
+			// Уже пойман и едет за ладонью — не обрабатываем.
+			if (item.IsCaught)
+			{
+				continue;
+			}
+
 			// Упал за нижнюю границу — штраф за фрукт/золотой, мусор просто пропадает.
 			if (item.Position.Y > viewSize.Y + 30f)
 			{
@@ -133,38 +140,61 @@ public partial class Main : Node2D
 			}
 
 			float itemScale = item.Scale.X;
-			foreach (Vector2 hand in hands)
+			for (int i = 0; i < hands.Length; i++)
 			{
+				// Рука может держать не более одного предмета; занятую пропускаем.
+				if (!_frog.CanHold(i))
+				{
+					continue;
+				}
+				Vector2 hand = hands[i];
 				// Радиус зависит от масштаба предмета и лягушки.
 				if (item.GlobalPosition.DistanceTo(hand) <= item.CatchRadius * itemScale + _frog.CatchRadiusWorld)
 				{
-					CatchItem(item);
+					CatchItem(item, i);
 					break;
 				}
 			}
 		}
 	}
 
-	private void CatchItem(FallingItem item)
+	private void CatchItem(FallingItem item, int handIndex)
 	{
-		switch (item.ItemType)
+		// Мусор нельзя нести в руках: сразу урон и исчезновение.
+		if (item.ItemType == ItemType.Trash)
 		{
-			case ItemType.GoldenFruit:
-				_score += 30;
-				_hud?.SpawnPopup(item.GlobalPosition, "+30");
-				break;
-			case ItemType.Fruit:
-				_score += 10;
-				_hud?.SpawnPopup(item.GlobalPosition, "+10");
-				break;
-			case ItemType.Trash:
-				TakeDamage();
-				break;
+			TakeDamage();
+			item.QueueFree();
+			return;
+		}
+
+		// Фрукт берётся в ладонь; очки начислятся позже — после полного возврата рук.
+		if (_frog?.AttachCaughtItem(item, handIndex) == true)
+		{
+			_frog.Pulse();
+		}
+	}
+
+	/// <summary>Фрукт полностью вернулся к лягушке — начисляем очки (если игра ещё идёт) и убираем предмет.</summary>
+	private void OnCaughtItemReturned(FallingItem item)
+	{
+		if (_state == GameState.Playing)
+		{
+			switch (item.ItemType)
+			{
+				case ItemType.GoldenFruit:
+					_score += 30;
+					_hud?.SpawnPopup(_frog?.GlobalPosition ?? item.GlobalPosition, "+30");
+					break;
+				case ItemType.Fruit:
+					_score += 10;
+					_hud?.SpawnPopup(_frog?.GlobalPosition ?? item.GlobalPosition, "+10");
+					break;
+			}
+			_hud?.SetScore(_score);
 		}
 
 		item.QueueFree();
-		_frog?.Pulse();
-		_hud?.SetScore(_score);
 	}
 
 	private void TakeDamage()
@@ -289,6 +319,7 @@ public partial class Main : Node2D
 				child.QueueFree();
 			}
 		}
+		_frog?.ClearCaughtItems();
 
 		_score = 0;
 		_lives = MaxLives;
