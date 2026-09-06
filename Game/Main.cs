@@ -30,6 +30,7 @@ public partial class Main : Node2D
 	private int _lives = MaxLives;
 	private int _highScore;
 	private GameState _state = GameState.Menu;
+	private readonly XpSystem _xp = new();
 
 	public GameState State => _state;
 	public int Score => _score;
@@ -43,6 +44,7 @@ public partial class Main : Node2D
 		_frog.Game = this;
 		_frog.SyncUiScale(ScreenScale);
 		_frog.CaughtItemReturned += OnCaughtItemReturned;
+		_xp.LevelUp += OnLevelUp;
 		_items = GetNode<Node2D>("Items");
 		_hud = GetNode<HUD>("HUD");
 
@@ -61,6 +63,7 @@ public partial class Main : Node2D
 		_hud.SetLives(_lives);
 		_hud.HideGameOver();
 		_hud.ShowStart();
+		_hud.SetXp(_xp.Level, _xp.LevelProgress);
 	}
 
 	private void OnViewportResized()
@@ -162,6 +165,21 @@ public partial class Main : Node2D
 		ResolveItemCollisions();
 	}
 
+	/// <summary>Сброс при рестарте партии (опыт не сохраняется между партиями).</summary>
+	private void ResetXp()
+	{
+		_xp.Reset();
+		_hud?.SetXp(_xp.Level, _xp.LevelProgress);
+	}
+
+	private void OnLevelUp(int newLevel)
+	{
+		if (_state == GameState.Playing)
+		{
+			_hud?.ShowLevelUp(newLevel);
+		}
+	}
+
 	/// <summary>
 	/// Попарное отталкивание падающих предметов: раздвигает пересекающиеся объекты
 	/// и разворачивает их скорости вдоль нормали (мягкий рикошет). Пойманные не участвуют.
@@ -247,6 +265,10 @@ public partial class Main : Node2D
 			}
 			_hud?.SetScore(_score);
 		}
+
+		// Пойман фрукт — начисляем опыт (в момент полного возврата к лягушке).
+		_xp.AddXp(XpSystem.XpFor(item.ItemType));
+		_hud?.SetXp(_xp.Level, _xp.LevelProgress);
 
 		item.QueueFree();
 	}
@@ -377,6 +399,7 @@ public partial class Main : Node2D
 
 		_score = 0;
 		_lives = MaxLives;
+		ResetXp();
 		_state = GameState.Playing;
 
 		_hud?.SetScore(0);
