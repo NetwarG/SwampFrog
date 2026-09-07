@@ -37,7 +37,12 @@ public partial class Main : Node2D
 	private int _highScore;
 	private GameState _state = GameState.Menu;
 	private readonly XpSystem _xp = new();
-	private readonly HashSet<FruitKind> _collectedFruits = new();
+	/// <summary>
+	/// Запас фруктов, собранных в классическом режиме: вид → количество штук.
+	/// Каждая поимка добавляет одну единицу; каждый бросок в Suika списывает одну.
+	/// Остаётся между партиями и перезапусками игры (сохраняется в save.cfg).
+	/// </summary>
+	private readonly Dictionary<FruitKind, int> _fruitStock = new();
 
 	public GameState State => _state;
 	public int Score => _score;
@@ -65,6 +70,7 @@ public partial class Main : Node2D
 
 		_highScore = LoadHighScore();
 		LoadCollectedFruits();
+		UpdateSuikaButton();
 
 		_spawnTimer = new Timer();
 		AddChild(_spawnTimer);
@@ -420,9 +426,15 @@ public partial class Main : Node2D
 		}
 	}
 
-	/// <summary>Открывает отдельную мини-игру с фруктами, уже доступными игроку.</summary>
+	/// <summary>Открывает отдельную мини-игру с фруктами из запаса игрока.</summary>
 	public void OpenSuika()
 	{
+		if (TotalFruitStock() <= 0)
+		{
+			// Фруктов нет — показываем подсказку, а не открываем режим.
+			_hud?.ShowSuikaNeedFruitsHint();
+			return;
+		}
 		_spawnTimer?.Stop();
 		ClearMainRound();
 		_state = GameState.Suika;
@@ -430,12 +442,13 @@ public partial class Main : Node2D
 		_hud?.HideStart();
 		_hud?.HideGameOver();
 		_hud?.SetGameplayVisible(false);
-		_suika?.Open(GetSuikaFruitPool());
+		_suika?.Open();
 	}
 
 	private void CloseSuika()
 	{
 		_suika?.Close();
+		UpdateSuikaButton();
 		ResetMainRoundData();
 		_state = GameState.Menu;
 		_frog!.Visible = true;
@@ -509,12 +522,17 @@ public partial class Main : Node2D
 		}
 	}
 
+	/// <summary>
+	/// Возвращает пул фруктов для Suika: только те виды, которые игрок собрал
+	/// в классическом режиме и которые ещё есть в запасе (количество &gt; 0).
+	/// </summary>
 	public FruitKind[] GetSuikaFruitPool()
 	{
-		var pool = new HashSet<FruitKind>();
-		foreach (FruitSpec spec in FruitCatalog.Classic) pool.Add(spec.Kind);
-		foreach (FruitKind kind in _collectedFruits) pool.Add(kind);
-		var result = new List<FruitKind>(pool);
+		var result = new List<FruitKind>();
+		foreach (FruitKind kind in _fruitStock.Keys)
+		{
+			if (StockOf(kind) > 0) result.Add(kind);
+		}
 		result.Sort();
 		return result.ToArray();
 	}
@@ -531,7 +549,49 @@ public partial class Main : Node2D
 
 	private void RegisterCollectedFruit(FruitKind kind)
 	{
-		if (_collectedFruits.Add(kind)) SaveCollectedFruits();
+		_fruitStock[kind] = StockOf(kind) + 1;
+		SaveCollectedFruits();
+		UpdateSuikaButton();
+	}
+
+	/// <summary>Остаток фруктов данного вида в запасе.</summary>
+	public int FruitStock(FruitKind kind) => StockOf(kind);
+
+	/// <summary>Внутренний хелпер чтения счётчика без исключений по отсутствующему ключу.</summary>
+	private int StockOf(FruitKind kind)
+	{
+		return _fruitStock.TryGetValue(kind, out int count) ? count : 0;
+	}
+
+	/// <summary>Суммарный остаток фруктов в запасе (сколько всего можно бросить в Suika).</summary>
+	public int TotalFruitStock()
+	{
+		int total = 0;
+		foreach (int count in _fruitStock.Values) total += count;
+		return total;
+	}
+
+	/// <summary>
+	/// Списывает одну единицу фрукта из запаса. Возвращает false, если такого фрукта нет.
+	/// Вызывается из Suika в момент броска, поэтому расход сохраняется сразу.
+	/// </summary>
+	public bool ConsumeFruit(FruitKind kind)
+	{
+		int count = StockOf(kind);
+		if (count <= 0)
+		{
+			return false;
+		}
+		if (count > 1)
+		{
+			_fruitStock[kind] = count - 1;
+		}
+		else
+		{
+			_fruitStock.Remove(kind);
+		}
+		SaveCollectedFruits();
+		return true;
 	}
 
 	private void LoadCollectedFruits()
@@ -541,7 +601,20 @@ public partial class Main : Node2D
 		string raw = config.GetValue("collection", "fruits", "").ToString();
 		foreach (string token in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
 		{
-			if (Enum.TryParse(token, out FruitKind kind)) _collectedFruits.Add(kind);
+			// Новый формат «Вид:Количество». Старые сейвы содержали просто имена видов —
+			// конвертируем их в одну единицу каждого вида.
+			int colon = token.IndexOf(':');
+			if (colon < 0)
+			{
+				if (Enum.TryParse(token, out FruitKind freshKind)) _fruitStock[freshKind] = StockOf(freshKind) + 1;
+				continue;
+			}
+			string name = token.Substring(0, colon).StripEdges();
+			int amount = token.Substring(colon + 1).StripEdges().ToInt();
+			if (amount > 0 && Enum.TryParse(name, out FruitKind savedKind))
+			{
+				_fruitStock[savedKind] = StockOf(savedKind) + amount;
+			}
 		}
 	}
 
@@ -549,11 +622,20 @@ public partial class Main : Node2D
 	{
 		var config = new ConfigFile();
 		config.Load("user://save.cfg");
-		var names = new List<string>();
-		foreach (FruitKind kind in _collectedFruits) names.Add(kind.ToString());
-		names.Sort();
-		config.SetValue("collection", "fruits", string.Join(",", names));
+		var entries = new List<string>();
+		foreach (FruitKind kind in _fruitStock.Keys)
+		{
+			entries.Add($"{kind}:{_fruitStock[kind]}");
+		}
+		entries.Sort();
+		config.SetValue("collection", "fruits", string.Join(",", entries));
 		config.Save("user://save.cfg");
+	}
+
+	/// <summary>Блокирует/разблокирует кнопку «Мини-игра: Suika» по наличию запаса.</summary>
+	private void UpdateSuikaButton()
+	{
+		_hud?.SetMiniGameEnabled(TotalFruitStock() > 0);
 	}
 
 	// ---------- Рекорд ----------

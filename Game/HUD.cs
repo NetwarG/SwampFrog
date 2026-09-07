@@ -17,6 +17,9 @@ public partial class HUD : CanvasLayer
 	private XpBar? _xpBar;
 	private Control? _gameOverRoot;
 	private Control? _startRoot;
+	private Button? _miniGameButton;
+	private bool _miniGameEnabled = true;
+	private Label? _suikaHintLabel;
 	private Label? _finalScore;
 	private Label? _finalHigh;
 
@@ -163,17 +166,19 @@ public partial class HUD : CanvasLayer
 		Label sub = MakeLabel("Собирай фрукты, не лови мусор!", (int)Mathf.Round(24f * ui), new Color("ffffff"));
 		Label sub2 = MakeLabel("Упустишь фрукт — потеряешь жизнь.", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
 		Button play = MakeButton("Играть", ui, new Color("b4e863"));
-		Button mini = MakeButton("Мини-игра: Suika", ui, new Color("ffd45e"));
 		Button exit = MakeButton("Выйти", ui, new Color("ff8c7a"));
+		_miniGameButton = MakeButton("Мини-игра: Suika", ui, new Color("ffd45e"));
 		play.Pressed += () => PlayPressed?.Invoke();
-		mini.Pressed += () => MiniGamePressed?.Invoke();
 		exit.Pressed += () => ExitPressed?.Invoke();
+		_miniGameButton!.Pressed += () => MiniGamePressed?.Invoke();
+		// Применяем состояние, заданное до создания кнопки (например из _Ready).
+		SetMiniGameEnabled(_miniGameEnabled);
 
 		box.AddChild(title);
 		box.AddChild(sub);
 		box.AddChild(sub2);
 		box.AddChild(play);
-		box.AddChild(mini);
+		box.AddChild(_miniGameButton!);
 		box.AddChild(exit);
 
 		var madeByText = MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
@@ -206,6 +211,73 @@ public partial class HUD : CanvasLayer
 		{
 			_startRoot.Visible = false;
 		}
+	}
+
+	/// <summary>
+	/// Блокирует/разблокирует кнопку «Мини-игра: Suika» в зависимости от того,
+	/// есть ли у игрока фрукты в запасе. Кнопка остаётся кликабельной всегда,
+	/// чтобы при пустом запасе можно было показать подсказку.
+	/// </summary>
+	public void SetMiniGameEnabled(bool enabled)
+	{
+		_miniGameEnabled = enabled;
+		if (_miniGameButton == null) return;
+		_miniGameButton.Modulate = enabled ? Colors.White : new Color(1f, 1f, 1f, 0.35f);
+	}
+
+	/// <summary>
+	/// Подсказка над кнопкой Suika, когда фруктов в запасе нет:
+	/// плавно появляется и растворяется.
+	/// </summary>
+	public void ShowSuikaNeedFruitsHint()
+	{
+		float ui = UiScale;
+		if (_suikaHintLabel == null)
+		{
+            _suikaHintLabel = new Label
+            {
+
+                Text = "Сначала собери фрукты в основном режиме!",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                ZIndex = 60
+
+            };
+            _suikaHintLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(22f * ui));
+			_suikaHintLabel.AddThemeColorOverride("font_color", new Color("ffd45e"));
+			_suikaHintLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
+			_suikaHintLabel.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
+			_suikaHintLabel.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(2f * ui));
+			AddChild(_suikaHintLabel);
+		}
+
+		_suikaHintLabel.ResetSize();
+		// Позиционируем над кнопкой «Мини-игра: Suika» по её верхнему краю.
+		if (_miniGameButton != null)
+		{
+			Vector2 btn = _miniGameButton.GetGlobalPosition();
+			Vector2 btnSize = _miniGameButton.Size;
+			_suikaHintLabel.Position = new Vector2(
+				btn.X + btnSize.X * 0.5f - _suikaHintLabel.Size.X * 0.5f,
+				btn.Y - _suikaHintLabel.Size.Y - 14f * ui);
+		}
+		else
+		{
+			// Запасной вариант: центр экрана, чуть выше средней зоны.
+			Vector2 vp = GetViewport().GetVisibleRect().Size;
+			_suikaHintLabel.Position = new Vector2(
+				vp.X * 0.5f - _suikaHintLabel.Size.X * 0.5f,
+				vp.Y * 0.24f);
+		}
+
+		_suikaHintLabel.Visible = true;
+		_suikaHintLabel.Modulate = new Color(1f, 1f, 1f, 1f);
+		_suikaHintLabel.QueueRedraw();
+
+		// Последовательный твин: сначала показываем, потом растворяем и скрываем.
+		Tween tween = CreateTween();
+		tween.TweenInterval(2.2f);
+		tween.TweenProperty(_suikaHintLabel, "modulate:a", 0f, 0.6f);
+		tween.Chain().TweenCallback(Callable.From(() => _suikaHintLabel.Visible = false));
 	}
 
 	private void BuildGameOver()

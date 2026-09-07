@@ -28,9 +28,14 @@ public partial class SuikaGame : Node2D
 	private const float BowlTop = 204f;
 	private const float OverflowDelay = 1.15f;
 
+	/// <summary>Пауза перед завершением раунда после того, как последний фрукт упал и устаканился.</summary>
+	private const float SettleDelay = 0.9f;
+
+	/// <summary>Скорость, ниже которой кусок считается «устаканившимся» (могут слиться).</summary>
+	private const float SettleSpeed = 40f;
+
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly List<Piece> _pieces = new();
-	private FruitKind[] _startPool = Array.Empty<FruitKind>();
 	private FruitKind _currentKind = FruitKind.Cherry;
 	private FruitKind _nextKind = FruitKind.Cherry;
 	private Rect2 _bowl;
@@ -43,6 +48,12 @@ public partial class SuikaGame : Node2D
 	private bool _active;
 	private bool _gameOver;
 
+	/// <summary>Запас закончился — ждём, пока последний фрукт упадёт и устаканится.</summary>
+	private bool _stockExhausted;
+
+	/// <summary>Время, в течение которого все куски почти неподвижны (для завершения раунда).</summary>
+	private float _settleTime;
+
 	private Frog? _frog;
 	private FallingItem? _heldFruit;
 	private FallingItem? _nextFruit;
@@ -52,8 +63,12 @@ public partial class SuikaGame : Node2D
 	private Label? _bestLabel;
 	private Label? _nextLabel;
 	private Label? _hintLabel;
+	private Label? _stockLabel;
 	private Control? _gameOverRoot;
+	private Label? _gameOverTitle;
+	private Button? _retryButton;
 	private Label? _gameOverScore;
+	private bool _stockEmpty;
 
 	public Main? Game { get; set; }
 	public event Action? ExitRequested;
@@ -79,14 +94,20 @@ public partial class SuikaGame : Node2D
 		Visible = false;
 	}
 
-	public void Open(FruitKind[] availableKinds)
+	/// <summary>
+	/// Открывает мини-игру. Пул фруктов берётся из запаса классического режима
+	/// (доступные виды и их количество). Если запас пуст, режим даже не открывается.
+	/// </summary>
+	public void Open()
 	{
-		_startPool = availableKinds.Length > 0 ? availableKinds : new[] { FruitKind.Cherry };
 		Visible = true;
 		_uiRoot!.Visible = true;
 		_uiLayer!.Visible = true;
 		_active = true;
 		_gameOver = false;
+		_stockEmpty = false;
+		_stockExhausted = false;
+		_settleTime = 0f;
 		_score = 0;
 		_overflowTime = 0f;
 		_dropCooldown = 0.25f;
@@ -97,16 +118,21 @@ public partial class SuikaGame : Node2D
 		_currentKind = PickStartFruit();
 		_nextKind = PickStartFruit();
 		UpdateVisuals();
+		if (_heldFruit != null) _heldFruit.Visible = true;
+		if (_nextFruit != null) _nextFruit.Visible = true;
 		_gameOverRoot!.Visible = false;
 		_scoreLabel!.Text = "Счёт  0";
 		_bestLabel!.Text = $"Рекорд  {_bestScore}";
 		_hintLabel!.Visible = true;
+		UpdateStockLabel();
 	}
 
 	public void Close()
 	{
 		_active = false;
 		_gameOver = false;
+		_stockExhausted = false;
+		_settleTime = 0f;
 		ClearPieces();
 		if (_gameOverRoot != null) _gameOverRoot.Visible = false;
 		if (_uiRoot != null) _uiRoot.Visible = false;
@@ -129,6 +155,7 @@ public partial class SuikaGame : Node2D
 		TryMergePieces();
 		UpdatePieceViews(dt);
 		CheckOverflow(dt);
+		CheckStockEnd(dt);
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -233,6 +260,10 @@ public partial class SuikaGame : Node2D
 		_bestLabel.Position = new Vector2(20f, 50f);
 		root.AddChild(_bestLabel);
 
+		_stockLabel = MakeLabel("Фрукты: 0", 17, new Color("ffd45e"));
+		_stockLabel.Position = new Vector2(20f, 74f);
+		root.AddChild(_stockLabel);
+
 		_nextLabel = MakeLabel("Следующий", 17, new Color("b4e863"));
 		_nextLabel.Position = new Vector2(0f, 15f);
 		_nextLabel.SetAnchorsPreset(Control.LayoutPreset.TopRight);
@@ -244,7 +275,7 @@ public partial class SuikaGame : Node2D
 		root.AddChild(_nextLabel);
 
 		Button back = MakeButton("В меню", 17, new Color("ffd45e"), new Vector2(112f, 42f));
-		back.Position = new Vector2(16f, 92f);
+		back.Position = new Vector2(16f, 108f);
 		back.Pressed += () => ExitRequested?.Invoke();
 		root.AddChild(back);
 
@@ -272,12 +303,13 @@ public partial class SuikaGame : Node2D
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
 		_gameOverRoot.AddChild(box);
-		box.AddChild(MakeLabel("Кувшин полон", 42, new Color("ffd45e")));
+		_gameOverTitle = MakeLabel("Кувшин полон", 42, new Color("ffd45e"));
+		box.AddChild(_gameOverTitle);
 		_gameOverScore = MakeLabel("Счёт: 0", 28, new Color("ffffff"));
 		box.AddChild(_gameOverScore);
-		Button retry = MakeButton("Играть ещё", 22, new Color("b4e863"), new Vector2(300f, 54f));
-		retry.Pressed += Restart;
-		box.AddChild(retry);
+		_retryButton = MakeButton("Играть ещё", 22, new Color("b4e863"), new Vector2(300f, 54f));
+		_retryButton!.Pressed += Restart;
+		box.AddChild(_retryButton!);
 		Button menu = MakeButton("В меню", 22, new Color("ffd45e"), new Vector2(300f, 54f));
 		menu.Pressed += () => ExitRequested?.Invoke();
 		box.AddChild(menu);
@@ -348,7 +380,7 @@ public partial class SuikaGame : Node2D
 	private void OnViewportResized()
 	{
 		UpdateBowl();
-		CenterGameOver();
+		CallDeferred(nameof(CenterGameOver));
 		UpdateVisuals();
 	}
 
@@ -378,14 +410,46 @@ public partial class SuikaGame : Node2D
 		_nextFruit.Position = new Vector2(GetViewportRect().Size.X - 65f, 67f);
 	}
 
+	/// <summary>Случайный фрукт из текущего запаса (только виды с остатком &gt; 0).</summary>
 	private FruitKind PickStartFruit()
 	{
-		return _startPool[_rng.RandiRange(0, _startPool.Length - 1)];
+		FruitKind[] pool = Game?.GetSuikaFruitPool() ?? Array.Empty<FruitKind>();
+		if (pool.Length == 0) return FruitKind.Cherry;
+		return pool[_rng.RandiRange(0, pool.Length - 1)];
+	}
+
+	/// <summary>
+	/// Перекидывает текущий фрукт на случайный доступный из запаса, если нынешний
+	/// уже исчерпан (или запас пуст). Возвращает false, если бросить больше нечего.
+	/// </summary>
+	private bool RePickCurrent()
+	{
+		FruitKind[] pool = Game?.GetSuikaFruitPool() ?? Array.Empty<FruitKind>();
+		if (pool.Length == 0) return false;
+		_currentKind = pool[_rng.RandiRange(0, pool.Length - 1)];
+		UpdateVisuals();
+		return true;
 	}
 
 	private void DropFruit()
 	{
-		if (!_active || _gameOver || _dropCooldown > 0f) return;
+		if (!_active || _gameOver || _dropCooldown > 0f || _stockExhausted) return;
+
+		// Если текущий вид уже израсходован (например, совпадал со «следующим»),
+		// перекидываем его на доступный. Если бросать нечего — завершаем раунд.
+		if ((Game?.FruitStock(_currentKind) ?? 0) <= 0 && !RePickCurrent())
+		{
+			SetStockExhausted();
+			return;
+		}
+
+		// Бросок тратит одну единицу фрукта из запаса классического режима.
+		if (Game == null || !Game.ConsumeFruit(_currentKind))
+		{
+			return;
+		}
+		UpdateStockLabel();
+
 		float radius = FruitRadius(_currentKind);
 		float x = Mathf.Clamp(_aimX, _bowl.Position.X + radius + 4f, _bowl.End.X - radius - 4f);
 		CreatePiece(_currentKind, new Vector2(x, _bowl.Position.Y + radius + 4f), new Vector2(0f, 80f));
@@ -395,6 +459,63 @@ public partial class SuikaGame : Node2D
 		_dropCooldown = 0.3f;
 		_hintLabel!.Visible = false;
 		UpdateVisuals();
+
+		// Запас закончился — больше бросать нечего, но даём последнему фрукту
+		// упасть, столкнуться и слиться (возможны доп. очки), затем завершаем.
+		if (Game.TotalFruitStock() <= 0)
+		{
+			SetStockExhausted();
+			return;
+		}
+
+		// «Следующий» мог быть того же вида, что только что съеденный — если он
+		// исчерпан, перекидываем текущий на оставшийся доступный вид.
+		if (Game.FruitStock(_currentKind) <= 0)
+		{
+			RePickCurrent();
+		}
+	}
+
+	/// <summary>
+	/// Помечает, что запас фруктов исчерпан: прячет фрукты «в лапе»/«следующий»
+	/// и запускает ожидание, пока последний кусок устаканится (см. CheckStockEnd).
+	/// </summary>
+	private void SetStockExhausted()
+	{
+		_stockExhausted = true;
+		_settleTime = 0f;
+		if (_heldFruit != null) _heldFruit.Visible = false;
+		if (_nextFruit != null) _nextFruit.Visible = false;
+		if (_hintLabel != null) _hintLabel.Visible = false;
+	}
+
+	/// <summary>
+	/// Пока запас исчерпан, ждём, пока все куски почти остановятся (могут слиться),
+	/// и по истечении паузы завершаем раунд.
+	/// </summary>
+	private void CheckStockEnd(float dt)
+	{
+		if (!_stockExhausted || _gameOver || _pieces.Count == 0)
+		{
+			return;
+		}
+		float maxSpeed = 0f;
+		foreach (Piece piece in _pieces)
+		{
+			maxSpeed = Mathf.Max(maxSpeed, piece.Velocity.Length());
+		}
+		if (maxSpeed < SettleSpeed)
+		{
+			_settleTime += dt;
+			if (_settleTime >= SettleDelay)
+			{
+				EndRound();
+			}
+		}
+		else
+		{
+			_settleTime = 0f;
+		}
 	}
 
 	private Piece CreatePiece(FruitKind kind, Vector2 position, Vector2 velocity)
@@ -560,11 +681,35 @@ public partial class SuikaGame : Node2D
 		_bestLabel!.Text = $"Рекорд  {_bestScore}";
 		_gameOverScore!.Text = $"Счёт: {_score}";
 		_gameOverRoot!.Visible = true;
+		UpdateStockLabel();
+
+		// Если запас фруктов закончился — «Играть ещё» недоступен.
+		_stockEmpty = Game?.TotalFruitStock() <= 0;
+		if (_gameOverTitle != null)
+		{
+			_gameOverTitle.Text = _stockEmpty ? "Фрукты закончились" : "Кувшин полон";
+		}
+		if (_retryButton != null)
+		{
+			_retryButton.Visible = !_stockEmpty;
+		}
+
+		// Пересчитываем центрирование панели (меняется ширина от заголовка),
+		// чтобы она не вылезала за правую границу экрана.
+		CallDeferred(nameof(CenterGameOver));
 	}
 
 	private void Restart()
 	{
-		Open(_startPool);
+		Open();
+	}
+
+	/// <summary>Обновляет индикатор остатка фруктов в запасе.</summary>
+	private void UpdateStockLabel()
+	{
+		if (_stockLabel == null) return;
+		int total = Game?.TotalFruitStock() ?? 0;
+		_stockLabel.Text = $"Фрукты: {total}";
 	}
 
 	private void ClearPieces()
