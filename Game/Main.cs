@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using Godot;
 
 namespace SwampFrog;
@@ -8,6 +9,7 @@ public enum GameState
 	Menu,
 	Playing,
 	GameOver,
+	Suika,
 }
 
 /// <summary>
@@ -26,6 +28,7 @@ public partial class Main : Node2D
 	private Frog? _frog;
 	private Node2D? _items;
 	private HUD? _hud;
+	private SuikaGame? _suika;
 	private Timer? _spawnTimer;
 	private readonly RandomNumberGenerator _rng = new();
 
@@ -34,6 +37,7 @@ public partial class Main : Node2D
 	private int _highScore;
 	private GameState _state = GameState.Menu;
 	private readonly XpSystem _xp = new();
+	private readonly HashSet<FruitKind> _collectedFruits = new();
 
 	public GameState State => _state;
 	public int Score => _score;
@@ -50,14 +54,23 @@ public partial class Main : Node2D
 		_xp.LevelUp += OnLevelUp;
 		_items = GetNode<Node2D>("Items");
 		_hud = GetNode<HUD>("HUD");
+		_suika = GetNode<SuikaGame>("Suika");
+		_suika.Game = this;
+		_suika.ExitRequested += CloseSuika;
+		_hud.PlayPressed += StartGame;
+		_hud.MiniGamePressed += OpenSuika;
+		_hud.ExitPressed += QuitGame;
+		_hud.RestartPressed += Restart;
+		_hud.MenuPressed += GoToMenu;
 
 		_highScore = LoadHighScore();
+		LoadCollectedFruits();
 
 		_spawnTimer = new Timer();
 		AddChild(_spawnTimer);
 		_spawnTimer.WaitTime = InitialSpawnInterval;
 		_spawnTimer.Timeout += OnSpawnTimerTimeout;
-		// Не запускаем: ждём первого касания на стартовом экране.
+		// Не запускаем: стартовая кнопка управляет запуском партии.
 
 		GetViewport().SizeChanged += OnViewportResized;
 
@@ -66,7 +79,9 @@ public partial class Main : Node2D
 		_hud.SetLives(_lives);
 		_hud.HideGameOver();
 		_hud.ShowStart();
+		_hud.SetGameplayVisible(false);
 		_hud.SetXp(_xp.Level, _xp.LevelProgress);
+		_suika.Visible = false;
 	}
 
 	private void OnViewportResized()
@@ -268,6 +283,10 @@ public partial class Main : Node2D
 	/// <summary>Фрукт полностью вернулся к лягушке — начисляем очки (если игра ещё идёт) и убираем предмет.</summary>
 	private void OnCaughtItemReturned(FallingItem item)
 	{
+		if (item.ItemType == ItemType.Fruit)
+		{
+			RegisterCollectedFruit(item.Kind);
+		}
 		if (_state == GameState.Playing)
 		{
 			switch (item.ItemType)
@@ -379,29 +398,19 @@ public partial class Main : Node2D
 
 	// ---------- Игровой цикл ----------
 
-	public override void _UnhandledInput(InputEvent @event)
-	{
-		if (@event is not InputEventScreenTouch { Pressed: true })
-		{
-			return;
-		}
-
-		switch (_state)
-		{
-			case GameState.Menu:
-				StartGame();
-				break;
-			case GameState.GameOver:
-				Restart();
-				break;
-		}
-	}
-
 	/// <summary>Запуск игры со стартового экрана.</summary>
-	private void StartGame()
+	public void StartGame()
 	{
+		if (_state == GameState.Menu)
+		{
+			ResetMainRoundData();
+		}
+		_suika?.Close();
+		if (_frog != null) _frog.Visible = true;
 		_state = GameState.Playing;
 		_hud?.HideStart();
+		_hud?.HideGameOver();
+		_hud?.SetGameplayVisible(true);
 		_hud?.ShowHint();
 
 		if (_spawnTimer != null)
@@ -409,6 +418,63 @@ public partial class Main : Node2D
 			_spawnTimer.WaitTime = InitialSpawnInterval;
 			_spawnTimer.Start();
 		}
+	}
+
+	/// <summary>Открывает отдельную мини-игру с фруктами, уже доступными игроку.</summary>
+	public void OpenSuika()
+	{
+		_spawnTimer?.Stop();
+		ClearMainRound();
+		_state = GameState.Suika;
+		_frog!.Visible = false;
+		_hud?.HideStart();
+		_hud?.HideGameOver();
+		_hud?.SetGameplayVisible(false);
+		_suika?.Open(GetSuikaFruitPool());
+	}
+
+	private void CloseSuika()
+	{
+		_suika?.Close();
+		ResetMainRoundData();
+		_state = GameState.Menu;
+		_frog!.Visible = true;
+		PositionFrog();
+		_hud?.SetGameplayVisible(false);
+		_hud?.ShowStart();
+	}
+
+	/// <summary>Возвращает игрока в главное меню, очищая текущую партию.</summary>
+	public void GoToMenu()
+	{
+		_spawnTimer?.Stop();
+		ClearMainRound();
+		ResetMainRoundData();
+		_state = GameState.Menu;
+		_frog!.Visible = true;
+		PositionFrog();
+		_hud?.HideGameOver();
+		_hud?.ShowStart();
+	}
+
+	private void QuitGame() => GetTree().Quit();
+
+	private void ClearMainRound()
+	{
+		if (_items != null)
+		{
+			foreach (Node child in _items.GetChildren()) child.QueueFree();
+		}
+		_frog?.ClearCaughtItems();
+	}
+
+	private void ResetMainRoundData()
+	{
+		_score = 0;
+		_lives = MaxLives;
+		ResetXp();
+		_hud?.SetScore(0);
+		_hud?.SetLives(_lives);
 	}
 
 	private void GameOver()
@@ -425,29 +491,69 @@ public partial class Main : Node2D
 
 	private void Restart()
 	{
-		if (_items != null)
-		{
-			foreach (Node child in _items.GetChildren())
-			{
-				child.QueueFree();
-			}
-		}
-		_frog?.ClearCaughtItems();
+		ClearMainRound();
+		_frog!.Visible = true;
 
-		_score = 0;
-		_lives = MaxLives;
-		ResetXp();
+		ResetMainRoundData();
 		_state = GameState.Playing;
 
-		_hud?.SetScore(0);
+		_hud?.SetScore(_score);
 		_hud?.SetLives(_lives);
 		_hud?.HideGameOver();
+		_hud?.SetGameplayVisible(true);
 
 		if (_spawnTimer != null)
 		{
 			_spawnTimer.WaitTime = InitialSpawnInterval;
 			_spawnTimer.Start();
 		}
+	}
+
+	public FruitKind[] GetSuikaFruitPool()
+	{
+		var pool = new HashSet<FruitKind>();
+		foreach (FruitSpec spec in FruitCatalog.Classic) pool.Add(spec.Kind);
+		foreach (FruitKind kind in _collectedFruits) pool.Add(kind);
+		var result = new List<FruitKind>(pool);
+		result.Sort();
+		return result.ToArray();
+	}
+
+	public override void _UnhandledInput(InputEvent @event)
+	{
+		if (@event is not InputEventKey { Pressed: true } key) return;
+		if (key.Keycode == Key.F2 && _state == GameState.Menu)
+		{
+			OpenSuika();
+			GetViewport().SetInputAsHandled();
+		}
+	}
+
+	private void RegisterCollectedFruit(FruitKind kind)
+	{
+		if (_collectedFruits.Add(kind)) SaveCollectedFruits();
+	}
+
+	private void LoadCollectedFruits()
+	{
+		var config = new ConfigFile();
+		if (config.Load("user://save.cfg") != Error.Ok) return;
+		string raw = config.GetValue("collection", "fruits", "").ToString();
+		foreach (string token in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+		{
+			if (Enum.TryParse(token, out FruitKind kind)) _collectedFruits.Add(kind);
+		}
+	}
+
+	private void SaveCollectedFruits()
+	{
+		var config = new ConfigFile();
+		config.Load("user://save.cfg");
+		var names = new List<string>();
+		foreach (FruitKind kind in _collectedFruits) names.Add(kind.ToString());
+		names.Sort();
+		config.SetValue("collection", "fruits", string.Join(",", names));
+		config.Save("user://save.cfg");
 	}
 
 	// ---------- Рекорд ----------

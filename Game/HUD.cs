@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace SwampFrog;
@@ -18,6 +19,12 @@ public partial class HUD : CanvasLayer
 	private Control? _startRoot;
 	private Label? _finalScore;
 	private Label? _finalHigh;
+
+	public event Action? PlayPressed;
+	public event Action? MiniGamePressed;
+	public event Action? ExitPressed;
+	public event Action? RestartPressed;
+	public event Action? MenuPressed;
 
 	/// <summary>
 	/// Адаптивный масштаб HUD: кламп min(видимая/540, видимая/960) так же, как в Main.
@@ -90,12 +97,12 @@ public partial class HUD : CanvasLayer
 	{
 		float ui = UiScale;
 
-        _scoreLabel = new Label
-        {
-            Text = "0",
-            Position = new Vector2(18f, 12f)
-        };
-        _scoreLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(44f * ui));
+		_scoreLabel = new Label
+		{
+			Text = "0",
+			Position = new Vector2(18f, 12f)
+		};
+		_scoreLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(44f * ui));
 		_scoreLabel.AddThemeColorOverride("font_color", new Color("ffffff"));
 		_scoreLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
 		_scoreLabel.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(3f * ui));
@@ -117,12 +124,20 @@ public partial class HUD : CanvasLayer
 		BuildStart();
 	}
 
+	/// <summary>Скрывает игровые показатели, пока открыт главное меню или мини-игра.</summary>
+	public void SetGameplayVisible(bool visible)
+	{
+		if (_scoreLabel != null) _scoreLabel.Visible = visible;
+		if (_hearts != null) _hearts.Visible = visible;
+		if (_xpBar != null) _xpBar.Visible = visible;
+	}
+
 	private void BuildStart()
 	{
 		_startRoot = new Control
 		{
 			Visible = true,
-			MouseFilter = Control.MouseFilterEnum.Ignore
+			MouseFilter = Control.MouseFilterEnum.Stop
 		};
 		_startRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_startRoot);
@@ -139,7 +154,7 @@ public partial class HUD : CanvasLayer
 		{
 			Alignment = BoxContainer.AlignmentMode.Center
 		};
-		box.AddThemeConstantOverride("separation", 20);
+		box.AddThemeConstantOverride("separation", 14);
 		_startRoot.AddChild(box);
 
 		float ui = UiScale;
@@ -147,12 +162,19 @@ public partial class HUD : CanvasLayer
 		Label title = MakeLabel("Лягушка-охотница", (int)Mathf.Round(50f * ui), new Color("ffe066"));
 		Label sub = MakeLabel("Собирай фрукты, не лови мусор!", (int)Mathf.Round(24f * ui), new Color("ffffff"));
 		Label sub2 = MakeLabel("Упустишь фрукт — потеряешь жизнь.", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
-		Label tap = MakeLabel("Нажми, чтобы начать", (int)Mathf.Round(27f * ui), new Color("b4e863"));
+		Button play = MakeButton("Играть", ui, new Color("b4e863"));
+		Button mini = MakeButton("Мини-игра: Suika", ui, new Color("ffd45e"));
+		Button exit = MakeButton("Выйти", ui, new Color("ff8c7a"));
+		play.Pressed += () => PlayPressed?.Invoke();
+		mini.Pressed += () => MiniGamePressed?.Invoke();
+		exit.Pressed += () => ExitPressed?.Invoke();
 
 		box.AddChild(title);
 		box.AddChild(sub);
 		box.AddChild(sub2);
-		box.AddChild(tap);
+		box.AddChild(play);
+		box.AddChild(mini);
+		box.AddChild(exit);
 
 		var madeByText = MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
 		// Текст по центру в самом низу стартового экрана (вне центрируемого меню).
@@ -167,16 +189,17 @@ public partial class HUD : CanvasLayer
 		RecenterBox(_startRoot);
 	}
 
-	/// <summary>Показывает стартовый экран «нажми, чтобы начать».</summary>
+	/// <summary>Показывает главное меню с запуском режимов и выходом.</summary>
 	public void ShowStart()
 	{
 		if (_startRoot != null)
 		{
 			_startRoot.Visible = true;
 		}
+		SetGameplayVisible(false);
 	}
 
-	/// <summary>Скрывает стартовый экран в начале игры.</summary>
+	/// <summary>Скрывает главное меню в начале игры.</summary>
 	public void HideStart()
 	{
 		if (_startRoot != null)
@@ -187,27 +210,27 @@ public partial class HUD : CanvasLayer
 
 	private void BuildGameOver()
 	{
-        _gameOverRoot = new Control
-        {
-            Visible = false,
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        _gameOverRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_gameOverRoot = new Control
+		{
+			Visible = false,
+			MouseFilter = Control.MouseFilterEnum.Stop
+		};
+		_gameOverRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_gameOverRoot);
 
-        var backdrop = new ColorRect
-        {
-            Color = new Color(0.02f, 0.12f, 0.09f, 0.62f),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		var backdrop = new ColorRect
+		{
+			Color = new Color(0.02f, 0.12f, 0.09f, 0.62f),
+			MouseFilter = Control.MouseFilterEnum.Ignore
+		};
+		backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		_gameOverRoot.AddChild(backdrop);
 
-        var box = new VBoxContainer
-        {
-            Alignment = BoxContainer.AlignmentMode.Center
-        };
-        box.AddThemeConstantOverride("separation", 16);
+		var box = new VBoxContainer
+		{
+			Alignment = BoxContainer.AlignmentMode.Center
+		};
+		box.AddThemeConstantOverride("separation", 16);
 		_gameOverRoot.AddChild(box);
 
 		float ui = UiScale;
@@ -215,46 +238,90 @@ public partial class HUD : CanvasLayer
 		Label title = MakeLabel("Игра окончена!", (int)Mathf.Round(48f * ui), new Color("ffd45e"));
 		_finalScore = MakeLabel("Счёт: 0", (int)Mathf.Round(32f * ui), new Color("ffffff"));
 		_finalHigh = MakeLabel("Рекорд: 0", (int)Mathf.Round(32f * ui), new Color("cfe9c2"));
-		Label hint = MakeLabel("Нажми, чтобы начать заново", (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.85f));
+		Button restart = MakeButton("Заново", ui, new Color("b4e863"));
+		Button menu = MakeButton("В меню", ui, new Color("ffd45e"));
+		restart.Pressed += () => RestartPressed?.Invoke();
+		menu.Pressed += () => MenuPressed?.Invoke();
 
 		box.AddChild(title);
 		box.AddChild(_finalScore);
 		box.AddChild(_finalHigh);
-		box.AddChild(hint);
+		box.AddChild(restart);
+		box.AddChild(menu);
 
 		RecenterBox(_gameOverRoot);
 	}
 
 	private static Label MakeLabel(string text, int fontSize, Color color)
 	{
-        var label = new Label
-        {
-            Text = text,
-            HorizontalAlignment = HorizontalAlignment.Center
-        };
-        label.AddThemeFontSizeOverride("font_size", fontSize);
+		var label = new Label
+		{
+			Text = text,
+			HorizontalAlignment = HorizontalAlignment.Center
+		};
+		label.AddThemeFontSizeOverride("font_size", fontSize);
 		label.AddThemeColorOverride("font_color", color);
 		return label;
+	}
+
+	private Button MakeButton(string text, float ui, Color accent)
+	{
+		var button = new Button
+		{
+			Text = text,
+			CustomMinimumSize = new Vector2(330f * ui, 56f * ui),
+			FocusMode = Control.FocusModeEnum.None,
+			MouseDefaultCursorShape = Control.CursorShape.PointingHand
+		};
+		button.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(24f * ui));
+		button.AddThemeColorOverride("font_color", new Color("173c34"));
+		button.AddThemeColorOverride("font_hover_color", new Color("102c27"));
+		button.AddThemeColorOverride("font_pressed_color", new Color("ffffff"));
+		button.AddThemeColorOverride("font_focus_color", new Color("173c34"));
+		button.AddThemeStyleboxOverride("normal", MakeButtonStyle(new Color(accent, 0.92f), accent, ui, 0.18f));
+		button.AddThemeStyleboxOverride("hover", MakeButtonStyle(new Color(accent, 1f), new Color("ffffff"), ui, 0.32f));
+		button.AddThemeStyleboxOverride("pressed", MakeButtonStyle(new Color(accent, 0.72f), new Color("ffffff"), ui, 0.10f));
+		button.AddThemeStyleboxOverride("focus", MakeButtonStyle(new Color(accent, 0.92f), accent, ui, 0.18f));
+		return button;
+	}
+
+	private static StyleBoxFlat MakeButtonStyle(Color background, Color border, float ui, float shadowAlpha)
+	{
+		var style = new StyleBoxFlat
+		{
+			BgColor = background,
+			BorderColor = new Color(border, 0.72f),
+			CornerRadiusTopLeft = (int)Mathf.Round(14f * ui),
+			CornerRadiusTopRight = (int)Mathf.Round(14f * ui),
+			CornerRadiusBottomLeft = (int)Mathf.Round(14f * ui),
+			CornerRadiusBottomRight = (int)Mathf.Round(14f * ui),
+			ShadowColor = new Color(0f, 0f, 0f, shadowAlpha),
+			ShadowSize = (int)Mathf.Round(5f * ui)
+		};
+		style.SetBorderWidthAll((int)Mathf.Round(2f * ui));
+		style.ContentMarginLeft = 18f * ui;
+		style.ContentMarginRight = 18f * ui;
+		return style;
 	}
 
 	/// <summary>Мимолётная подсказка «держи палец» после старта.</summary>
 	public void ShowHint()
 	{
 		float ui = UiScale;
-        var hint = new Label
-        {
-            Text = "Держи палец на экране — руки растут",
-            AnchorLeft = 0.5f,
-            AnchorRight = 0.5f,
-            AnchorTop = 1f,
-            AnchorBottom = 1f,
-            OffsetLeft = -240f * ui,
-            OffsetRight = 240f * ui,
-            OffsetTop = -46f * ui,
-            OffsetBottom = -14f * ui,
-            HorizontalAlignment = HorizontalAlignment.Center
-        };
-        hint.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(18f * ui));
+		var hint = new Label
+		{
+			Text = "Держи палец на экране — руки растут",
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 1f,
+			AnchorBottom = 1f,
+			OffsetLeft = -240f * ui,
+			OffsetRight = 240f * ui,
+			OffsetTop = -46f * ui,
+			OffsetBottom = -14f * ui,
+			HorizontalAlignment = HorizontalAlignment.Center
+		};
+		hint.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(18f * ui));
 		hint.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 0.9f));
 		hint.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
 		hint.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
@@ -293,6 +360,7 @@ public partial class HUD : CanvasLayer
 		{
 			_gameOverRoot.Visible = true;
 		}
+		SetGameplayVisible(false);
 	}
 
 	public void HideGameOver()
@@ -307,12 +375,12 @@ public partial class HUD : CanvasLayer
 	public void SpawnPopup(Vector2 globalPos, string text)
 	{
 		float ui = UiScale;
-        var popup = new Label
-        {
-            Text = text,
-            GlobalPosition = globalPos
-        };
-        popup.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(30f * ui));
+		var popup = new Label
+		{
+			Text = text,
+			GlobalPosition = globalPos
+		};
+		popup.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(30f * ui));
 		popup.AddThemeColorOverride("font_color", new Color("fff45e"));
 		popup.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
 		popup.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
@@ -367,22 +435,22 @@ public partial class XpBar : Control
 	{
 		MouseFilter = MouseFilterEnum.Ignore;
 
-        _levelLabel = new Label
-        {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            MouseFilter = MouseFilterEnum.Ignore
-        };
-        _levelLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 0.55f));
+		_levelLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			MouseFilter = MouseFilterEnum.Ignore
+		};
+		_levelLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 0.55f));
 		_levelLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.5f));
 		AddChild(_levelLabel);
 
-        _levelUpLabel = new Label
-        {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Visible = false,
-            MouseFilter = MouseFilterEnum.Ignore
-        };
-        _levelUpLabel.AddThemeColorOverride("font_color", new Color("ffd32e"));
+		_levelUpLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			Visible = false,
+			MouseFilter = MouseFilterEnum.Ignore
+		};
+		_levelUpLabel.AddThemeColorOverride("font_color", new Color("ffd32e"));
 		_levelUpLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
 		AddChild(_levelUpLabel);
 

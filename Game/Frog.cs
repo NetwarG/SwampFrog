@@ -34,7 +34,13 @@ public partial class Frog : Node2D
 	private static readonly Color HandDark = new("3a8a2a");
 
 	/// <summary>Ссылка на корень игры (устанавливается из Main).</summary>
-	public Main Game { get; set; } = null!;
+	public Main? Game { get; set; }
+
+	/// <summary>Режим декоративной лягушки для экранов, где ловля не используется.</summary>
+	public bool DecorativeOnly { get; set; }
+
+	/// <summary>Короткая вытянутая поза броска для декоративного режима.</summary>
+	public bool ThrowPose { get; set; }
 
 	private Vector2 _direction = Vector2.Right;
 	/// <summary>Длины рук в «мировых» единицах экрана.</summary>
@@ -59,7 +65,7 @@ public partial class Frog : Node2D
 	/// <summary>Предмет «доехал» до лягушки — после полного возврата рук.</summary>
 	public event Action<FallingItem>? CaughtItemReturned;
 
-	private bool CanAct => Game.State == GameState.Playing;
+	private bool CanAct => !DecorativeOnly && Game?.State == GameState.Playing;
 
 	/// <summary>Текущий коэффициент масштаба UI/мира, чтобы лягушка не «худела» на больших экранах.</summary>
 	public float UiScale => _currentUiScale;
@@ -79,6 +85,16 @@ public partial class Frog : Node2D
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
+		if (DecorativeOnly)
+		{
+			_flash = Mathf.Max(0f, _flash - dt);
+			QueueRedraw();
+			return;
+		}
+		if (Game == null)
+		{
+			return;
+		}
 
 		// Пересчитываем длины рук под текущее разрешение экрана (скорости — от глобального максимума).
 		UpdateArmLengths(ComputeMaxArmLength(Game.ViewSize));
@@ -314,6 +330,9 @@ public partial class Frog : Node2D
 		}
 	}
 
+	/// <summary>Поворачивает взгляд лягушки без запуска режима ловли.</summary>
+	public void SetLookTarget(Vector2 target) => UpdateDirection(target);
+
 	public override void _Draw()
 	{
 		float ui = _currentUiScale;
@@ -321,13 +340,13 @@ public partial class Frog : Node2D
 		Vector2 o = new(0f, bob);
 
 		// --- Руки и ладони (за телом) ---
-		if (_armLengthWorld > 2f)
+		if (_armLengthWorld > 2f || (DecorativeOnly && ThrowPose))
 		{
 			float spread = Mathf.DegToRad(HandSpreadDeg);
 			Vector2 upperDir = _direction.Rotated(spread);
 			Vector2 lowerDir = _direction.Rotated(-spread);
 			// Локальная длина руки в координатах ноды (одна и та же для обеих рук).
-			float armLocal = _armLengthWorld / ui;
+			float armLocal = DecorativeOnly ? 54f : _armLengthWorld / ui;
 
 			foreach (Vector2 dir in new[] { upperDir, lowerDir })
 			{

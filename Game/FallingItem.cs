@@ -19,6 +19,9 @@ public partial class FallingItem : Node2D
 	/// <summary>Текущая скорость движения в мировых единицах в секунду.</summary>
 	public Vector2 Velocity { get; set; }
 
+	/// <summary>Отключает встроенное падение, когда объект управляется физикой Suika.</summary>
+	public bool ManualPhysics { get; set; }
+
 	/// <summary>Радиус коллизии (учитывает масштаб): используется для отталкивания от стен и других предметов.</summary>
 	public float Radius { get; set; }
 
@@ -61,6 +64,10 @@ public partial class FallingItem : Node2D
 
 	public override void _Process(double delta)
 	{
+		if (ManualPhysics)
+		{
+			return;
+		}
 		// Пойманный предмет управляется лягушкой: не падает и не вращается.
 		if (IsCaught)
 		{
