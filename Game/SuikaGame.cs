@@ -68,6 +68,12 @@ public partial class SuikaGame : Node2D
 	private Label? _gameOverTitle;
 	private Button? _retryButton;
 	private Label? _gameOverScore;
+	/// <summary>Окно со списком собранных фруктов перед началом раунда Suika.</summary>
+	private Control? _stockRoot;
+	private VBoxContainer? _stockListBox;
+	private Label? _stockTotal;
+	/// <summary>Заранее созданные строки «вид — количество» на каждый вид из FruitCatalog.All.</summary>
+	private readonly List<Label> _stockRows = new();
 	private bool _stockEmpty;
 
 	public Main? Game { get; set; }
@@ -125,6 +131,10 @@ public partial class SuikaGame : Node2D
 		_bestLabel!.Text = $"Рекорд  {_bestScore}";
 		_hintLabel!.Visible = true;
 		UpdateStockLabel();
+
+		// Окно со списком собранных фруктов: раунд начнётся после нажатия «Начать игру».
+		_active = false;
+		ShowStockDialog();
 	}
 
 	public void Close()
@@ -135,6 +145,7 @@ public partial class SuikaGame : Node2D
 		_settleTime = 0f;
 		ClearPieces();
 		if (_gameOverRoot != null) _gameOverRoot.Visible = false;
+		if (_stockRoot != null) _stockRoot.Visible = false;
 		if (_uiRoot != null) _uiRoot.Visible = false;
 		if (_uiLayer != null) _uiLayer.Visible = false;
 		Visible = false;
@@ -288,6 +299,7 @@ public partial class SuikaGame : Node2D
 		_hintLabel.HorizontalAlignment = HorizontalAlignment.Center;
 		root.AddChild(_hintLabel);
 
+		BuildStockDialog(root);
 		BuildGameOver(root);
 	}
 
@@ -320,6 +332,89 @@ public partial class SuikaGame : Node2D
 	{
 		if (_gameOverRoot == null) return;
 		foreach (Node child in _gameOverRoot.GetChildren())
+		{
+			if (child is VBoxContainer box)
+			{
+				box.ResetSize();
+				Vector2 view = GetViewportRect().Size;
+				box.Position = new Vector2(view.X * 0.5f - box.Size.X * 0.5f, view.Y * 0.5f - box.Size.Y * 0.5f);
+			}
+		}
+	}
+
+	/// <summary>Строит окно со списком собранных фруктов и кнопкой старта раунда.</summary>
+	private void BuildStockDialog(Control parent)
+	{
+		_stockRoot = new Control { Visible = false, MouseFilter = Control.MouseFilterEnum.Stop };
+		_stockRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		parent.AddChild(_stockRoot);
+
+		var shade = new ColorRect { Color = new Color(0.02f, 0.08f, 0.1f, 0.82f), MouseFilter = Control.MouseFilterEnum.Ignore };
+		shade.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_stockRoot.AddChild(shade);
+
+		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+		box.AddThemeConstantOverride("separation", 12);
+		_stockRoot.AddChild(box);
+
+		Label title = MakeLabel("Собранные фрукты", 34, new Color("ffd45e"));
+		box.AddChild(title);
+
+		_stockListBox = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+		_stockListBox.AddThemeConstantOverride("separation", 6);
+		box.AddChild(_stockListBox);
+
+		foreach (FruitSpec spec in FruitCatalog.All)
+		{
+			Label row = MakeLabel($"{spec.Name} — 0", 24, new Color("ffffff"));
+			row.Visible = false;
+			_stockListBox!.AddChild(row);
+			_stockRows.Add(row);
+		}
+
+		_stockTotal = MakeLabel("Всего: 0", 20, new Color("b4e863"));
+		box.AddChild(_stockTotal);
+
+		Button start = MakeButton("Начать игру", 22, new Color("b4e863"), new Vector2(300f, 54f));
+		start.Pressed += StartFromStockDialog;
+		box.AddChild(start);
+
+		CallDeferred(nameof(CenterStockDialog));
+	}
+
+	/// <summary>Обновляет и показывает окно со списком фруктов перед началом раунда.</summary>
+	private void ShowStockDialog()
+	{
+		if (_stockRoot == null) return;
+		int total = 0;
+		int rowIndex = 0;
+		foreach (FruitSpec spec in FruitCatalog.All)
+		{
+			Label row = _stockRows[rowIndex++];
+			int count = Game?.FruitStock(spec.Kind) ?? 0;
+			row.Text = $"{spec.Name} — {count}";
+			row.Visible = count > 0;
+			total += count;
+		}
+		if (_stockTotal != null) _stockTotal.Text = $"Всего: {total}";
+		_stockRoot.Visible = true;
+		CallDeferred(nameof(CenterStockDialog));
+	}
+
+	/// <summary>Игрок подтвердил список — скрываем окно и начинаем раунд.</summary>
+	private void StartFromStockDialog()
+	{
+		if (_stockRoot != null) _stockRoot.Visible = false;
+		_active = true;
+		// Небольшая пауза, чтобы клик по кнопке случайно не бросил фрукт.
+		_dropCooldown = Mathf.Max(_dropCooldown, 0.35f);
+	}
+
+	/// <summary>Центрирует панель списка фруктов после изменения размеров окна.</summary>
+	private void CenterStockDialog()
+	{
+		if (_stockRoot == null) return;
+		foreach (Node child in _stockRoot.GetChildren())
 		{
 			if (child is VBoxContainer box)
 			{

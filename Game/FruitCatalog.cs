@@ -11,8 +11,6 @@ namespace SwampFrog;
 /// </summary>
 public record FruitSpec(FruitKind Kind, string Name, float BaseRadius, bool ActiveInClassic)
 {
-	/// <summary>Имя вида (для отладки/будущих UI-подписей).</summary>
-	public string Name => Name;
 }
 
 /// <summary>Каталог всех фруктов и списки для режимов.</summary>
