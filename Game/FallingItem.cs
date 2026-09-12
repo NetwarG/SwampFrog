@@ -16,6 +16,12 @@ public partial class FallingItem : Node2D
 	/// <summary>Пойманный предмет больше не падает, а следует за ладонью лягушки.</summary>
 	public bool IsCaught { get; set; }
 
+	/// <summary>
+	/// Предмет обездвижен: заморозка «Взгляда василиска», остановка «Зоны замедления»
+	/// или пауза выбора перка. Поймать такой предмет всё ещё можно.
+	/// </summary>
+	public bool Frozen { get; set; }
+
 	/// <summary>Текущая скорость движения в мировых единицах в секунду.</summary>
 	public Vector2 Velocity { get; set; }
 
@@ -64,6 +70,11 @@ public partial class FallingItem : Node2D
 
 	public override void _Process(double delta)
 	{
+		// Предмет заморожен (эффект перка или пауза) — не двигается.
+		if (Frozen)
+		{
+			return;
+		}
 		if (ManualPhysics)
 		{
 			return;

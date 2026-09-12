@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System;
 using Godot;
 
@@ -10,6 +10,9 @@ public enum GameState
 	Playing,
 	GameOver,
 	Suika,
+
+	/// <summary>Игра на паузе с оверлеем выбора перка.</summary>
+	PerkSelect,
 }
 
 /// <summary>
@@ -18,7 +21,6 @@ public enum GameState
 /// </summary>
 public partial class Main : Node2D
 {
-	private const int MaxLives = 3;
 	private const float InitialSpawnInterval = 0.95f;
 	private const float MinSpawnInterval = 0.34f;
 
@@ -31,9 +33,10 @@ public partial class Main : Node2D
 	private SuikaGame? _suika;
 	private Timer? _spawnTimer;
 	private readonly RandomNumberGenerator _rng = new();
+	private readonly PerkPlayer _perkPlayer = new();
 
 	private int _score;
-	private int _lives = MaxLives;
+	private int _lives = 3;
 	private int _highScore;
 	private GameState _state = GameState.Menu;
 	private readonly XpSystem _xp = new();
@@ -48,9 +51,68 @@ public partial class Main : Node2D
 	public int Score => _score;
 	public int Lives => _lives;
 
+	/// <summary>Максимум жизней: базовые 3 + бонус перка «Панцирь».</summary>
+	public int MaxLives => 3 + PerkEffects.ShellMaxLivesBonus(_perkPlayer.State);
+
+	// ---------- Публичные доступы для PerkPlayer (см. Game/Perks/PerkPlayer.cs) ----------
+
+	public Frog? FrogNode => _frog;
+	public Node2D? ItemsNode => _items;
+	public HUD? HudNode => _hud;
+	public RandomNumberGenerator GameRng => _rng;
+	public XpSystem Xp => _xp;
+	public bool IsPlaying => _state == GameState.Playing;
+	public bool IsChoosingPerk => _state == GameState.PerkSelect;
+
+	/// <summary>Ставит игру на паузу выбора перка.</summary>
+	public void StartPerkPause()
+	{
+		_state = GameState.PerkSelect;
+		_spawnTimer?.Stop();
+		GetTree().Paused = true;
+	}
+
+	/// <summary>Снимает паузу выбора перка и возобновляет игру.</summary>
+	public void EndPerkPause()
+	{
+		GetTree().Paused = false;
+		_state = GameState.Playing;
+		_spawnTimer?.Start();
+	}
+
+	public void AddScore(int amount)
+	{
+		if (amount == 0)
+		{
+			return;
+		}
+		_score += amount;
+		_hud?.SetScore(_score);
+	}
+
+	public void SetLivesFromPerk(int lives)
+	{
+		_lives = lives;
+		_hud?.SetLives(lives);
+	}
+
+	/// <summary>Урон: -1 жизнь, вспышка на экране и у лягушки.</summary>
+	public void ReduceLife()
+	{
+		_lives--;
+		_hud?.SetLives(_lives);
+		_hud?.FlashRed();
+		_frog?.Flash();
+	}
+
+	public void SetMaxHeartsFromPerk() => _hud?.SetMaxLives(MaxLives);
+	public void GameOverFromPerk() => GameOver();
+	public void RegisterFruitFromPerk(FruitKind kind) => RegisterCollectedFruit(kind);
+
 	public override void _Ready()
 	{
 		_rng.Randomize();
+		_perkPlayer.Game = this;
 
 		_frog = GetNode<Frog>("Frog");
 		_frog.Game = this;
@@ -67,6 +129,7 @@ public partial class Main : Node2D
 		_hud.ExitPressed += QuitGame;
 		_hud.RestartPressed += Restart;
 		_hud.MenuPressed += GoToMenu;
+		_hud.PerkPicked += OnPerkPicked;
 
 		_highScore = LoadHighScore();
 		LoadCollectedFruits();
@@ -134,6 +197,11 @@ public partial class Main : Node2D
 			return;
 		}
 
+		float dt = (float)delta;
+
+		// Перки: модификаторы лягушки и таймеры.
+		_perkPlayer.Update(dt, _frog);
+
 		Vector2 viewSize = GetViewportRect().Size;
 		Vector2[]? hands = _frog.IsCatching ? _frog.GetHandPositions() : null;
 
@@ -160,14 +228,12 @@ public partial class Main : Node2D
 			// Упал за нижнюю границу — штраф за фрукт/золотой, мусор просто пропадает.
 			if (item.Position.Y > viewSize.Y + 30f)
 			{
-				if (item.ItemType == ItemType.Fruit || item.ItemType == ItemType.GoldenFruit)
-				{
-					_hud?.SpawnPopup(new Vector2(item.Position.X, viewSize.Y - 60f), "Мимо!");
-					TakeDamage();
-				}
-				item.QueueFree();
+				_perkPlayer.OnItemMissed(item);
 				continue;
 			}
+
+			// Заморозка/замедление/магнит перков.
+			_perkPlayer.ApplyWorldEffect(item, dt, viewSize, hands);
 
 			if (hands == null)
 			{
@@ -177,7 +243,7 @@ public partial class Main : Node2D
 			float itemScale = item.Scale.X;
 			for (int i = 0; i < hands.Length; i++)
 			{
-				// Рука может держать не более одного предмета; занятую пропускаем.
+				// Рука может держать один предмет (или два — перк «Липкие ладони»); занятую пропускаем.
 				if (!_frog.CanHold(i))
 				{
 					continue;
@@ -205,10 +271,13 @@ public partial class Main : Node2D
 
 	private void OnLevelUp(int newLevel)
 	{
-		if (_state == GameState.Playing)
-		{
-			_hud?.ShowLevelUp(newLevel);
-		}
+		_perkPlayer.OnLevelUp(newLevel);
+	}
+
+	/// <summary>Игрок выбрал перк в оверлее (HUD → PerkPlayer).</summary>
+	private void OnPerkPicked(PerkId id)
+	{
+		_perkPlayer.OnPicked(id);
 	}
 
 	/// <summary>
@@ -263,11 +332,10 @@ public partial class Main : Node2D
 
 	private void CatchItem(FallingItem item, int handIndex)
 	{
-		// Мусор нельзя нести в руках: сразу урон и исчезновение.
+		// Мусор нельзя нести в руках: отскок/камень либо урон и исчезновение.
 		if (item.ItemType == ItemType.Trash)
 		{
-			TakeDamage();
-			item.QueueFree();
+			_perkPlayer.HandleTrashTouch(item);
 			return;
 		}
 
@@ -286,47 +354,10 @@ public partial class Main : Node2D
 		}
 	}
 
-	/// <summary>Фрукт полностью вернулся к лягушке — начисляем очки (если игра ещё идёт) и убираем предмет.</summary>
+	/// <summary>Фрукт полностью вернулся к лягушке — начисляем награду (очки, комбо, перки).</summary>
 	private void OnCaughtItemReturned(FallingItem item)
 	{
-		if (item.ItemType == ItemType.Fruit)
-		{
-			RegisterCollectedFruit(item.Kind);
-		}
-		if (_state == GameState.Playing)
-		{
-			switch (item.ItemType)
-			{
-				case ItemType.GoldenFruit:
-					_score += 30;
-					_hud?.SpawnPopup(_frog?.GlobalPosition ?? item.GlobalPosition, "+30");
-					break;
-				case ItemType.Fruit:
-					_score += 10;
-					_hud?.SpawnPopup(_frog?.GlobalPosition ?? item.GlobalPosition, "+10");
-					break;
-			}
-			_hud?.SetScore(_score);
-		}
-
-		// Пойман фрукт — начисляем опыт (в момент полного возврата к лягушке).
-		_xp.AddXp(XpSystem.XpFor(item.ItemType));
-		_hud?.SetXp(_xp.Level, _xp.LevelProgress);
-
-		item.QueueFree();
-	}
-
-	private void TakeDamage()
-	{
-		_lives--;
-		_hud?.SetLives(_lives);
-		_hud?.FlashRed();
-		_frog?.Flash();
-
-		if (_lives <= 0)
-		{
-			GameOver();
-		}
+		_perkPlayer.AwardCaught(item);
 	}
 
 	/// <summary>Восстанавливает одну жизнь (не превышая максимум).</summary>
@@ -359,37 +390,55 @@ public partial class Main : Node2D
 		Vector2 size = GetViewportRect().Size;
 
 		float trashWeight = Mathf.Min(0.32f, 0.15f + _score * 0.00025f);
-		float roll = _rng.Randf();
+		float goldenChance = Mathf.Min(0.34f, _perkPlayer.GoldenSpawnChance());
+		bool guaranteedGolden = _perkPlayer.IsGoldenGuaranteed();
 
 		ItemType type;
 		// Хилка выпадает только при неполных жизнях и с очень маленьким шансом.
-		if (_lives < MaxLives && _rng.Randf() < HealSpawnChance)
+		if (!guaranteedGolden && _lives < MaxLives && _rng.Randf() < HealSpawnChance)
 		{
 			type = ItemType.Healing;
 		}
-		else if (roll < trashWeight)
+		else if (guaranteedGolden)
 		{
-			type = ItemType.Trash;
-		}
-		else if (roll < trashWeight + 0.14f)
-		{
+			// «Золотая лихорадка» ур. 5: каждый N-й фрукт гарантированно золотой.
 			type = ItemType.GoldenFruit;
 		}
 		else
 		{
-			type = ItemType.Fruit;
-			// В классическом режиме попадаются только «мелкие» фрукты (первые 6 из каталога).
-			item.Kind = FruitCatalog.PickClassic(_rng);
+			float roll = _rng.Randf();
+			if (roll < trashWeight)
+			{
+				type = ItemType.Trash;
+			}
+			else if (roll < trashWeight + goldenChance)
+			{
+				type = ItemType.GoldenFruit;
+			}
+			else
+			{
+				type = ItemType.Fruit;
+				// В классическом режиме попадаются только «мелкие» фрукты (первые 6 из каталога).
+				item.Kind = FruitCatalog.PickClassic(_rng);
+			}
 		}
 
 		float difficulty = Mathf.Clamp(_score / 500f, 0f, 1f);
 		float speed = Mathf.Lerp(150f, 330f, difficulty) + _rng.RandfRange(-25f, 25f);
+		if (type == ItemType.GoldenFruit)
+		{
+			// «Золотая лихорадка» ур. 4: золотой падает медленнее обычного.
+			speed *= _perkPlayer.GoldenFallSpeedFactor();
+		}
 
 		item.ItemType = type;
 		item.FallSpeed = speed;
 		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), -70f);
 		item.Scale = Vector2.One * (ScreenScale * _rng.RandfRange(0.85f, 1.08f));
 		_items!.AddChild(item);
+
+		// Учёт спавна: счётчик золотых и заморозка «Зоны замедления» ур. 5.
+		_perkPlayer.OnItemSpawned(type);
 	}
 
 	private void UpdateDifficulty()
@@ -412,6 +461,8 @@ public partial class Main : Node2D
 			ResetMainRoundData();
 		}
 		_suika?.Close();
+		GetTree().Paused = false;
+		_hud?.HidePerkSelection();
 		if (_frog != null) _frog.Visible = true;
 		_state = GameState.Playing;
 		_hud?.HideStart();
@@ -448,6 +499,8 @@ public partial class Main : Node2D
 	private void CloseSuika()
 	{
 		_suika?.Close();
+		GetTree().Paused = false;
+		_hud?.HidePerkSelection();
 		UpdateSuikaButton();
 		ResetMainRoundData();
 		_state = GameState.Menu;
@@ -461,6 +514,8 @@ public partial class Main : Node2D
 	public void GoToMenu()
 	{
 		_spawnTimer?.Stop();
+		GetTree().Paused = false;
+		_hud?.HidePerkSelection();
 		ClearMainRound();
 		ResetMainRoundData();
 		_state = GameState.Menu;
@@ -484,8 +539,10 @@ public partial class Main : Node2D
 	private void ResetMainRoundData()
 	{
 		_score = 0;
+		_perkPlayer.Reset();
 		_lives = MaxLives;
 		ResetXp();
+		_hud?.SetMaxLives(MaxLives);
 		_hud?.SetScore(0);
 		_hud?.SetLives(_lives);
 	}
@@ -493,6 +550,9 @@ public partial class Main : Node2D
 	private void GameOver()
 	{
 		_state = GameState.GameOver;
+		// На случай завершения во время паузы выбора перка (теоретически невозможно).
+		GetTree().Paused = false;
+		_hud?.HidePerkSelection();
 		if (_score > _highScore)
 		{
 			_highScore = _score;
@@ -505,6 +565,8 @@ public partial class Main : Node2D
 	private void Restart()
 	{
 		ClearMainRound();
+		GetTree().Paused = false;
+		_hud?.HidePerkSelection();
 		_frog!.Visible = true;
 
 		ResetMainRoundData();

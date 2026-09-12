@@ -23,11 +23,17 @@ public partial class HUD : CanvasLayer
 	private Label? _finalScore;
 	private Label? _finalHigh;
 
+	/// <summary>Оверлей выбора перка (работает и на паузе игры).</summary>
+	private PerkSelectionOverlay? _perkOverlay;
+
 	public event Action? PlayPressed;
 	public event Action? MiniGamePressed;
 	public event Action? ExitPressed;
 	public event Action? RestartPressed;
 	public event Action? MenuPressed;
+
+	/// <summary>Игрок выбрал перк в оверлее выбора.</summary>
+	public event Action<PerkId>? PerkPicked;
 
 	/// <summary>
 	/// Адаптивный масштаб HUD: кламп min(видимая/540, видимая/960) так же, как в Main.
@@ -50,6 +56,15 @@ public partial class HUD : CanvasLayer
 	{
 		BuildUI();
 		GetViewport().SizeChanged += OnViewportResized;
+
+		_perkOverlay = new PerkSelectionOverlay { ZIndex = 80 };
+		AddChild(_perkOverlay);
+		_perkOverlay.PerkPicked += OnPerkPicked;
+	}
+
+	private void OnPerkPicked(PerkId id)
+	{
+		PerkPicked?.Invoke(id);
 	}
 
 	private void OnViewportResized()
@@ -71,6 +86,7 @@ public partial class HUD : CanvasLayer
 	{
 		RecenterBoxIfVisible(_gameOverRoot);
 		RecenterBoxIfVisible(_startRoot);
+		_perkOverlay?.RecenterIfVisible();
 	}
 
 	// Переименованный хелпер: центрирует контейнер внутри родителя, если тот видим.
@@ -416,6 +432,18 @@ public partial class HUD : CanvasLayer
 
 	public void SetLives(int lives) => _hearts?.SetLives(lives);
 
+	/// <summary>Обновляет максимум жизней (перк «Панцирь» увеличивает число сердечек).</summary>
+	public void SetMaxLives(int max) => _hearts?.SetMaxLives(max);
+
+	/// <summary>Показывает оверлей выбора перка с карточками.</summary>
+	public void ShowPerkSelection(int level, PerkOffer[] cards)
+	{
+		_perkOverlay?.Show(level, cards);
+	}
+
+	/// <summary>Скрывает оверлей выбора перка.</summary>
+	public void HidePerkSelection() => _perkOverlay?.Hide();
+
 	public void FlashRed() => _flash?.Start();
 
 	public void ShowGameOver(int score, int highScore)
@@ -654,13 +682,14 @@ public partial class XpBar : Control
 		DrawCircle(new Vector2(w - h * 0.5f, y + h * 0.5f), h * 0.5f, TrackOutline, false, 1f);
 	}
 }
-/// <summary>Три сердечка жизней в правом верхнем углу.</summary>
+/// <summary>Сердечки жизней в правом верхнем углу (до 7 — перк «Панцирь»).</summary>
 public partial class HeartsIndicator : Control
 {
 	private static readonly Color FullHeart = new("f7454a");
 	private static readonly Color EmptyHeart = new Color(1f, 1f, 1f, 0.22f);
 
 	private int _lives = 3;
+	private int _maxLives = 3;
 	private float _uiScale = 1f;
 
 	public override void _Ready()
@@ -671,7 +700,15 @@ public partial class HeartsIndicator : Control
 
 	public void SetLives(int lives)
 	{
-		_lives = Mathf.Clamp(lives, 0, 3);
+		_lives = Mathf.Clamp(lives, 0, _maxLives);
+		QueueRedraw();
+	}
+
+	/// <summary>Обновляет максимум жизней (число нарисованных сердечек).</summary>
+	public void SetMaxLives(int max)
+	{
+		_maxLives = Mathf.Max(3, max);
+		UpdateLayout();
 		QueueRedraw();
 	}
 
@@ -683,27 +720,36 @@ public partial class HeartsIndicator : Control
 		QueueRedraw();
 	}
 
+	/// <summary>Коэффициент размера сердечка: при большом числе жизней — компактнее.</summary>
+	private float HeartScale()
+	{
+		if (_maxLives > 6) return 0.62f;
+		if (_maxLives > 4) return 0.78f;
+		return 1f;
+	}
+
 	private void UpdateLayout()
 	{
 		AnchorLeft = 1f;
 		AnchorRight = 1f;
 		AnchorTop = 0f;
 		AnchorBottom = 0f;
-		OffsetLeft = -118f * _uiScale;
+		float s = 30f * _uiScale * HeartScale();
+		float w = 12f * _uiScale + _maxLives * s * 0.98f;
+		OffsetLeft = -(w + 16f * _uiScale);
 		OffsetRight = -14f * _uiScale;
 		OffsetTop = 14f * _uiScale;
-		OffsetBottom = 78f * _uiScale;
-		Size = new Vector2(104f * _uiScale, 64f * _uiScale);
+		OffsetBottom = 74f * _uiScale;
+		Size = new Vector2(w + 30f * _uiScale, 64f * _uiScale);
 	}
 
 	public override void _Draw()
 	{
-		const float sBase = 30f;
-		float s = sBase * _uiScale;
-		for (int i = 0; i < 3; i++)
+		float s = 30f * _uiScale * HeartScale();
+		for (int i = 0; i < _maxLives; i++)
 		{
 			Color color = i < _lives ? FullHeart : EmptyHeart;
-			Vector2 c = new(12f + i * s * 0.98f, 22f * _uiScale);
+			Vector2 c = new(12f * _uiScale + i * s * 0.98f, 22f * _uiScale);
 
 			DrawCircle(c + new Vector2(-s * 0.26f, -s * 0.22f), s * 0.32f, color);
 			DrawCircle(c + new Vector2(s * 0.26f, -s * 0.22f), s * 0.32f, color);

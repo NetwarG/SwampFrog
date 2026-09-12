@@ -70,8 +70,23 @@ public partial class Frog : Node2D
 	/// <summary>Текущий коэффициент масштаба UI/мира, чтобы лягушка не «худела» на больших экранах.</summary>
 	public float UiScale => _currentUiScale;
 
-	/// <summary>Радиус «ловли» ладонью в мировых единицах (учитывает масштаб ноды).</summary>
-	public float CatchRadiusWorld => CatchRadius * _currentUiScale;
+	/// <summary>Радиус «ловли» ладонью в мировых единицах (учитывает масштаб ноды и множитель перков).</summary>
+	public float CatchRadiusWorld => CatchRadius * _currentUiScale * CatchRadiusMultiplier;
+
+	/// <summary>Множитель радиуса ловли (перк «Липкие ладони»). Выставляется из Main.</summary>
+	public float CatchRadiusMultiplier { get; set; } = 1f;
+
+	/// <summary>Множитель скорости вытягивания рук (перк «Скорострельность»).</summary>
+	public float ExtendSpeedMultiplier { get; set; } = 1f;
+
+	/// <summary>Множитель скорости втягивания рук (перк «Скорострельность»).</summary>
+	public float RetractSpeedMultiplier { get; set; } = 1f;
+
+	/// <summary>Разрешает держать несколько предметов в одной ладони (перк «Липкие ладони» ур. 5).</summary>
+	public bool MultiCatch { get; set; }
+
+	/// <summary>Сколько предметов максимально в одной ладони при MultiCatch.</summary>
+	private const int MaxItemsPerHand = 2;
 
 	/// <summary>Обновляет текущий масштаб ноды из корня игры.</summary>
 	public void SyncUiScale(float uiScale)
@@ -264,21 +279,23 @@ public partial class Frog : Node2D
 		return true;
 	}
 
-	/// <summary>Свободна ли ладонь (в каждой руке не более одного предмета).</summary>
+	/// <summary>Свободна ли ладонь (обычно не более одного предмета; при MultiCatch — два).</summary>
 	public bool CanHold(int handIndex)
 	{
 		if (handIndex < 0 || handIndex >= 2)
 		{
 			return false;
 		}
+		int limit = MultiCatch ? MaxItemsPerHand : 1;
+		int count = 0;
 		foreach (CaughtItem held in _caughtItems)
 		{
 			if (held.HandIndex == handIndex)
 			{
-				return false;
+				count++;
 			}
 		}
-		return true;
+		return count < limit;
 	}
 
 	/// <summary>Сбрасывает список пойманных предметов (например, при рестарте).</summary>
@@ -316,8 +333,10 @@ public partial class Frog : Node2D
 
 	private void UpdateArmLengths(float maxWorld)
 	{
-		_armGrowSpeedWorld = maxWorld / FullExtendTime;
-		_armRetractSpeedWorld = _armGrowSpeedWorld * RetractScale;
+		// Базовые скорости умножаются на множители перка «Скорострельность».
+		float baseSpeed = maxWorld / FullExtendTime;
+		_armGrowSpeedWorld = baseSpeed * ExtendSpeedMultiplier;
+		_armRetractSpeedWorld = baseSpeed * RetractScale * RetractSpeedMultiplier;
 	}
 
 	private void UpdateDirection(Vector2 target)
