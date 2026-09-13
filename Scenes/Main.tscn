@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" path="res://Game/Main.cs" id="1_main"]
 [ext_resource type="Script" path="res://Game/Frog.cs" id="2_frog"]
-[ext_resource type="Script" path="res://Game/HUD.cs" id="3_hud"]
-[ext_resource type="Script" path="res://Game/SuikaGame.cs" id="4_suika"]
+[ext_resource type="Script" path="res://Game/UI/HUD.cs" id="3_hud"]
+[ext_resource type="Script" path="res://Game/Modes/SuikaGame.cs" id="4_suika"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
