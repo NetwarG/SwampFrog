@@ -23,9 +23,17 @@ public partial class SuikaGame : Node2D
 
 	private const float Gravity = 980f;
 	private const float Restitution = 0.12f;
-	private const float BowlSide = 34f;
+	/// <summary>Ширина кувшина в долях от ширины экрана.</summary>
+	private const float BowlWidthRatio = 0.80f;
+	/// <summary>Высота кувшина в долях от высоты экрана.</summary>
+	private const float BowlHeightRatio = 0.70f;
+	/// <summary>Отступ кувшина от нижнего края экрана.</summary>
 	private const float BowlBottom = 88f;
-	private const float BowlTop = 204f;
+	/// <summary>Минимальные размеры кувшина, чтобы корзина оставалась играбельной на узких окнах.</summary>
+	private const float BowlMinWidth = 160f;
+	private const float BowlMinHeight = 200f;
+	/// <summary>Отступ линии переполнения от верхнего края кувшина.</summary>
+	private const float OverflowRimOffset = 56f;
 	private const float OverflowDelay = 1.15f;
 
 	/// <summary>Пауза перед завершением раунда после того, как последний фрукт упал и устаканился.</summary>
@@ -167,6 +175,7 @@ public partial class SuikaGame : Node2D
 		SimulatePieces(dt);
 		ResolveCollisions();
 		TryMergePieces();
+		ClampToBowl();
 		UpdatePieceViews(dt);
 		CheckOverflow(dt);
 		CheckStockEnd(dt);
@@ -254,7 +263,7 @@ public partial class SuikaGame : Node2D
 		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y + 30f), new Vector2(_bowl.End.X, _bowl.Position.Y + 30f), new Color(0.62f, 0.93f, 0.8f, 0.18f), 2f);
 
 		// Линия переполнения помогает понять, когда кувшин уже заполнен.
-		float dangerY = _bowl.Position.Y + 56f;
+		float dangerY = _bowl.Position.Y + OverflowRimOffset;
 		DrawLine(new Vector2(_bowl.Position.X + 5f, dangerY), new Vector2(_bowl.End.X - 5f, dangerY), new Color(1f, 0.55f, 0.38f, 0.33f), 2f);
 	}
 
@@ -471,7 +480,9 @@ public partial class SuikaGame : Node2D
 	private void UpdateBowl()
 	{
 		Vector2 view = GetViewportRect().Size;
-		_bowl = new Rect2(BowlSide, BowlTop, Mathf.Max(180f, view.X - BowlSide * 2f), Mathf.Max(260f, view.Y - BowlTop - BowlBottom));
+		float width = Mathf.Max(BowlMinWidth, view.X * BowlWidthRatio);
+		float height = Mathf.Max(BowlMinHeight, view.Y * BowlHeightRatio);
+		_bowl = new Rect2((view.X - width) * 0.5f, view.Y - BowlBottom - height, width, height);
 		QueueRedraw();
 	}
 
@@ -549,7 +560,7 @@ public partial class SuikaGame : Node2D
 		UpdateStockLabel();
 
 		float radius = FruitRadius(_currentKind);
-		float x = Mathf.Clamp(_aimX, _bowl.Position.X + radius + 4f, _bowl.End.X - radius - 4f);
+		float x = ClampDropX(_aimX, radius);
 		// Случайный боковой импульс: даже бросая в одну точку, фрукт на лету смещается
 		// вбок и при падении на горку отскакивает, а не ложится ровным столбцом.
 		CreatePiece(_currentKind, new Vector2(x, _bowl.Position.Y + radius + 4f), new Vector2(_rng.RandfRange(-DropScatter, DropScatter), 80f));
@@ -645,6 +656,19 @@ public partial class SuikaGame : Node2D
 		return 16f * Mathf.Pow(1.18f, order);
 	}
 
+	/// <summary>
+	/// Ограничивает горизонтальную точку броска стенами кувшина с учётом радиуса
+	/// фрукта. Если фрукт шире кувшина, цель ставится в середину.
+	/// </summary>
+	private float ClampDropX(float x, float radius)
+	{
+		float left = _bowl.Position.X + radius + 4f;
+		float right = _bowl.End.X - radius - 4f;
+		if (left > right)
+			return _bowl.Position.X + _bowl.Size.X * 0.5f;
+		return Mathf.Clamp(x, left, right);
+	}
+
 	private void SimulatePieces(float dt)
 	{
 		foreach (Piece piece in _pieces)
@@ -653,28 +677,48 @@ public partial class SuikaGame : Node2D
 			piece.Velocity.Y += Gravity * dt;
 			piece.Velocity.X *= Mathf.Pow(0.997f, dt * 60f);
 			piece.Position += piece.Velocity * dt;
+		}
+	}
 
-			float left = _bowl.Position.X + piece.Radius;
-			float right = _bowl.End.X - piece.Radius;
-			if (piece.Position.X < left)
-			{
-				piece.Position.X = left;
-				piece.Velocity.X = Mathf.Abs(piece.Velocity.X) * 0.35f;
-			}
-			else if (piece.Position.X > right)
-			{
-				piece.Position.X = right;
-				piece.Velocity.X = -Mathf.Abs(piece.Velocity.X) * 0.35f;
-			}
+	/// <summary>
+	/// Возвращает все куски внутрь кувшина после столкновений и слияний,
+	/// чтобы фрукты не выпирали за стены и дно.
+	/// </summary>
+	private void ClampToBowl()
+	{
+		foreach (Piece piece in _pieces) ClampPieceToBowl(piece);
+	}
 
-			float floor = _bowl.End.Y - piece.Radius - 6f;
-			if (piece.Position.Y > floor)
-			{
-				piece.Position.Y = floor;
-				if (Mathf.Abs(piece.Velocity.Y) > 16f) piece.Velocity.Y = -Mathf.Abs(piece.Velocity.Y) * Restitution;
-				else piece.Velocity.Y = 0f;
-				piece.Velocity.X *= 0.86f;
-			}
+	/// <summary>Упирает один кусок в стены и дно кувшина, гася скорость.</summary>
+	private void ClampPieceToBowl(Piece piece)
+	{
+		float left = _bowl.Position.X + piece.Radius;
+		float right = _bowl.End.X - piece.Radius;
+		// Кусок шире кувшина: диапазон вырождается, поэтому центр прижимается
+		// к середине, чтобы фрукт свисал за обе стенки равномерно.
+		if (left > right)
+		{
+			piece.Position.X = _bowl.Position.X + _bowl.Size.X * 0.5f;
+			piece.Velocity.X = 0f;
+		}
+		else if (piece.Position.X < left)
+		{
+			piece.Position.X = left;
+			piece.Velocity.X = Mathf.Abs(piece.Velocity.X) * 0.35f;
+		}
+		else if (piece.Position.X > right)
+		{
+			piece.Position.X = right;
+			piece.Velocity.X = -Mathf.Abs(piece.Velocity.X) * 0.35f;
+		}
+
+		float floor = _bowl.End.Y - piece.Radius - 6f;
+		if (piece.Position.Y > floor)
+		{
+			piece.Position.Y = floor;
+			if (Mathf.Abs(piece.Velocity.Y) > 16f) piece.Velocity.Y = -Mathf.Abs(piece.Velocity.Y) * Restitution;
+			else piece.Velocity.Y = 0f;
+			piece.Velocity.X *= 0.86f;
 		}
 	}
 
@@ -754,7 +798,7 @@ public partial class SuikaGame : Node2D
 	private void CheckOverflow(float dt)
 	{
 		bool overflowing = false;
-		float danger = _bowl.Position.Y + 56f;
+		float danger = _bowl.Position.Y + OverflowRimOffset;
 		foreach (Piece piece in _pieces)
 		{
 			// Новый фрукт пересекает линию по пути вниз, поэтому учитываем только
