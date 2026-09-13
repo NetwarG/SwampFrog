@@ -211,21 +211,19 @@ public sealed class PerkPlayer
 		return PerkEffects.GoldenFallsSlower(_perks) ? 0.75f : 1f;
 	}
 
-	/// <summary>Учёт спавна предмета: счётчик золотых и заморозка «Зоны замедления» ур. 5.</summary>
-	public void OnItemSpawned(ItemType type)
+	/// <summary>Учёт спавна фрукта: счётчик до гарантированного золотого и заморозка «Зоны замедления» ур. 5.</summary>
+	public void OnFruitSpawned(bool golden)
 	{
-		if (type == ItemType.Fruit)
+		if (!golden)
 		{
 			_fruitsSinceLastGolden++;
+			return;
 		}
-		else if (type == ItemType.GoldenFruit)
+		_fruitsSinceLastGolden = 0;
+		float freeze = PerkEffects.GoldFreezeDuration(_perks);
+		if (freeze > 0f)
 		{
-			_fruitsSinceLastGolden = 0;
-			float freeze = PerkEffects.GoldFreezeDuration(_perks);
-			if (freeze > 0f)
-			{
-				_worldFreezeTimer = Mathf.Max(_worldFreezeTimer, freeze);
-			}
+			_worldFreezeTimer = Mathf.Max(_worldFreezeTimer, freeze);
 		}
 	}
 
@@ -262,7 +260,7 @@ public sealed class PerkPlayer
 	/// <summary>Фрукт/золотой упал мимо: штраф за промах и сброс комбо.</summary>
 	public void OnItemMissed(FallingItem item)
 	{
-		if (item.ItemType == ItemType.Fruit || item.ItemType == ItemType.GoldenFruit)
+		if (item.ItemType == ItemType.Fruit)
 		{
 			Game?.HudNode?.SpawnPopup(item.GlobalPosition, "Мимо!");
 			TakeDamage();
@@ -364,14 +362,10 @@ public sealed class PerkPlayer
 		}
 
 		int basePoints = 0;
-		switch (item.ItemType)
+		if (item.ItemType == ItemType.Fruit)
 		{
-			case ItemType.Fruit:
-				basePoints = 10;
-				break;
-			case ItemType.GoldenFruit:
-				basePoints = 10 * PerkEffects.GoldenScoreMultiplier(_perks);
-				break;
+			// Золотой фрукт — тот же фрукт, но ценнее в N раз («Золотая лихорадка»).
+			basePoints = item.IsGolden ? 10 * PerkEffects.GoldenScoreMultiplier(_perks) : 10;
 		}
 
 		// Замороженные фрукты «Взгляда василиска» (lvl5) дают x2.
@@ -411,7 +405,7 @@ public sealed class PerkPlayer
 
 		if (!fromExplosion)
 		{
-			Game.Xp.AddXp(XpSystem.XpFor(item.ItemType));
+			Game.Xp.AddXp(XpSystem.XpForFruit(item.ItemType == ItemType.Fruit && item.IsGolden));
 			Game.HudNode?.SetXp(Game.Xp.Level, Game.Xp.LevelProgress);
 		}
 
@@ -509,7 +503,7 @@ public sealed class PerkPlayer
 				{
 					continue;
 				}
-				if (item.ItemType != ItemType.Fruit && item.ItemType != ItemType.GoldenFruit && item.ItemType != ItemType.Trash)
+				if (item.ItemType != ItemType.Fruit && item.ItemType != ItemType.Trash)
 				{
 					continue;
 				}
@@ -622,7 +616,7 @@ public sealed class PerkPlayer
 		{
 			return false;
 		}
-		return item.ItemType == ItemType.Fruit || item.ItemType == ItemType.GoldenFruit;
+		return item.ItemType == ItemType.Fruit;
 	}
 
 	// ---------- Заморозка, замедление, магнит ----------
@@ -636,7 +630,7 @@ public sealed class PerkPlayer
 		}
 		if (_gazeFreezeTimer > 0f)
 		{
-			if (item.ItemType == ItemType.Fruit || item.ItemType == ItemType.GoldenFruit)
+			if (item.ItemType == ItemType.Fruit)
 			{
 				return true;
 			}

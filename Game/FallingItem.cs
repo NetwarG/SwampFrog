@@ -3,7 +3,8 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Падающий сверху объект: фрукт (ловить), золотой фрукт (ловить, +30) или мусор (не ловить).
+/// Падающий сверху объект: фрукт (ловить), мусор (не ловить) или хилка (+1 жизнь).
+/// Любой фрукт может быть золотым (IsGolden): он крупнее и даёт больше очков и опыта.
 /// Вся графика рисуется процедурно в _Draw, поэтому ассеты не нужны.
 /// </summary>
 public partial class FallingItem : Node2D
@@ -14,6 +15,9 @@ public partial class FallingItem : Node2D
 
 	/// <summary>Пойманный предмет больше не падает, а следует за ладонью лягушки.</summary>
 	public bool IsCaught { get; set; }
+
+	/// <summary>Золотой фрукт: модификатор любого фрукта — крупнее и даёт больше очков.</summary>
+	public bool IsGolden { get; set; }
 
 	/// <summary>
 	/// Предмет обездвижен: заморозка «Взгляда василиска», остановка «Зоны замедления»
@@ -38,12 +42,16 @@ public partial class FallingItem : Node2D
 
 	private const float WallRestitution = 0.85f;
 
+	/// <summary>Насколько золотой фрукт крупнее обычного (умножение масштаба).</summary>
+	private const float GoldenSizeFactor = 1.35f;
+
 	private float _rotationSpeed;
 
 	private static readonly Color Leaf = new("57a74a");
 	private static readonly Color Stem = new("5a4a2a");
 	private static readonly Color TrashBag = new("89a29d");
 	private static readonly Color TrashDark = new("4d635e");
+	private static readonly Color GoldColor = new("ffd700");
 
 	private readonly RandomNumberGenerator _rng = new();
 
@@ -54,6 +62,11 @@ public partial class FallingItem : Node2D
 		_rotationSpeed = _rng.RandfRange(-1.3f, 1.3f);
 
 		float scale = _rng.RandfRange(0.85f, 1.08f);
+		// Золотой фрукт крупнее обычного: масштаб и хитбокс растут вместе.
+		if (IsGolden)
+		{
+			scale *= GoldenSizeFactor;
+		}
 		Scale = new Vector2(scale, scale);
 
 		// Начальная скорость: падение вниз + случайный горизонтальный дрейф,
@@ -67,7 +80,6 @@ public partial class FallingItem : Node2D
 	/// <summary>Базовый радиус предмета без учёта масштаба.</summary>
 	private float BaseRadius => ItemType switch
 	{
-		ItemType.GoldenFruit => 25f,
 		ItemType.Trash => 23f,
 		ItemType.Healing => 20f,
 		_ => FruitCatalog.Get(Kind).BaseRadius,
@@ -115,9 +127,6 @@ public partial class FallingItem : Node2D
 	{
 		switch (ItemType)
 		{
-			case ItemType.GoldenFruit:
-				DrawGoldenFruit();
-				break;
 			case ItemType.Trash:
 				DrawTrash();
 				break;
@@ -166,6 +175,20 @@ public partial class FallingItem : Node2D
 				DrawWatermelon();
 				break;
 		}
+
+		if (IsGolden)
+		{
+			DrawGoldenGlow();
+		}
+	}
+
+	/// <summary>Золотой отблеск поверх обычного фрукта: окантовка, заливка и блик.</summary>
+	private void DrawGoldenGlow()
+	{
+		float r = BaseRadius;
+		DrawCircle(Vector2.Zero, r + 2f, GoldColor, false, 4f);
+		DrawCircle(Vector2.Zero, r, new Color(1f, 0.84f, 0.2f, 0.22f));
+		DrawCircle(new Vector2(-r * 0.30f, -r * 0.32f), r * 0.22f, new Color(1f, 1f, 1f, 0.5f));
 	}
 
 	// --- Вишня: две красные ягоды ---
@@ -342,20 +365,6 @@ public partial class FallingItem : Node2D
 			DrawArc(new Vector2(x, 0f), 5f, 0f, Mathf.Tau, 12, new Color("8ab85a"), 5f);
 		}
 		DrawLine(new Vector2(0f, -24f), new Vector2(0f, -30f), Stem, 3f);
-	}
-
-	private void DrawGoldenFruit()
-	{
-		DrawCircle(Vector2.Zero, 24f, new Color("ffd32e"));
-		DrawCircle(new Vector2(-8f, -9f), 7f, new Color(1f, 1f, 1f, 0.45f));
-		DrawLine(new Vector2(0f, -18f), new Vector2(2f, -30f), Stem, 3f);
-		Vector2[] leaf =
-		{
-			new(3f, -29f),
-			new(18f, -23f),
-			new(4f, -20f),
-		};
-		DrawColoredPolygon(leaf, Leaf);
 	}
 
 	private void DrawTrash()

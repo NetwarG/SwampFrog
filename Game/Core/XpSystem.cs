@@ -7,7 +7,7 @@ namespace SwampFrog;
 /// чтобы логику можно было легко тестировать и расширять.
 ///
 /// Расширение функционала:
-/// - новые источники опыта — добавить строку в <see cref="XpFor"/>;
+/// - новые источники опыта — добавить строку в <see cref="XpForFruit"/>;
 /// - награды за уровень — подписаться на <see cref="LevelUp"/>;
 /// - бонусы/перки, зависящие от уровня — добавить методы чтения свойств здесь.
 /// </summary>
@@ -33,22 +33,8 @@ public sealed class XpSystem
 	/// <summary>Происходит при повышении уровня. Аргумент — новый уровень (начиная с 2).</summary>
 	public event Action<int>? LevelUp;
 
-	/// <summary>
-	/// Единое место, где типу предмета сопоставляется награда опытом.
-	/// Для новых типов достаточно добавить строку здесь.
-	/// </summary>
-	public static int XpFor(ItemType type)
-	{
-		switch (type)
-		{
-			case ItemType.Fruit:
-				return 1;
-			case ItemType.GoldenFruit:
-				return 5;
-			default:
-				return 0;
-		}
-	}
+	/// <summary>Единое место, где фрукту сопоставляется награда опытом.</summary>
+	public static int XpForFruit(bool golden) => golden ? 5 : 1;
 
 	/// <summary>
 	/// Добавляет опыт, обрабатывая переходы через несколько уровней разом.

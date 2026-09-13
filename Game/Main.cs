@@ -394,51 +394,57 @@ public partial class Main : Node2D
 		bool guaranteedGolden = _perkPlayer.IsGoldenGuaranteed();
 
 		ItemType type;
+		bool golden = false;
 		// Хилка выпадает только при неполных жизнях и с очень маленьким шансом.
 		if (!guaranteedGolden && _lives < MaxLives && _rng.Randf() < HealSpawnChance)
 		{
 			type = ItemType.Healing;
 		}
-		else if (guaranteedGolden)
-		{
-			// «Золотая лихорадка» ур. 5: каждый N-й фрукт гарантированно золотой.
-			type = ItemType.GoldenFruit;
-		}
 		else
 		{
-			float roll = _rng.Randf();
-			if (roll < trashWeight)
+			// Базовый случай — фрукт одного из «мелких» видов классического режима.
+			type = ItemType.Fruit;
+			item.Kind = FruitCatalog.PickClassic(_rng);
+			if (guaranteedGolden)
 			{
-				type = ItemType.Trash;
-			}
-			else if (roll < trashWeight + goldenChance)
-			{
-				type = ItemType.GoldenFruit;
+				// «Золотая лихорадка» ур. 5: каждый N-й фрукт гарантированно золотой.
+				golden = true;
 			}
 			else
 			{
-				type = ItemType.Fruit;
-				// В классическом режиме попадаются только «мелкие» фрукты (первые 6 из каталога).
-				item.Kind = FruitCatalog.PickClassic(_rng);
+				float roll = _rng.Randf();
+				if (roll < trashWeight)
+				{
+					type = ItemType.Trash;
+				}
+				else
+				{
+					// Золотым может стать любой фрукт: он крупнее и ценнее обычного.
+					golden = roll < trashWeight + goldenChance;
+				}
 			}
 		}
 
 		float difficulty = Mathf.Clamp(_score / 500f, 0f, 1f);
 		float speed = Mathf.Lerp(150f, 330f, difficulty) + _rng.RandfRange(-25f, 25f);
-		if (type == ItemType.GoldenFruit)
+		if (golden)
 		{
 			// «Золотая лихорадка» ур. 4: золотой падает медленнее обычного.
 			speed *= _perkPlayer.GoldenFallSpeedFactor();
 		}
 
 		item.ItemType = type;
+		item.IsGolden = golden;
 		item.FallSpeed = speed;
 		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), -70f);
 		item.Scale = Vector2.One * (ScreenScale * _rng.RandfRange(0.85f, 1.08f));
 		_items!.AddChild(item);
 
-		// Учёт спавна: счётчик золотых и заморозка «Зоны замедления» ур. 5.
-		_perkPlayer.OnItemSpawned(type);
+		// Учёт спавна фрукта: счётчик золотых и заморозка «Зоны замедления» ур. 5.
+		if (type == ItemType.Fruit)
+		{
+			_perkPlayer.OnFruitSpawned(golden);
+		}
 	}
 
 	private void UpdateDifficulty()
