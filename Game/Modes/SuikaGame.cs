@@ -34,6 +34,9 @@ public partial class SuikaGame : Node2D
 	/// <summary>Скорость, ниже которой кусок считается «устаканившимся» (могут слиться).</summary>
 	private const float SettleSpeed = 40f;
 
+	/// <summary>Случайный боковой импульс брошенного фрукта, чтобы броски в одну точку не ложились столбцом.</summary>
+	private const float DropScatter = 52f;
+
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly List<Piece> _pieces = new();
 	private FruitKind _currentKind = FruitKind.Cherry;
@@ -547,7 +550,9 @@ public partial class SuikaGame : Node2D
 
 		float radius = FruitRadius(_currentKind);
 		float x = Mathf.Clamp(_aimX, _bowl.Position.X + radius + 4f, _bowl.End.X - radius - 4f);
-		CreatePiece(_currentKind, new Vector2(x, _bowl.Position.Y + radius + 4f), new Vector2(0f, 80f));
+		// Случайный боковой импульс: даже бросая в одну точку, фрукт на лету смещается
+		// вбок и при падении на горку отскакивает, а не ложится ровным столбцом.
+		CreatePiece(_currentKind, new Vector2(x, _bowl.Position.Y + radius + 4f), new Vector2(_rng.RandfRange(-DropScatter, DropScatter), 80f));
 		_throwTimer = 0.24f;
 		_currentKind = _nextKind;
 		_nextKind = PickStartFruit();
