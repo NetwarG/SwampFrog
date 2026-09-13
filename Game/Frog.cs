@@ -12,7 +12,8 @@ namespace SwampFrog;
 /// </summary>
 public partial class Frog : Node2D
 {
-	public const float CatchRadius = 44f;
+	/// <summary>Радиус хитбокса ладони в локальных единицах — чуть больше нарисованной ладони (15f), до пальцев.</summary>
+	public const float HandHitRadiusLocal = 16f;
 
 	/// <summary>На сколько дольше максимально возможной дистанции тянутся руки.</summary>
 	private const float ReachMargin = 1.06f;
@@ -70,10 +71,10 @@ public partial class Frog : Node2D
 	/// <summary>Текущий коэффициент масштаба UI/мира, чтобы лягушка не «худела» на больших экранах.</summary>
 	public float UiScale => _currentUiScale;
 
-	/// <summary>Радиус «ловли» ладонью в мировых единицах (учитывает масштаб ноды и множитель перков).</summary>
-	public float CatchRadiusWorld => CatchRadius * _currentUiScale * CatchRadiusMultiplier;
+	/// <summary>Радиус хитбокса ладони в мировых единицах (учитывает масштаб ноды и множитель перка «Липкие ладони»).</summary>
+	public float HandHitRadiusWorld => HandHitRadiusLocal * _currentUiScale * CatchRadiusMultiplier;
 
-	/// <summary>Множитель радиуса ловли (перк «Липкие ладони»). Выставляется из Main.</summary>
+	/// <summary>Множитель радиуса хитбокса ладони (перк «Липкие ладони»). Выставляется из Main.</summary>
 	public float CatchRadiusMultiplier { get; set; } = 1f;
 
 	/// <summary>Множитель скорости вытягивания рук (перк «Скорострельность»).</summary>
@@ -245,6 +246,24 @@ public partial class Frog : Node2D
 		{
 			HandPositionWorld(0),
 			HandPositionWorld(1),
+		};
+	}
+
+	/// <summary>
+	/// Хитбоксы обеих ладоней в мировых координатах: центры совпадают с позициями ладоней,
+	/// радиус — с размером видимой ладони. Используются для проверки реального касания предмета.
+	/// </summary>
+	public CircleHitbox[] GetHandHitboxes()
+	{
+		if (_armLengthWorld <= 2f)
+		{
+			return Array.Empty<CircleHitbox>();
+		}
+
+		return new[]
+		{
+			new CircleHitbox(HandPositionWorld(0), HandHitRadiusWorld),
+			new CircleHitbox(HandPositionWorld(1), HandHitRadiusWorld),
 		};
 	}
 

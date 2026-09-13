@@ -11,7 +11,6 @@ public partial class FallingItem : Node2D
 	public ItemType ItemType { get; set; } = ItemType.Fruit;
 	public FruitKind Kind { get; set; } = FruitKind.Cherry;
 	public float FallSpeed { get; set; } = 160f;
-	public float CatchRadius { get; set; } = 40f;
 
 	/// <summary>Пойманный предмет больше не падает, а следует за ладонью лягушки.</summary>
 	public bool IsCaught { get; set; }
@@ -30,6 +29,12 @@ public partial class FallingItem : Node2D
 
 	/// <summary>Радиус коллизии (учитывает масштаб): используется для отталкивания от стен и других предметов.</summary>
 	public float Radius { get; set; }
+
+	/// <summary>
+	/// Хитбокс предмета: круг в мировых координатах с радиусом фактического рисуемого размера
+	/// (Radius = BaseRadius × масштаб). Ловля срабатывает только при пересечении с хитбоксом ладони.
+	/// </summary>
+	public CircleHitbox GetHitbox() => new(GlobalPosition, Radius);
 
 	private const float WallRestitution = 0.85f;
 

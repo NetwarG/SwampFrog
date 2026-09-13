@@ -204,6 +204,7 @@ public partial class Main : Node2D
 
 		Vector2 viewSize = GetViewportRect().Size;
 		Vector2[]? hands = _frog.IsCatching ? _frog.GetHandPositions() : null;
+		CircleHitbox[]? handHitboxes = _frog.IsCatching ? _frog.GetHandHitboxes() : null;
 
 		foreach (Node child in _items.GetChildren())
 		{
@@ -235,22 +236,21 @@ public partial class Main : Node2D
 			// Заморозка/замедление/магнит перков.
 			_perkPlayer.ApplyWorldEffect(item, dt, viewSize, hands);
 
-			if (hands == null)
+			if (hands == null || handHitboxes == null)
 			{
 				continue;
 			}
 
-			float itemScale = item.Scale.X;
-			for (int i = 0; i < hands.Length; i++)
+			CircleHitbox itemHitbox = item.GetHitbox();
+			for (int i = 0; i < handHitboxes.Length; i++)
 			{
 				// Рука может держать один предмет (или два — перк «Липкие ладони»); занятую пропускаем.
 				if (!_frog.CanHold(i))
 				{
 					continue;
 				}
-				Vector2 hand = hands[i];
-				// Радиус зависит от масштаба предмета и лягушки.
-				if (item.GlobalPosition.DistanceTo(hand) <= item.CatchRadius * itemScale + _frog.CatchRadiusWorld)
+				// Ловим только при реальном касании хитбоксов ладони и предмета.
+				if (handHitboxes[i].Overlaps(itemHitbox))
 				{
 					CatchItem(item, i);
 					break;
