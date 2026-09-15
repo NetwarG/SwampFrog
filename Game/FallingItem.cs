@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace SwampFrog;
@@ -5,12 +6,34 @@ namespace SwampFrog;
 /// <summary>
 /// Падающий сверху объект: фрукт (ловить), мусор (не ловить) или хилка (+1 жизнь).
 /// Любой фрукт может быть золотым (IsGolden): он крупнее и даёт больше очков и опыта.
-/// Вся графика рисуется процедурно в _Draw, поэтому ассеты не нужны.
+/// Фрукты и мусор отображаются спрайтами из Game/assets; хилка пока рисуется
+/// процедурно — у неё ещё нет ассета.
 /// </summary>
 public partial class FallingItem : Node2D
 {
-	public ItemType ItemType { get; set; } = ItemType.Fruit;
-	public FruitKind Kind { get; set; } = FruitKind.Cherry;
+	private ItemType _itemType = ItemType.Fruit;
+
+	public ItemType ItemType
+	{
+		get => _itemType;
+		set
+		{
+			_itemType = value;
+			RefreshSprite();
+		}
+	}
+
+	private FruitKind _kind = FruitKind.Cherry;
+
+	public FruitKind Kind
+	{
+		get => _kind;
+		set
+		{
+			_kind = value;
+			RefreshSprite();
+		}
+	}
 	public float FallSpeed { get; set; } = 160f;
 
 	/// <summary>Пойманный предмет больше не падает, а следует за ладонью лягушки.</summary>
@@ -47,11 +70,13 @@ public partial class FallingItem : Node2D
 
 	private float _rotationSpeed;
 
-	private static readonly Color Leaf = new("57a74a");
-	private static readonly Color Stem = new("5a4a2a");
-	private static readonly Color TrashBag = new("89a29d");
-	private static readonly Color TrashDark = new("4d635e");
-	private static readonly Color GoldColor = new("ffd700");
+	/// <summary>Спрайт предмета (фрукт или мусор).</summary>
+	private Sprite2D? _sprite;
+
+	/// <summary>Золотое кольцо поверх спрайта золотого фрукта.</summary>
+	private GoldenGlow? _glow;
+
+	private static readonly Dictionary<string, Texture2D> TextureCache = new();
 
 	private readonly RandomNumberGenerator _rng = new();
 
@@ -73,8 +98,19 @@ public partial class FallingItem : Node2D
 		// чтобы предметы сами «гуляли» по экрану и сталкивались друг с другом.
 		Velocity = new Vector2(_rng.RandfRange(-60f, 60f), FallSpeed);
 
-		// Радиус коллизии совпадает с прорисовкой предмета.
+		// Радиус коллизии совпадает с видимым размером спрайта.
 		Radius = BaseRadius * scale;
+
+		_sprite = new Sprite2D { Centered = true };
+		AddChild(_sprite);
+		RefreshSprite();
+
+		// Золотой отблеск добавляется узлом поверх спрайта (ассета для золота нет).
+		if (IsGolden)
+		{
+			_glow = new GoldenGlow { Radius = BaseRadius };
+			AddChild(_glow);
+		}
 	}
 
 	/// <summary>Базовый радиус предмета без учёта масштаба.</summary>
@@ -84,6 +120,53 @@ public partial class FallingItem : Node2D
 		ItemType.Healing => 20f,
 		_ => FruitCatalog.Get(Kind).BaseRadius,
 	};
+
+	/// <summary>
+	/// Обновляет текстуру и масштаб спрайта под текущие ItemType/Kind. Вызывается
+	/// из сеттеров и после создания спрайта, поэтому в Suika вид меняется сразу.
+	/// </summary>
+	private void RefreshSprite()
+	{
+		if (_sprite == null)
+		{
+			return;
+		}
+		Texture2D? texture = LoadItemTexture();
+		if (texture == null)
+		{
+			_sprite.Visible = false;
+			_sprite.Texture = null;
+			return;
+		}
+		_sprite.Visible = true;
+		_sprite.Texture = texture;
+		// Высота спрайта в локальных единицах — диаметр хитбокса (2 × BaseRadius):
+		// видимый размер и радиус коллизии всегда совпадают.
+		_sprite.Scale = Vector2.One * (2f * BaseRadius / texture.GetHeight());
+	}
+
+	/// <summary>Текстура предмета из Game/assets или null для хилки (нет ассета).</summary>
+	private Texture2D? LoadItemTexture()
+	{
+		string path = ItemType switch
+		{
+			ItemType.Trash => "res://Game/assets/fruits/trash.png",
+			ItemType.Healing => string.Empty,
+			_ => "res://Game/assets/fruits/" + Kind.ToString().ToLower() + ".png",
+		};
+		return path.Length == 0 ? null : LoadTextureAt(path);
+	}
+
+	private static Texture2D LoadTextureAt(string path)
+	{
+		if (TextureCache.TryGetValue(path, out Texture2D? cached) && cached != null)
+		{
+			return cached;
+		}
+		Texture2D loaded = GD.Load<Texture2D>(path);
+		TextureCache[path] = loaded;
+		return loaded;
+	}
 
 	public override void _Process(double delta)
 	{
@@ -120,265 +203,29 @@ public partial class FallingItem : Node2D
 		}
 
 		Rotation += _rotationSpeed * dt;
-		QueueRedraw();
 	}
 
 	public override void _Draw()
 	{
-		switch (ItemType)
+		// Хилка пока процедурная — для неё нет ассета. Остальное рисуют спрайты.
+		if (ItemType == ItemType.Healing)
 		{
-			case ItemType.Trash:
-				DrawTrash();
-				break;
-			case ItemType.Healing:
-				DrawHealing();
-				break;
-			default:
-				DrawFruitByKind(Kind);
-				break;
+			DrawHealing();
 		}
 	}
 
-	/// <summary>Рисует конкретный вид фрукта. Новый фрукт = новый case здесь.</summary>
-	private void DrawFruitByKind(FruitKind kind)
+	/// <summary>Золотое кольцо поверх спрайта золотого фрукта.</summary>
+	private sealed partial class GoldenGlow : Node2D
 	{
-		switch (kind)
+		/// <summary>Радиус кольца в локальных единицах предмета.</summary>
+		public float Radius { get; set; }
+
+		public override void _Draw()
 		{
-			case FruitKind.Cherry:
-				DrawCherry();
-				break;
-			case FruitKind.Strawberry:
-				DrawStrawberry();
-				break;
-			case FruitKind.Grape:
-				DrawGrape();
-				break;
-			case FruitKind.Mandarin:
-				DrawMandarin();
-				break;
-			case FruitKind.Apple:
-				DrawApple();
-				break;
-			case FruitKind.Pear:
-				DrawPear();
-				break;
-			case FruitKind.Peach:
-				DrawPeach();
-				break;
-			case FruitKind.Pineapple:
-				DrawPineapple();
-				break;
-			case FruitKind.Melon:
-				DrawMelon();
-				break;
-			case FruitKind.Watermelon:
-				DrawWatermelon();
-				break;
+			DrawCircle(Vector2.Zero, Radius + 2f, new Color("ffd700"), false, 4f);
+			DrawCircle(Vector2.Zero, Radius, new Color(1f, 0.84f, 0.2f, 0.22f));
+			DrawCircle(new Vector2(-Radius * 0.30f, -Radius * 0.32f), Radius * 0.22f, new Color(1f, 1f, 1f, 0.5f));
 		}
-
-		if (IsGolden)
-		{
-			DrawGoldenGlow();
-		}
-	}
-
-	/// <summary>Золотой отблеск поверх обычного фрукта: окантовка, заливка и блик.</summary>
-	private void DrawGoldenGlow()
-	{
-		float r = BaseRadius;
-		DrawCircle(Vector2.Zero, r + 2f, GoldColor, false, 4f);
-		DrawCircle(Vector2.Zero, r, new Color(1f, 0.84f, 0.2f, 0.22f));
-		DrawCircle(new Vector2(-r * 0.30f, -r * 0.32f), r * 0.22f, new Color(1f, 1f, 1f, 0.5f));
-	}
-
-	// --- Вишня: две красные ягоды ---
-	private void DrawCherry()
-	{
-		DrawCircle(new Vector2(-5f, 0f), 8f, new Color("c1222f"));
-		DrawCircle(new Vector2(5f, -2f), 8f, new Color("c1222f"));
-		DrawCircle(new Vector2(-6f, -2f), 3f, new Color(1f, 1f, 1f, 0.4f));
-		DrawCircle(new Vector2(4f, -4f), 3f, new Color(1f, 1f, 1f, 0.4f));
-		DrawLine(new Vector2(-2f, -4f), new Vector2(-1f, -16f), Stem, 3f);
-		DrawLine(new Vector2(6f, -6f), new Vector2(2f, -18f), Stem, 3f);
-	}
-
-	// --- Клубника: красная ягода с зелёной шапочкой и семечками ---
-	private void DrawStrawberry()
-	{
-		// Ягода — сердцевидная форма.
-		DrawCircle(new Vector2(0f, -2f), 13f, new Color("e03a3a"));
-		DrawCircle(new Vector2(0f, 4f), 8f, new Color("e03a3a"));
-
-		// Семечки.
-		Vector2[] seeds =
-		{
-			new Vector2(-4f, -6f), new Vector2(5f, -4f), new Vector2(-2f, 1f),
-			new Vector2(3f, 4f), new Vector2(-6f, 5f),
-		};
-		foreach (Vector2 p in seeds)
-		{
-			DrawCircle(p, 1.6f, new Color("f8e24a"));
-		}
-
-		// Шапочка из листиков.
-		Vector2[] cap =
-		{
-			new(-10f, -10f),
-			new(-4f, -15f),
-			new(4f, -15f),
-			new(10f, -10f),
-			new(0f, -8f),
-		};
-		DrawColoredPolygon(cap, Leaf);
-		DrawCircle(new Vector2(0f, -13f), 2.5f, Stem);
-	}
-
-	// --- Виноград: гроздь фиолетовых ягод ---
-	private void DrawGrape()
-	{
-		Color grape = new("6d4ac9");
-		Vector2[] berries =
-		{
-			new(0f, 4f), new(-6f, 3f), new(6f, 3f),
-			new(-3f, -3f), new(3f, -3f), new(0f, -8f),
-		};
-		foreach (Vector2 p in berries)
-		{
-			DrawCircle(p, 5.5f, grape);
-		}
-		DrawCircle(new Vector2(-2f, -4f), 2f, new Color(1f, 1f, 1f, 0.35f));
-		DrawLine(new Vector2(0f, -10f), new Vector2(1f, -20f), Stem, 3f);
-		DrawCircle(new Vector2(1f, -20f), 3f, Leaf);
-	}
-
-	// --- Мандарин: оранжевый с листиком ---
-	private void DrawMandarin()
-	{
-		DrawCircle(Vector2.Zero, 15f, new Color("f08a2a"));
-		DrawCircle(new Vector2(-5f, -6f), 4f, new Color(1f, 1f, 1f, 0.35f));
-		Vector2[] leaf =
-		{
-			new(2f, -14f),
-			new(14f, -8f),
-			new(4f, -10f),
-		};
-		DrawColoredPolygon(leaf, Leaf);
-		DrawLine(new Vector2(0f, -14f), new Vector2(2f, -20f), Stem, 3f);
-	}
-
-	// --- Яблоко: красное с черенком и листом ---
-	private void DrawApple()
-	{
-		DrawCircle(Vector2.Zero, 16f, new Color("d63a2a"));
-		DrawCircle(new Vector2(-5f, -7f), 5f, new Color(1f, 1f, 1f, 0.4f));
-		Vector2[] leaf =
-		{
-			new(2f, -15f),
-			new(16f, -9f),
-			new(4f, -11f),
-		};
-		DrawColoredPolygon(leaf, Leaf);
-		DrawLine(new Vector2(0f, -16f), new Vector2(0f, -23f), Stem, 3f);
-	}
-
-	// --- Груша: жёлто-зелёная с узким верхом ---
-	private void DrawPear()
-	{
-		Color pear = new("9ac44a");
-		DrawCircle(new Vector2(0f, 6f), 9f, pear);
-		DrawCircle(new Vector2(0f, -4f), 14f, pear);
-		DrawCircle(new Vector2(-5f, -8f), 4f, new Color(1f, 1f, 1f, 0.35f));
-		DrawLine(new Vector2(0f, -2f), new Vector2(0f, -13f), Stem, 3f);
-		Vector2[] leaf =
-		{
-			new(0f, -12f),
-			new(10f, -5f),
-			new(2f, -8f),
-		};
-		DrawColoredPolygon(leaf, Leaf);
-	}
-
-	// --- Персик: оранжево-розовый с бороздкой (для будущего режима) ---
-	private void DrawPeach()
-	{
-		DrawCircle(Vector2.Zero, 16f, new Color("f2a05a"));
-		DrawCircle(new Vector2(0f, -2f), 2f, new Color(1f, 1f, 1f, 0.25f));
-		DrawLine(new Vector2(-4f, 10f), new Vector2(4f, -10f), new Color("d97a3a"), 1.5f);
-		Vector2[] leaf =
-		{
-			new(2f, -15f),
-			new(14f, -9f),
-			new(4f, -11f),
-		};
-		DrawColoredPolygon(leaf, Leaf);
-		DrawLine(new Vector2(0f, -16f), new Vector2(0f, -22f), Stem, 3f);
-	}
-
-	// --- Ананас: жёлтый бочонок с кроной (для будущего режима) ---
-	private void DrawPineapple()
-	{
-		// Тело.
-		DrawRect(new Rect2(-11f, -8f, 22f, 26f), new Color("e9c940"));
-		DrawRect(new Rect2(-11f, -8f, 22f, 26f), new Color("b58f2a"), false, 2f);
-		// Ромбики-чешуйки.
-		for (float y = -6f; y <= 12f; y += 6f)
-		{
-			for (float x = -7f; x <= 7f; x += 6f)
-			{
-				DrawLine(new Vector2(x - 3f, y + 2f), new Vector2(x + 3f, y - 2f), new Color("b58f2a"), 1.5f);
-				DrawLine(new Vector2(x - 3f, y - 2f), new Vector2(x + 3f, y + 2f), new Color("b58f2a"), 1.5f);
-			}
-		}
-		// Крона.
-		DrawCircle(new Vector2(0f, -14f), 4f, Stem);
-		Vector2[] crown =
-		{
-			new Vector2(-5f, -22f), new Vector2(0f, -25f), new Vector2(5f, -22f),
-		};
-		foreach (Vector2 p in crown)
-		{
-			DrawCircle(p, 4f, Leaf);
-		}
-	}
-
-	// --- Дыня: светлая с тёмными полосами (для будущего режима) ---
-	private void DrawMelon()
-	{
-		DrawCircle(Vector2.Zero, 21f, new Color("f2e3a0"));
-		DrawCircle(new Vector2(-5f, -7f), 4f, new Color(1f, 1f, 1f, 0.3f));
-		// Сеточка полос.
-		for (float a = -0.6f; a <= 0.6f; a += 0.3f)
-		{
-			Vector2 d = Vector2.FromAngle(a);
-			DrawLine(-d * 20f, d * 22f, new Color("a8924a"), 2f);
-		}
-		DrawLine(new Vector2(0f, -19f), new Vector2(0f, -26f), Stem, 3f);
-	}
-
-	// --- Арбуз: тёмно-зелёный с полосами (для будущего режима) ---
-	private void DrawWatermelon()
-	{
-		DrawCircle(Vector2.Zero, 26f, new Color("2e6b2e"));
-		// Изогнутые светлые полосы.
-		foreach (float x in new float[] { -16f, 0f, 16f })
-		{
-			DrawArc(new Vector2(x, 0f), 5f, 0f, Mathf.Tau, 12, new Color("8ab85a"), 5f);
-		}
-		DrawLine(new Vector2(0f, -24f), new Vector2(0f, -30f), Stem, 3f);
-	}
-
-	private void DrawTrash()
-	{
-		// Полиэтиленовый пакет: прямоугольник с ручками.
-		DrawRect(new Rect2(-22f, -12f, 44f, 34f), TrashBag, true);
-		DrawRect(new Rect2(-22f, -12f, 44f, 34f), TrashDark, false, 3f);
-
-		DrawArc(new Vector2(-8f, -12f), 6f, Mathf.Pi, Mathf.Pi * 2f, 16, TrashDark, 3f);
-		DrawArc(new Vector2(8f, -12f), 6f, Mathf.Pi, Mathf.Pi * 2f, 16, TrashDark, 3f);
-
-		DrawLine(new Vector2(-13f, 2f), new Vector2(1f, -2f), TrashDark, 2f);
-		DrawLine(new Vector2(1f, -2f), new Vector2(13f, 4f), TrashDark, 2f);
-		DrawLine(new Vector2(-8f, 10f), new Vector2(9f, 12f), TrashDark, 2f);
 	}
 
 	// --- Хилка: сердечко с медицинским крестом (+1 жизнь) ---

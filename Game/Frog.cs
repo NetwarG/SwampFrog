@@ -7,6 +7,8 @@ namespace SwampFrog;
 /// <summary>
 /// Лягушка с вытягивающимися руками. Пока палец зажат — руки растут в направлении
 /// точки касания (направление можно менять, двигая палец). Отпустил — руки втягиваются.
+/// Тело — спрайт из Game/assets/frogs (позы idle/catching/eating/angry), а руки и ладони
+/// рисуются процедурно: они динамически следуют за пальцем и задают хитбоксы ловли.
 /// Вся геометрия рук хранится в «мировых» единицах (как и границы экрана), поэтому руки
 /// всегда дотягиваются до любого угла экрана на любом разрешении.
 /// </summary>
@@ -28,9 +30,29 @@ public partial class Frog : Node2D
 	/// <summary>Отступ ладони от края экрана (в базовых единицах, затем умножается на UiScale).</summary>
 	private const float HandScreenMargin = 24f;
 
+	/// <summary>Сколько секунд лягушка находится в позе «ест» после доставки предмета.</summary>
+	private const float EatingStateTime = 0.7f;
+
+	/// <summary>Высота персонажа в локальных единицах (как у старого процедурного тела).</summary>
+	private const float BodyVisualHeight = 85f;
+
+	/// <summary>Высота текстуры тела из Game/assets/frogs.</summary>
+	private const float BodyTextureHeight = 179f;
+
+	/// <summary>Позы тела лягушки — соответствуют файлам в Game/assets/frogs.</summary>
+	private enum FrogPose
+	{
+		Idle,
+		Catching,
+		Eating,
+		Angry,
+	}
+
+	/// <summary>Кэш текстур тела по позе.</summary>
+	private static readonly Dictionary<FrogPose, Texture2D> BodyTextures = new();
+
 	private static readonly Color Skin = new("55a82e");
 	private static readonly Color SkinDark = new("2f7d2f");
-	private static readonly Color Belly = new("eaf3a6");
 	private static readonly Color Hand = new("b4e863");
 	private static readonly Color HandDark = new("3a8a2a");
 
@@ -53,6 +75,8 @@ public partial class Frog : Node2D
 	private bool _pulsing;
 	private float _pulseT;
 	private float _currentUiScale = 1f;
+	private Sprite2D? _body;
+	private float _eatingTimer;
 
 	/// <summary>Пойманный предмет, зажатый в ладони (с индексом держащей руки).</summary>
 	private struct CaughtItem
@@ -93,10 +117,87 @@ public partial class Frog : Node2D
 	public void SyncUiScale(float uiScale)
 	{
 		_currentUiScale = uiScale;
+		UpdateBodyState();
 	}
 
 	/// <summary>Идёт ли ловля прямо сейчас: руки достаточно вытянуты (во время роста, удержания или втягивания).</summary>
 	public bool IsCatching => _armLengthWorld >= MinCatchLengthPx * _currentUiScale;
+
+	private static string TexturePath(FrogPose pose) => pose switch
+	{
+		FrogPose.Catching => "res://Game/assets/frogs/catching.png",
+		FrogPose.Eating => "res://Game/assets/frogs/eating.png",
+		FrogPose.Angry => "res://Game/assets/frogs/angry.png",
+		_ => "res://Game/assets/frogs/idle.png",
+	};
+
+	private static Texture2D LoadBodyTexture(FrogPose pose)
+	{
+		if (BodyTextures.TryGetValue(pose, out Texture2D? cached))
+		{
+			return cached;
+		}
+		Texture2D loaded = GD.Load<Texture2D>(TexturePath(pose));
+		BodyTextures[pose] = loaded;
+		return loaded;
+	}
+
+	public override void _Ready()
+	{
+		_body = new Sprite2D { Centered = true };
+		AddChild(_body);
+		UpdateBodyState();
+	}
+
+	/// <summary>Текущая поза: урон важнее «еды», «еда» важнее ловли.</summary>
+	private FrogPose CurrentPose()
+	{
+		if (_flash > 0f)
+		{
+			return FrogPose.Angry;
+		}
+		if (_eatingTimer > 0f)
+		{
+			return FrogPose.Eating;
+		}
+		if (DecorativeOnly ? ThrowPose : IsCatching)
+		{
+			return FrogPose.Catching;
+		}
+		return FrogPose.Idle;
+	}
+
+	/// <summary>Обновляет текстуру и позиционирование тела по текущему состоянию.</summary>
+	private void UpdateBodyState()
+	{
+		if (_body == null)
+		{
+			return;
+		}
+		UpdateBodyTransform();
+
+		FrogPose pose = CurrentPose();
+		Texture2D texture = LoadBodyTexture(pose);
+		if (_body.Texture != texture)
+		{
+			_body.Texture = texture;
+		}
+	}
+
+	/// <summary>Масштабирует тело под UiScale, зеркалирует к направлению рук и покачивает.</summary>
+	private void UpdateBodyTransform()
+	{
+		if (_body == null)
+		{
+			return;
+		}
+		float unit = BodyVisualHeight * _currentUiScale / BodyTextureHeight;
+		float flip = _direction.X < -0.01f ? -1f : 1f;
+		_body.Scale = new Vector2(unit * flip, unit);
+		// Лёгкое покачивание как в старом процедурном рисунке.
+		float bob = Mathf.Sin((float)Time.GetTicksMsec() / 380f) * 2.2f * _currentUiScale;
+		_body.Position = new Vector2(0f, bob);
+	}
 
 	public override void _Process(double delta)
 	{
@@ -104,6 +205,8 @@ public partial class Frog : Node2D
 		if (DecorativeOnly)
 		{
 			_flash = Mathf.Max(0f, _flash - dt);
+			_eatingTimer = Mathf.Max(0f, _eatingTimer - dt);
+			UpdateBodyState();
 			QueueRedraw();
 			return;
 		}
@@ -138,6 +241,7 @@ public partial class Frog : Node2D
 		UpdateCaughtItems();
 
 		_flash = Mathf.Max(0f, _flash - dt);
+		_eatingTimer = Mathf.Max(0f, _eatingTimer - dt);
 
 		float uiScale = UiScale;
 		if (_pulsing)
@@ -154,6 +258,7 @@ public partial class Frog : Node2D
 			Scale = Vector2.One * uiScale;
 		}
 
+		UpdateBodyState();
 		QueueRedraw();
 	}
 
@@ -275,7 +380,7 @@ public partial class Frog : Node2D
 		return GlobalPosition + dir * _armLengthWorld;
 	}
 
-	/// <summary>Белый «всполох» при попадании мусором.</summary>
+	/// <summary>Реакция на урон мусором: на короткое время включает позу «злая».</summary>
 	public void Flash() => _flash = 0.45f;
 
 	/// <summary>Маленький подпрыг, когда что-то поймали (без конфликта с масштабом).</summary>
@@ -338,6 +443,8 @@ public partial class Frog : Node2D
 			{
 				CaughtItemReturned?.Invoke(entry.Item);
 			}
+			// Предмет «съеден» — включаем короткую позу eating.
+			_eatingTimer = EatingStateTime;
 			return;
 		}
 
@@ -364,6 +471,7 @@ public partial class Frog : Node2D
 		if (to.LengthSquared() > 4f)
 		{
 			_direction = to.Normalized();
+			UpdateBodyState();
 			QueueRedraw();
 		}
 	}
@@ -374,10 +482,8 @@ public partial class Frog : Node2D
 	public override void _Draw()
 	{
 		float ui = _currentUiScale;
-		float bob = Mathf.Sin((float)Time.GetTicksMsec() / 380f) * 2.2f * ui;
-		Vector2 o = new(0f, bob);
 
-		// --- Руки и ладони (за телом) ---
+		// --- Руки и ладони (за телом): динамически следуют за пальцем ---
 		if (_armLengthWorld > 2f || (DecorativeOnly && ThrowPose))
 		{
 			float spread = Mathf.DegToRad(HandSpreadDeg);
@@ -403,35 +509,6 @@ public partial class Frog : Node2D
 					DrawCircle(handLocal + finger * (14f * ui), 4.5f * ui, Hand);
 				}
 			}
-		}
-
-		// --- Ножки ---
-		DrawCircle(o + new Vector2(-18f, 30f) * ui, 11f * ui, SkinDark);
-		DrawCircle(o + new Vector2(6f, 32f) * ui, 11f * ui, SkinDark);
-		DrawCircle(o + new Vector2(-17f, 30f) * ui, 7f * ui, Skin);
-		DrawCircle(o + new Vector2(7f, 32f) * ui, 7f * ui, Skin);
-
-		// --- Тело ---
-		DrawCircle(o, 42f * ui, SkinDark);
-		DrawCircle(o, 40f * ui, Skin);
-		DrawCircle(o + new Vector2(2f, 12f) * ui, 24f * ui, Belly);
-
-		// --- Глаза ---
-		Vector2 pupil = _direction * (5f * ui);
-		foreach (Vector2 eye in new[] { o + new Vector2(-11f, -27f) * ui, o + new Vector2(12f, -27f) * ui })
-		{
-			DrawCircle(eye, 15f * ui, new Color("ffffff"));
-			DrawCircle(eye + pupil, 7f * ui, new Color("1d1d1d"));
-		}
-
-		// --- Румянец ---
-		DrawCircle(o + new Vector2(-26f, 8f) * ui, 6f * ui, new Color(1f, 0.5f, 0.4f, 0.35f));
-		DrawCircle(o + new Vector2(26f, 8f) * ui, 6f * ui, new Color(1f, 0.5f, 0.4f, 0.35f));
-
-		// --- Вспышка при уроне ---
-		if (_flash > 0f)
-		{
-			DrawCircle(o, 44f * ui, new Color(1f, 0.35f, 0.3f, 0.55f * Mathf.Min(1f, _flash * 3f)));
 		}
 	}
 }
