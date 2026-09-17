@@ -241,7 +241,7 @@ public partial class Main : Node2D
 				continue;
 			}
 
-			CircleHitbox itemHitbox = item.GetHitbox();
+			EllipseHitbox itemHitbox = item.GetHitbox();
 			for (int i = 0; i < handHitboxes.Length; i++)
 			{
 				// Рука может держать один предмет (или два — перк «Липкие ладони»); занятую пропускаем.
@@ -250,7 +250,7 @@ public partial class Main : Node2D
 					continue;
 				}
 				// Ловим только при реальном касании хитбоксов ладони и предмета.
-				if (handHitboxes[i].Overlaps(itemHitbox))
+				if (itemHitbox.Overlaps(handHitboxes[i]))
 				{
 					CatchItem(item, i);
 					break;
@@ -303,15 +303,19 @@ public partial class Main : Node2D
 				FallingItem a = moving[i];
 				FallingItem b = moving[j];
 				Vector2 delta = a.GlobalPosition - b.GlobalPosition;
-				float minDist = a.Radius + b.Radius;
 				float distSq = delta.LengthSquared();
-				if (distSq > minDist * minDist || distSq <= 0.0001f)
+				if (distSq <= 0.0001f)
 				{
 					continue;
 				}
-
 				float dist = Mathf.Sqrt(distSq);
 				Vector2 n = delta / dist;
+				// Порог касания считается по эллипсам формы обоих предметов вдоль нормали.
+				float minDist = a.GetHitbox().RadiusAlong(n) + b.GetHitbox().RadiusAlong(n);
+				if (distSq > minDist * minDist)
+				{
+					continue;
+				}
 
 				// Раздвигаем, чтобы предметы не проникали друг в друга.
 				float overlap = minDist - dist;
@@ -437,7 +441,8 @@ public partial class Main : Node2D
 		item.IsGolden = golden;
 		item.FallSpeed = speed;
 		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), -70f);
-		item.Scale = Vector2.One * (ScreenScale * _rng.RandfRange(0.85f, 1.08f));
+		// Базовый масштаб предмета; случайный разброс и золото применяет FallingItem._Ready.
+		item.Scale = Vector2.One * ScreenScale;
 		_items!.AddChild(item);
 
 		// Учёт спавна фрукта: счётчик золотых и заморозка «Зоны замедления» ур. 5.

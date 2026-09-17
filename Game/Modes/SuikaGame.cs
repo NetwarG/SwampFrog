@@ -17,7 +17,9 @@ public partial class SuikaGame : Node2D
 		public FruitKind Kind;
 		public Vector2 Position;
 		public Vector2 Velocity;
-		public float Radius;
+		/// <summary>Полуоси эллипса коллизии (форма тела фрукта из FruitCatalog).</summary>
+		public float RadiusX;
+		public float RadiusY;
 		public float Age;
 	}
 
@@ -559,11 +561,12 @@ public partial class SuikaGame : Node2D
 		}
 		UpdateStockLabel();
 
+		FruitBody body = FruitCatalog.Get(_currentKind).Body;
 		float radius = FruitRadius(_currentKind);
-		float x = ClampDropX(_aimX, radius);
+		float x = ClampDropX(_aimX, radius * body.HitX);
 		// Случайный боковой импульс: даже бросая в одну точку, фрукт на лету смещается
 		// вбок и при падении на горку отскакивает, а не ложится ровным столбцом.
-		CreatePiece(_currentKind, new Vector2(x, _bowl.Position.Y + radius + 4f), new Vector2(_rng.RandfRange(-DropScatter, DropScatter), 80f));
+		CreatePiece(_currentKind, new Vector2(x, _bowl.Position.Y + radius * body.HitY + 4f), new Vector2(_rng.RandfRange(-DropScatter, DropScatter), 80f));
 		_throwTimer = 0.24f;
 		_currentKind = _nextKind;
 		_nextKind = PickStartFruit();
@@ -633,9 +636,10 @@ public partial class SuikaGame : Node2D
 	{
 		float radius = FruitRadius(kind);
 		var item = CreateVisualFruit(kind, radius);
+		FruitBody shape = FruitCatalog.Get(kind).Body;
 		item.Position = position;
 		item.Rotation = _rng.RandfRange(-0.2f, 0.2f);
-		var piece = new Piece { View = item, Kind = kind, Position = position, Velocity = velocity, Radius = radius };
+		var piece = new Piece { View = item, Kind = kind, Position = position, Velocity = velocity, RadiusX = radius * shape.HitX, RadiusY = radius * shape.HitY };
 		_pieces.Add(piece);
 		return piece;
 	}
@@ -646,19 +650,29 @@ public partial class SuikaGame : Node2D
 		AddChild(item);
 		float baseRadius = FruitCatalog.Get(kind).BaseRadius;
 		item.Scale = Vector2.One * (radius / baseRadius);
-		item.Radius = radius;
 		return item;
 	}
 
 	private float FruitRadius(FruitKind kind)
 	{
 		int order = (int)kind;
-		return 16f * Mathf.Pow(1.18f, order);
+		// Базовый радиус куска (вишня) вдвое больше прежнего (16): фрукты в Suika
+		// крупные, поэтому корзина вмещает заметно меньше плодов.
+		return 32f * Mathf.Pow(1.18f, order);
+	}
+
+	/// <summary>Эффективный радиус эллипса вдоль направления dir (для столкновений кусков).</summary>
+	private static float EffectiveRadius(Piece piece, Vector2 dir)
+	{
+		float nx = dir.X / piece.RadiusX;
+		float ny = dir.Y / piece.RadiusY;
+		float len = Mathf.Sqrt(nx * nx + ny * ny);
+		return len < 0.0001f ? Mathf.Min(piece.RadiusX, piece.RadiusY) : 1f / len;
 	}
 
 	/// <summary>
-	/// Ограничивает горизонтальную точку броска стенами кувшина с учётом радиуса
-	/// фрукта. Если фрукт шире кувшина, цель ставится в середину.
+	/// Ограничивает горизонтальную точку броска стенами кувшина с учётом
+	/// горизонтальной полуоси фрукта. Если фрукт шире кувшина, цель — в середине.
 	/// </summary>
 	private float ClampDropX(float x, float radius)
 	{
@@ -692,8 +706,8 @@ public partial class SuikaGame : Node2D
 	/// <summary>Упирает один кусок в стены и дно кувшина, гася скорость.</summary>
 	private void ClampPieceToBowl(Piece piece)
 	{
-		float left = _bowl.Position.X + piece.Radius;
-		float right = _bowl.End.X - piece.Radius;
+		float left = _bowl.Position.X + piece.RadiusX;
+		float right = _bowl.End.X - piece.RadiusX;
 		// Кусок шире кувшина: диапазон вырождается, поэтому центр прижимается
 		// к середине, чтобы фрукт свисал за обе стенки равномерно.
 		if (left > right)
@@ -712,7 +726,7 @@ public partial class SuikaGame : Node2D
 			piece.Velocity.X = -Mathf.Abs(piece.Velocity.X) * 0.35f;
 		}
 
-		float floor = _bowl.End.Y - piece.Radius - 6f;
+		float floor = _bowl.End.Y - piece.RadiusY - 6f;
 		if (piece.Position.Y > floor)
 		{
 			piece.Position.Y = floor;
@@ -733,11 +747,12 @@ public partial class SuikaGame : Node2D
 					Piece a = _pieces[i];
 					Piece b = _pieces[j];
 					Vector2 delta = a.Position - b.Position;
-					float minDistance = a.Radius + b.Radius;
 					float distanceSquared = delta.LengthSquared();
+					// Порог контакта — по эллипсам формы обоих кусков вдоль нормали.
+					Vector2 normal = distanceSquared > 0.0001f ? delta / Mathf.Sqrt(distanceSquared) : Vector2.Up;
+					float minDistance = EffectiveRadius(a, normal) + EffectiveRadius(b, normal);
 					if (distanceSquared >= minDistance * minDistance) continue;
 					float distance = Mathf.Sqrt(Mathf.Max(distanceSquared, 0.0001f));
-					Vector2 normal = distanceSquared > 0.0001f ? delta / distance : Vector2.Up;
 					float overlap = minDistance - distance;
 					a.Position += normal * (overlap * 0.5f);
 					b.Position -= normal * (overlap * 0.5f);
@@ -763,9 +778,16 @@ public partial class SuikaGame : Node2D
 			{
 				Piece b = _pieces[j];
 				if (a.Kind != b.Kind) continue;
-				// ResolveCollisions оставляет соприкасающиеся круги ровно на сумме
-				// радиусов, поэтому слияние проверяется по факту контакта.
-				if (a.Position.DistanceTo(b.Position) > (a.Radius + b.Radius) * 1.06f) continue;
+				// ResolveCollisions оставляет соприкасающиеся куски ровно на границе
+				// контакта эллипсов, поэтому слияние проверяется по факту касания.
+				Vector2 delta = a.Position - b.Position;
+				float distSq = delta.LengthSquared();
+				if (distSq > 0.0001f)
+				{
+					Vector2 normal = delta / Mathf.Sqrt(distSq);
+					float touchDist = (EffectiveRadius(a, normal) + EffectiveRadius(b, normal)) * 1.06f;
+					if (distSq > touchDist * touchDist) continue;
+				}
 
 				FruitKind mergedKind = (FruitKind)((int)a.Kind + 1);
 				Vector2 position = (a.Position + b.Position) * 0.5f;
@@ -791,7 +813,7 @@ public partial class SuikaGame : Node2D
 		foreach (Piece piece in _pieces)
 		{
 			piece.View.Position = piece.Position;
-			piece.View.Rotation += Mathf.Clamp(piece.Velocity.X / Mathf.Max(30f, piece.Radius * 4f), -1.4f, 1.4f) * dt;
+			piece.View.Rotation += Mathf.Clamp(piece.Velocity.X / Mathf.Max(30f, piece.RadiusX * 4f), -1.4f, 1.4f) * dt;
 		}
 	}
 
@@ -803,7 +825,7 @@ public partial class SuikaGame : Node2D
 		{
 			// Новый фрукт пересекает линию по пути вниз, поэтому учитываем только
 			// объект, который уже пробыл в кувшине заметное время.
-			if (piece.Age > 0.45f && piece.Position.Y - piece.Radius < danger)
+			if (piece.Age > 0.45f && piece.Position.Y - piece.RadiusY < danger)
 			{
 				overflowing = true;
 				break;

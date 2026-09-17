@@ -54,14 +54,15 @@ public partial class FallingItem : Node2D
 	/// <summary>Отключает встроенное падение, когда объект управляется физикой Suika.</summary>
 	public bool ManualPhysics { get; set; }
 
-	/// <summary>Радиус коллизии (учитывает масштаб): используется для отталкивания от стен и других предметов.</summary>
-	public float Radius { get; set; }
+	/// <summary>Полуоси эллипса коллизии в мировых единицах (учитывают масштаб и форму спрайта).</summary>
+	public float HitRadiusX { get; set; }
+	public float HitRadiusY { get; set; }
 
 	/// <summary>
-	/// Хитбокс предмета: круг в мировых координатах с радиусом фактического рисуемого размера
-	/// (Radius = BaseRadius × масштаб). Ловля срабатывает только при пересечении с хитбоксом ладони.
+	/// Хитбокс предмета: эллипс по форме тела фрукта в мировых координатах.
+	/// Ловля срабатывает только при пересечении эллипса с хитбоксом ладони.
 	/// </summary>
-	public CircleHitbox GetHitbox() => new(GlobalPosition, Radius);
+	public EllipseHitbox GetHitbox() => new(GlobalPosition, HitRadiusX, HitRadiusY, Rotation);
 
 	private const float WallRestitution = 0.85f;
 
@@ -86,8 +87,10 @@ public partial class FallingItem : Node2D
 
 		_rotationSpeed = _rng.RandfRange(-1.3f, 1.3f);
 
-		float scale = _rng.RandfRange(0.85f, 1.08f);
-		// Золотой фрукт крупнее обычного: масштаб и хитбокс растут вместе.
+		float baseScale = Mathf.Max(Scale.X, 0.01f);
+		// Масштаб: базовый (ScreenScale от Main или 1 по умолчанию) умножается на случайный
+		// разброс, чтобы одинаковые предметы отличались размером; золотой — крупнее.
+		float scale = baseScale * _rng.RandfRange(0.85f, 1.08f);
 		if (IsGolden)
 		{
 			scale *= GoldenSizeFactor;
@@ -98,8 +101,10 @@ public partial class FallingItem : Node2D
 		// чтобы предметы сами «гуляли» по экрану и сталкивались друг с другом.
 		Velocity = new Vector2(_rng.RandfRange(-60f, 60f), FallSpeed);
 
-		// Радиус коллизии совпадает с видимым размером спрайта.
-		Radius = BaseRadius * scale;
+		// Полуоси эллипса коллизии — форма тела из спрайта (доли от BaseRadius) в мировых единицах.
+		FruitBody body = BaseBody();
+		HitRadiusX = BaseRadius * body.HitX * scale;
+		HitRadiusY = BaseRadius * body.HitY * scale;
 
 		_sprite = new Sprite2D { Centered = true };
 		AddChild(_sprite);
@@ -116,9 +121,17 @@ public partial class FallingItem : Node2D
 	/// <summary>Базовый радиус предмета без учёта масштаба.</summary>
 	private float BaseRadius => ItemType switch
 	{
-		ItemType.Trash => 23f,
+		ItemType.Trash => 46f,
 		ItemType.Healing => 20f,
 		_ => FruitCatalog.Get(Kind).BaseRadius,
+	};
+
+	/// <summary>Форма тела для хитбокса: у фруктов из FruitCatalog, у остальных — свои доли.</summary>
+	private FruitBody BaseBody() => ItemType switch
+	{
+		ItemType.Trash => new FruitBody(0.677f, 0.799f),
+		ItemType.Healing => new FruitBody(1f, 1f),
+		_ => FruitCatalog.Get(Kind).Body,
 	};
 
 	/// <summary>
@@ -191,14 +204,14 @@ public partial class FallingItem : Node2D
 
 		// Отталкивание от боковых стен экрана: ладонь полностью в границах, скорость разворачиваем.
 		float viewWidth = GetViewportRect().Size.X;
-		if (Position.X < Radius)
+		if (Position.X < HitRadiusX)
 		{
-			Position = new Vector2(Radius, Position.Y);
+			Position = new Vector2(HitRadiusX, Position.Y);
 			Velocity = new Vector2(Mathf.Abs(Velocity.X) * WallRestitution, Velocity.Y);
 		}
-		else if (Position.X > viewWidth - Radius)
+		else if (Position.X > viewWidth - HitRadiusX)
 		{
-			Position = new Vector2(viewWidth - Radius, Position.Y);
+			Position = new Vector2(viewWidth - HitRadiusX, Position.Y);
 			Velocity = new Vector2(-Mathf.Abs(Velocity.X) * WallRestitution, Velocity.Y);
 		}
 
