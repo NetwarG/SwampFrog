@@ -6,7 +6,9 @@ namespace SwampFrog;
 /// <summary>
 /// Оверлей выбора перка: показывается поверх HUD, когда игра остановлена
 /// (SceneTree.Paused). Благодаря ProcessMode.Always этот узел продолжает
-/// работать во время паузы — кнопки карточек остаются кликабельными.
+/// работать во время паузы — карточки реагируют на ввод. Выбор перка
+/// происходит удержанием карточки 1 секунду (см. <see cref="HoldCardButton"/>),
+/// случайный короткий клик выбор не срабатывает.
 /// </summary>
 public partial class PerkSelectionOverlay : Control
 {
@@ -98,29 +100,31 @@ public partial class PerkSelectionOverlay : Control
 		float ui = UiScale;
 
 		_box.AddChild(MakeLabel($"Новый перк!  Уровень {_level}", (int)Mathf.Round(44f * ui), new Color("ffd45e")));
-		_box.AddChild(MakeLabel("Выбери одно улучшение", (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.92f)));
+		_box.AddChild(MakeLabel("Выбери одно улучшение — удерживай карточку 1 сек", (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.92f)));
 
 		foreach (PerkOffer card in _cards)
 		{
 			PerkId id = card.Id;
 			string text = $"{card.Name}\n“{card.Tagline}”\nУр. {card.CurrentLevel}/{card.MaxLevel} → {card.CurrentLevel + 1}\n{card.NextLevelEffect}";
-			Button button = MakeCardButton(text, card.Accent, ui);
-			button.Pressed += () => PerkPicked?.Invoke(id);
+			HoldCardButton button = MakeCardButton(text, card.Accent, ui);
+			button.Held += () => PerkPicked?.Invoke(id);
 			_box.AddChild(button);
 		}
 
 		_box.AddChild(MakeLabel("Слоты перков ограничены — выбирай с умом!", (int)Mathf.Round(18f * ui), new Color(1f, 1f, 1f, 0.75f)));
 	}
 
-	private Button MakeCardButton(string text, Color accent, float ui)
+	private HoldCardButton MakeCardButton(string text, Color accent, float ui)
 	{
-		var button = new Button
+		var button = new HoldCardButton
 		{
 			Text = text,
 			AutowrapMode = TextServer.AutowrapMode.Word,
 			CustomMinimumSize = new Vector2(430f * ui, 156f * ui),
 			FocusMode = Control.FocusModeEnum.None,
-			MouseDefaultCursorShape = Control.CursorShape.PointingHand
+			MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+			UiScale = ui,
+			BarColor = new Color(accent, 0.9f)
 		};
 		button.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(18f * ui));
 		button.AddThemeColorOverride("font_color", new Color("173c34"));
