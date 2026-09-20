@@ -21,9 +21,6 @@ public enum GameState
 /// </summary>
 public partial class Main : Node2D
 {
-	private const float InitialSpawnInterval = 0.95f;
-	private const float MinSpawnInterval = 0.34f;
-
 	/// <summary>Очень маленький шанс выпадения хилки при неполном HP.</summary>
 	private const float HealSpawnChance = 0.05f;
 
@@ -36,6 +33,8 @@ public partial class Main : Node2D
 	private readonly PerkPlayer _perkPlayer = new();
 
 	private int _score;
+	/// <summary>Секунды текущей партии — источник роста сложности.</summary>
+	private float _runTime;
 	private int _lives = 3;
 	private int _highScore;
 	private GameState _state = GameState.Menu;
@@ -137,7 +136,7 @@ public partial class Main : Node2D
 
 		_spawnTimer = new Timer();
 		AddChild(_spawnTimer);
-		_spawnTimer.WaitTime = InitialSpawnInterval;
+		_spawnTimer.WaitTime = Difficulty.InitialSpawnInterval;
 		_spawnTimer.Timeout += OnSpawnTimerTimeout;
 		// Не запускаем: стартовая кнопка управляет запуском партии.
 
@@ -198,6 +197,7 @@ public partial class Main : Node2D
 		}
 
 		float dt = (float)delta;
+		_runTime += dt;
 
 		// Перки: модификаторы лягушки и таймеры.
 		_perkPlayer.Update(dt, _frog);
@@ -393,7 +393,7 @@ public partial class Main : Node2D
 		var item = new FallingItem();
 		Vector2 size = GetViewportRect().Size;
 
-		float trashWeight = Mathf.Min(0.32f, 0.15f + _score * 0.00025f);
+		float trashWeight = Difficulty.TrashChance(_runTime);
 		float goldenChance = Mathf.Min(0.34f, _perkPlayer.GoldenSpawnChance());
 		bool guaranteedGolden = _perkPlayer.IsGoldenGuaranteed();
 
@@ -429,8 +429,7 @@ public partial class Main : Node2D
 			}
 		}
 
-		float difficulty = Mathf.Clamp(_score / 500f, 0f, 1f);
-		float speed = Mathf.Lerp(150f, 330f, difficulty) + _rng.RandfRange(-25f, 25f);
+		float speed = Difficulty.FallSpeed(_runTime) + _rng.RandfRange(-25f, 25f);
 		if (golden)
 		{
 			// «Золотая лихорадка» ур. 4: золотой падает медленнее обычного.
@@ -458,8 +457,7 @@ public partial class Main : Node2D
 		{
 			return;
 		}
-		float difficulty = Mathf.Clamp(_score / 500f, 0f, 1f);
-		_spawnTimer.WaitTime = Mathf.Lerp(InitialSpawnInterval, MinSpawnInterval, difficulty) * _rng.RandfRange(0.8f, 1.2f);
+		_spawnTimer.WaitTime = Difficulty.SpawnInterval(_runTime, _rng);
 	}
 
 	// ---------- Игровой цикл ----------
@@ -483,7 +481,7 @@ public partial class Main : Node2D
 
 		if (_spawnTimer != null)
 		{
-			_spawnTimer.WaitTime = InitialSpawnInterval;
+			_spawnTimer.WaitTime = Difficulty.InitialSpawnInterval;
 			_spawnTimer.Start();
 		}
 	}
@@ -550,6 +548,7 @@ public partial class Main : Node2D
 	private void ResetMainRoundData()
 	{
 		_score = 0;
+		_runTime = 0f;
 		_perkPlayer.Reset();
 		_lives = MaxLives;
 		ResetXp();
@@ -590,7 +589,7 @@ public partial class Main : Node2D
 
 		if (_spawnTimer != null)
 		{
-			_spawnTimer.WaitTime = InitialSpawnInterval;
+			_spawnTimer.WaitTime = Difficulty.InitialSpawnInterval;
 			_spawnTimer.Start();
 		}
 	}
