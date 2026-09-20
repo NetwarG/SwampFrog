@@ -12,6 +12,10 @@ namespace SwampFrog;
 /// </summary>
 public partial class PerkSelectionOverlay : Control
 {
+	private const float CardWidth = 430f;
+	private const float CardHeight = 156f;
+	private const float ScreenPadding = 24f;
+
 	public event Action<PerkId>? PerkPicked;
 
 	private ColorRect? _backdrop;
@@ -98,6 +102,8 @@ public partial class PerkSelectionOverlay : Control
 		}
 
 		float ui = UiScale;
+		float contentWidth = GetContentWidth(ui);
+		_box.CustomMinimumSize = new Vector2(contentWidth, 0f);
 
 		_box.AddChild(MakeLabel($"Новый перк!  Уровень {_level}", (int)Mathf.Round(44f * ui), new Color("ffd45e")));
 		_box.AddChild(MakeLabel("Выбери одно улучшение — удерживай карточку 1 сек", (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.92f)));
@@ -120,7 +126,7 @@ public partial class PerkSelectionOverlay : Control
 		{
 			Text = text,
 			AutowrapMode = TextServer.AutowrapMode.Word,
-			CustomMinimumSize = new Vector2(430f * ui, 156f * ui),
+			CustomMinimumSize = new Vector2(GetContentWidth(ui), CardHeight * ui),
 			FocusMode = Control.FocusModeEnum.None,
 			MouseDefaultCursorShape = Control.CursorShape.PointingHand,
 			UiScale = ui,
@@ -156,11 +162,14 @@ public partial class PerkSelectionOverlay : Control
 		return style;
 	}
 
-	private static Label MakeLabel(string text, int fontSize, Color color)
+	private Label MakeLabel(string text, int fontSize, Color color)
 	{
 		var label = new Label
 		{
-			Text = text
+			Text = text,
+			AutowrapMode = TextServer.AutowrapMode.Word,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			CustomMinimumSize = new Vector2(GetContentWidth(UiScale), 0f)
 		};
 		label.AddThemeFontSizeOverride("font_size", fontSize);
 		label.AddThemeColorOverride("font_color", color);
@@ -174,7 +183,32 @@ public partial class PerkSelectionOverlay : Control
 			return;
 		}
 		Vector2 vp = GetViewport().GetVisibleRect().Size;
+		ApplyContentWidth(GetContentWidth(UiScale));
 		_box.ResetSize();
 		_box.Position = new Vector2(vp.X * 0.5f - _box.Size.X * 0.5f, vp.Y * 0.5f - _box.Size.Y * 0.5f);
+	}
+
+	private float GetContentWidth(float ui)
+	{
+		Vector2 viewport = GetViewport().GetVisibleRect().Size;
+		float horizontalPadding = ScreenPadding * ui;
+		return Mathf.Max(1f, Mathf.Min(CardWidth * ui, viewport.X - horizontalPadding * 2f));
+	}
+
+	private void ApplyContentWidth(float contentWidth)
+	{
+		if (_box == null)
+		{
+			return;
+		}
+
+		_box.CustomMinimumSize = new Vector2(contentWidth, _box.CustomMinimumSize.Y);
+		foreach (Node child in _box.GetChildren())
+		{
+			if (child is Control control)
+			{
+				control.CustomMinimumSize = new Vector2(contentWidth, control.CustomMinimumSize.Y);
+			}
+		}
 	}
 }
