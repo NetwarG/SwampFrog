@@ -11,7 +11,7 @@ namespace SwampFrog;
 public sealed class PerkState
 {
 	/// <summary>Раз в сколько уровней жабы предлагается выбор перка.</summary>
-	public const int OfferEveryLevels = 6;
+	public const int OfferEveryLevels = 3;
 
 	/// <summary>Максимум улучшений (слотов) за один забег.</summary>
 	public const int MaxSlots = 8;
