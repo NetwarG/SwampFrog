@@ -41,6 +41,13 @@ public partial class SuikaGame : Node2D
 	/// <summary>Пауза перед завершением раунда после того, как последний фрукт упал и устаканился.</summary>
 	private const float SettleDelay = 0.9f;
 
+	/// <summary>
+	/// Жёсткий лимит завершения раунда: даже если куски долго не «устаканиваются»
+	/// из-за столкновений, раунд завершится не позднее чем через 8 секунд
+	/// после последнего брошенного фрукта.
+	/// </summary>
+	private const float CompletionTimeout = 8f;
+
 	/// <summary>Скорость, ниже которой кусок считается «устаканившимся» (могут слиться).</summary>
 	private const float SettleSpeed = 40f;
 
@@ -66,6 +73,9 @@ public partial class SuikaGame : Node2D
 
 	/// <summary>Время, в течение которого все куски почти неподвижны (для завершения раунда).</summary>
 	private float _settleTime;
+
+	/// <summary>Время с момента последнего брошенного фрукта (принудительное завершение раунда).</summary>
+	private float _completionTimer;
 
 	private Frog? _frog;
 	private FallingItem? _heldFruit;
@@ -127,6 +137,7 @@ public partial class SuikaGame : Node2D
 		_stockEmpty = false;
 		_stockExhausted = false;
 		_settleTime = 0f;
+		_completionTimer = 0f;
 		_score = 0;
 		_overflowTime = 0f;
 		_dropCooldown = 0.25f;
@@ -156,6 +167,7 @@ public partial class SuikaGame : Node2D
 		_gameOver = false;
 		_stockExhausted = false;
 		_settleTime = 0f;
+		_completionTimer = 0f;
 		ClearPieces();
 		if (_gameOverRoot != null) _gameOverRoot.Visible = false;
 		if (_stockRoot != null) _stockRoot.Visible = false;
@@ -598,6 +610,7 @@ public partial class SuikaGame : Node2D
 	{
 		_stockExhausted = true;
 		_settleTime = 0f;
+		_completionTimer = 0f;
 		if (_heldFruit != null) _heldFruit.Visible = false;
 		if (_nextFruit != null) _nextFruit.Visible = false;
 		if (_hintLabel != null) _hintLabel.Visible = false;
@@ -606,13 +619,29 @@ public partial class SuikaGame : Node2D
 	/// <summary>
 	/// Пока запас исчерпан, ждём, пока все куски почти остановятся (могут слиться),
 	/// и по истечении паузы завершаем раунд.
+	/// Столкновения могут долго не давать кускам устаканиться — таймер
+	/// гарантирует завершение раунда не позднее чем через CompletionTimeout секунд.
 	/// </summary>
 	private void CheckStockEnd(float dt)
 	{
-		if (!_stockExhausted || _gameOver || _pieces.Count == 0)
+		if (!_stockExhausted || _gameOver)
 		{
 			return;
 		}
+
+		// Жёсткий дедлайн: даже если куски продолжают сталкиваться, раунд завершаем.
+		_completionTimer += dt;
+		if (_completionTimer >= CompletionTimeout)
+		{
+			EndRound();
+			return;
+		}
+
+		if (_pieces.Count == 0)
+		{
+			return;
+		}
+
 		float maxSpeed = 0f;
 		foreach (Piece piece in _pieces)
 		{
