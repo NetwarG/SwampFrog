@@ -22,6 +22,7 @@ public partial class HUD : CanvasLayer
 	private Label? _suikaHintLabel;
 	private Label? _finalScore;
 	private Label? _finalHigh;
+	private PerkBar? _perkBar;
 
 	/// <summary>Оверлей выбора перка (работает и на паузе игры).</summary>
 	private PerkSelectionOverlay? _perkOverlay;
@@ -79,6 +80,7 @@ public partial class HUD : CanvasLayer
 		}
 		_hearts?.SetUiScale(ui);
 		_xpBar?.SetUiScale(ui);
+		_perkBar?.SetUiScale(ui);
 	}
 
 	/// <summary>Перецентрирует все видимые оверлеи после изменения размера окна.</summary>
@@ -128,6 +130,10 @@ public partial class HUD : CanvasLayer
 		_scoreLabel.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(3f * ui));
 		AddChild(_scoreLabel);
 
+		_perkBar = new PerkBar();
+		_perkBar.SetUiScale(ui);
+		AddChild(_perkBar);
+
 		_hearts = new HeartsIndicator();
 		_hearts.SetUiScale(ui);
 		AddChild(_hearts);
@@ -149,6 +155,7 @@ public partial class HUD : CanvasLayer
 		if (_scoreLabel != null) _scoreLabel.Visible = visible;
 		if (_hearts != null) _hearts.Visible = visible;
 		if (_xpBar != null) _xpBar.Visible = visible;
+		if (_perkBar != null && _perkBar.HasIcons) _perkBar.Visible = visible;
 	}
 
 	private void BuildStart()
@@ -431,6 +438,9 @@ public partial class HUD : CanvasLayer
 	}
 
 	public void SetLives(int lives) => _hearts?.SetLives(lives);
+
+	/// <summary>Обновляет панель выбранных перков внизу экрана.</summary>
+	public void SetPickedPerks(PerkIconInfo[] perks) => _perkBar?.SetPerks(perks);
 
 	/// <summary>Обновляет максимум жизней (перк «Панцирь» увеличивает число сердечек).</summary>
 	public void SetMaxLives(int max) => _hearts?.SetMaxLives(max);

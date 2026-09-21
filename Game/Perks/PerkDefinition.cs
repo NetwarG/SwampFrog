@@ -51,3 +51,6 @@ public sealed class PerkDefinition
 public record PerkOffer(PerkId Id, string Name, string Tagline, int CurrentLevel, string NextLevelEffect, int MaxLevel, Color Accent)
 {
 }
+
+/// <summary>Данные выбранного перка для панели-индикатора внизу экрана.</summary>
+public record PerkIconInfo(PerkId Id, int Level);

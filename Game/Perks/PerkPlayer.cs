@@ -45,6 +45,9 @@ public sealed class PerkPlayer
 		_gazeFreezeTimer = 0f;
 		_worldFreezeTimer = 0f;
 		_invulnTimer = 0f;
+
+		// Панель перков очищается вместе с состоянием.
+		Game?.HudNode?.SetPickedPerks(_perks.PickedSnapshot());
 	}
 
 	// ---------- Выбор перка ----------
@@ -109,6 +112,9 @@ public sealed class PerkPlayer
 			return;
 		}
 		_perks.Increment(id);
+
+		// Панель выбранных перков обновляется сразу после выбора.
+		Game.HudNode?.SetPickedPerks(_perks.PickedSnapshot());
 
 		// «Панцирь» тут же даёт новую жизнь (до нового максимума).
 		if (id == PerkId.Shell)

@@ -55,6 +55,21 @@ public sealed class PerkState
 		return true;
 	}
 
+	/// <summary>Выбранные перки в порядке каталога: идентификатор и уровень.</summary>
+	public PerkIconInfo[] PickedSnapshot()
+	{
+		var result = new List<PerkIconInfo>();
+		foreach (PerkDefinition def in PerkCatalog.All)
+		{
+			int level = LevelOf(def.Id);
+			if (level > 0)
+			{
+				result.Add(new PerkIconInfo(def.Id, level));
+			}
+		}
+		return result.ToArray();
+	}
+
 	/// <summary>Случайные доступные перки для оверлея (без повторов, не более count).</summary>
 	public PerkId[] OfferCandidates(int count, RandomNumberGenerator rng)
 	{
