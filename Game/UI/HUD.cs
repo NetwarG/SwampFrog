@@ -70,8 +70,6 @@ public partial class HUD : CanvasLayer
 
 	private void OnViewportResized()
 	{
-		RecenterOverlays();
-
 		// Обновляем адаптивные размеры HUD-элементов.
 		float ui = UiScale;
 		if (_scoreLabel != null)
@@ -81,37 +79,7 @@ public partial class HUD : CanvasLayer
 		_hearts?.SetUiScale(ui);
 		_xpBar?.SetUiScale(ui);
 		_perkBar?.SetUiScale(ui);
-	}
-
-	/// <summary>Перецентрирует все видимые оверлеи после изменения размера окна.</summary>
-	public void RecenterOverlays()
-	{
-		RecenterBoxIfVisible(_gameOverRoot);
-		RecenterBoxIfVisible(_startRoot);
 		_perkOverlay?.RecenterIfVisible();
-	}
-
-	// Переименованный хелпер: центрирует контейнер внутри родителя, если тот видим.
-	private void RecenterBoxIfVisible(Control? root)
-	{
-		if (root == null || !root.Visible)
-		{
-			return;
-		}
-		RecenterBox(root);
-	}
-
-	private void RecenterBox(Control parent)
-	{
-		foreach (Node child in parent.GetChildren())
-		{
-			if (child is VBoxContainer box)
-			{
-				Vector2 vp = GetViewport().GetVisibleRect().Size;
-				box.ResetSize();
-				box.Position = new Vector2(vp.X * 0.5f - box.Size.X * 0.5f, vp.Y * 0.5f - box.Size.Y * 0.5f);
-			}
-		}
 	}
 
 	private void BuildUI()
@@ -176,12 +144,19 @@ public partial class HUD : CanvasLayer
 		backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		_startRoot.AddChild(backdrop);
 
+		// Центрирующий контейнер держит меню строго по центру экрана
+		// независимо от разрешения и режима растяжения (aspect expand).
+		var center = new CenterContainer();
+		center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		center.MouseFilter = Control.MouseFilterEnum.Ignore;
+		_startRoot.AddChild(center);
+
 		var box = new VBoxContainer
 		{
 			Alignment = BoxContainer.AlignmentMode.Center
 		};
 		box.AddThemeConstantOverride("separation", 14);
-		_startRoot.AddChild(box);
+		center.AddChild(box);
 
 		float ui = UiScale;
 
@@ -213,8 +188,6 @@ public partial class HUD : CanvasLayer
 		madeByText.OffsetBottom = -(int)Mathf.Round(6f * ui);
 		madeByText.HorizontalAlignment = HorizontalAlignment.Center;
 		_startRoot.AddChild(madeByText);
-
-		RecenterBox(_startRoot);
 	}
 
 	/// <summary>Показывает главное меню с запуском режимов и выходом.</summary>
@@ -326,7 +299,11 @@ public partial class HUD : CanvasLayer
 			Alignment = BoxContainer.AlignmentMode.Center
 		};
 		box.AddThemeConstantOverride("separation", 16);
-		_gameOverRoot.AddChild(box);
+		var center = new CenterContainer();
+		center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		center.MouseFilter = Control.MouseFilterEnum.Ignore;
+		_gameOverRoot.AddChild(center);
+		center.AddChild(box);
 
 		float ui = UiScale;
 
@@ -343,8 +320,6 @@ public partial class HUD : CanvasLayer
 		box.AddChild(_finalHigh);
 		box.AddChild(restart);
 		box.AddChild(menu);
-
-		RecenterBox(_gameOverRoot);
 	}
 
 	private static Label MakeLabel(string text, int fontSize, Color color)

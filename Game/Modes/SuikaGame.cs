@@ -340,7 +340,11 @@ public partial class SuikaGame : Node2D
 
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
-		_gameOverRoot.AddChild(box);
+		var center = new CenterContainer();
+		center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		center.MouseFilter = Control.MouseFilterEnum.Ignore;
+		_gameOverRoot.AddChild(center);
+		center.AddChild(box);
 		_gameOverTitle = MakeLabel("Кувшин полон", 42, new Color("ffd45e"));
 		box.AddChild(_gameOverTitle);
 		_gameOverScore = MakeLabel("Счёт: 0", 28, new Color("ffffff"));
@@ -351,21 +355,6 @@ public partial class SuikaGame : Node2D
 		Button menu = MakeButton("В меню", 22, new Color("ffd45e"), new Vector2(300f, 54f));
 		menu.Pressed += () => ExitRequested?.Invoke();
 		box.AddChild(menu);
-		CallDeferred(nameof(CenterGameOver));
-	}
-
-	private void CenterGameOver()
-	{
-		if (_gameOverRoot == null) return;
-		foreach (Node child in _gameOverRoot.GetChildren())
-		{
-			if (child is VBoxContainer box)
-			{
-				box.ResetSize();
-				Vector2 view = GetViewportRect().Size;
-				box.Position = new Vector2(view.X * 0.5f - box.Size.X * 0.5f, view.Y * 0.5f - box.Size.Y * 0.5f);
-			}
-		}
 	}
 
 	/// <summary>Строит окно со списком собранных фруктов и кнопкой старта раунда.</summary>
@@ -381,7 +370,11 @@ public partial class SuikaGame : Node2D
 
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 12);
-		_stockRoot.AddChild(box);
+		var center = new CenterContainer();
+		center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		center.MouseFilter = Control.MouseFilterEnum.Ignore;
+		_stockRoot.AddChild(center);
+		center.AddChild(box);
 
 		Label title = MakeLabel("Собранные фрукты", 34, new Color("ffd45e"));
 		box.AddChild(title);
@@ -404,8 +397,6 @@ public partial class SuikaGame : Node2D
 		Button start = MakeButton("Начать игру", 22, new Color("b4e863"), new Vector2(300f, 54f));
 		start.Pressed += StartFromStockDialog;
 		box.AddChild(start);
-
-		CallDeferred(nameof(CenterStockDialog));
 	}
 
 	/// <summary>Обновляет и показывает окно со списком фруктов перед началом раунда.</summary>
@@ -424,7 +415,6 @@ public partial class SuikaGame : Node2D
 		}
 		if (_stockTotal != null) _stockTotal.Text = $"Всего: {total}";
 		_stockRoot.Visible = true;
-		CallDeferred(nameof(CenterStockDialog));
 	}
 
 	/// <summary>Игрок подтвердил список — скрываем окно и начинаем раунд.</summary>
@@ -434,21 +424,6 @@ public partial class SuikaGame : Node2D
 		_active = true;
 		// Небольшая пауза, чтобы клик по кнопке случайно не бросил фрукт.
 		_dropCooldown = Mathf.Max(_dropCooldown, 0.35f);
-	}
-
-	/// <summary>Центрирует панель списка фруктов после изменения размеров окна.</summary>
-	private void CenterStockDialog()
-	{
-		if (_stockRoot == null) return;
-		foreach (Node child in _stockRoot.GetChildren())
-		{
-			if (child is VBoxContainer box)
-			{
-				box.ResetSize();
-				Vector2 view = GetViewportRect().Size;
-				box.Position = new Vector2(view.X * 0.5f - box.Size.X * 0.5f, view.Y * 0.5f - box.Size.Y * 0.5f);
-			}
-		}
 	}
 
 	private Label MakeLabel(string text, int size, Color color)
@@ -503,7 +478,6 @@ public partial class SuikaGame : Node2D
 	private void OnViewportResized()
 	{
 		UpdateBowl();
-		CallDeferred(nameof(CenterGameOver));
 		UpdateVisuals();
 	}
 
@@ -889,9 +863,7 @@ public partial class SuikaGame : Node2D
 			_retryButton.Visible = !_stockEmpty;
 		}
 
-		// Пересчитываем центрирование панели (меняется ширина от заголовка),
-		// чтобы она не вылезала за правую границу экрана.
-		CallDeferred(nameof(CenterGameOver));
+		// Панель заново центрируется автоматически: раскладкой занимается CenterContainer.
 	}
 
 	private void Restart()

@@ -42,7 +42,14 @@ public partial class PerkSelectionOverlay : Control
 			Alignment = BoxContainer.AlignmentMode.Center
 		};
 		_box.AddThemeConstantOverride("separation", 14);
-		AddChild(_box);
+
+		// Центрирующий контейнер держит карточки строго по центру экрана,
+		// независимо от разрешения и режима растяжения (aspect expand).
+		var center = new CenterContainer();
+		center.SetAnchorsPreset(LayoutPreset.FullRect);
+		center.MouseFilter = MouseFilterEnum.Ignore;
+		AddChild(center);
+		center.AddChild(_box);
 
 		Visible = false;
 	}
@@ -63,13 +70,22 @@ public partial class PerkSelectionOverlay : Control
 		Visible = false;
 	}
 
-	/// <summary>Перецентрирует блок, если оверлей виден (вызывается при ресайзе).</summary>
+	/// <summary>Обновляет ширину контента карточек (вызывается при ресайзе).</summary>
 	public void RecenterIfVisible()
 	{
 		if (Visible)
 		{
 			Recenter();
 		}
+	}
+
+	private void Recenter()
+	{
+		if (_box == null)
+		{
+			return;
+		}
+		ApplyContentWidth(GetContentWidth(UiScale));
 	}
 
 	/// <summary>Адаптивный масштаб UI (тот же принцип, что в HUD).</summary>
@@ -174,18 +190,6 @@ public partial class PerkSelectionOverlay : Control
 		label.AddThemeFontSizeOverride("font_size", fontSize);
 		label.AddThemeColorOverride("font_color", color);
 		return label;
-	}
-
-	private void Recenter()
-	{
-		if (_box == null)
-		{
-			return;
-		}
-		Vector2 vp = GetViewport().GetVisibleRect().Size;
-		ApplyContentWidth(GetContentWidth(UiScale));
-		_box.ResetSize();
-		_box.Position = new Vector2(vp.X * 0.5f - _box.Size.X * 0.5f, vp.Y * 0.5f - _box.Size.Y * 0.5f);
 	}
 
 	private float GetContentWidth(float ui)
