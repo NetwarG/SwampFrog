@@ -27,15 +27,16 @@ public partial class PerkSelectionOverlay : Control
 	{
 		ProcessMode = ProcessModeEnum.Always;
 		MouseFilter = MouseFilterEnum.Ignore;
-		SetAnchorsPreset(LayoutPreset.FullRect);
+		// Сбрасываем и смещения: одни якоря сохраняют прежний нулевой размер Control.
+		SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 
 		_backdrop = new ColorRect
 		{
 			Color = new Color(0.02f, 0.12f, 0.09f, 0.66f),
 			MouseFilter = MouseFilterEnum.Stop
 		};
-		_backdrop.SetAnchorsPreset(LayoutPreset.FullRect);
 		AddChild(_backdrop);
+		_backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 
 		_box = new VBoxContainer
 		{
@@ -46,9 +47,9 @@ public partial class PerkSelectionOverlay : Control
 		// Центрирующий контейнер держит карточки строго по центру экрана,
 		// независимо от разрешения и режима растяжения (aspect expand).
 		var center = new CenterContainer();
-		center.SetAnchorsPreset(LayoutPreset.FullRect);
 		center.MouseFilter = MouseFilterEnum.Ignore;
 		AddChild(center);
+		center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 		center.AddChild(_box);
 
 		Visible = false;
