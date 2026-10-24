@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System;
 using Godot;
 
@@ -29,6 +29,8 @@ public partial class Main : Node2D
 	private HUD? _hud;
 	private SuikaGame? _suika;
 	private Timer? _spawnTimer;
+	private CollisionShape2D? _leftWall;
+	private CollisionShape2D? _rightWall;
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly PerkPlayer _perkPlayer = new();
 
@@ -119,6 +121,7 @@ public partial class Main : Node2D
 		_frog.CaughtItemReturned += OnCaughtItemReturned;
 		_xp.LevelUp += OnLevelUp;
 		_items = GetNode<Node2D>("Items");
+		BuildClassicWalls();
 		_hud = GetNode<HUD>("HUD");
 		_suika = GetNode<SuikaGame>("Suika");
 		_suika.Game = this;
@@ -155,6 +158,7 @@ public partial class Main : Node2D
 	private void OnViewportResized()
 	{
 		QueueRedraw();
+		UpdateClassicWalls();
 		_frog?.SyncUiScale(ScreenScale);
 		if (_score >= Difficulty.FrogMovementScore)
 		{
@@ -164,6 +168,42 @@ public partial class Main : Node2D
 		{
 			PositionFrog();
 		}
+		_frog?.ConstrainHands();
+		if (_items != null)
+		{
+			foreach (Node child in _items.GetChildren())
+			{
+				if (child is FallingItem item) item.ConstrainToViewport(ViewSize);
+			}
+		}
+	}
+
+	private void BuildClassicWalls()
+	{
+		var walls = new StaticBody2D
+		{
+			Name = "ClassicWalls",
+			CollisionLayer = ItemPhysics.ClassicLayer,
+			CollisionMask = ItemPhysics.ClassicLayer,
+			PhysicsMaterialOverride = new PhysicsMaterial { Friction = 0f, Bounce = 0.55f }
+		};
+		AddChild(walls);
+		_leftWall = new CollisionShape2D { Shape = new RectangleShape2D() };
+		_rightWall = new CollisionShape2D { Shape = new RectangleShape2D() };
+		walls.AddChild(_leftWall);
+		walls.AddChild(_rightWall);
+		UpdateClassicWalls();
+	}
+
+	private void UpdateClassicWalls()
+	{
+		if (_leftWall == null || _rightWall == null) return;
+		Vector2 size = ViewSize;
+		// Верх и низ открыты: предметы появляются над экраном и могут быть пропущены снизу.
+		((RectangleShape2D)_leftWall.Shape).Size = new Vector2(32f, size.Y + 600f);
+		((RectangleShape2D)_rightWall.Shape).Size = new Vector2(32f, size.Y + 600f);
+		_leftWall.Position = new Vector2(-16f, size.Y * 0.5f);
+		_rightWall.Position = new Vector2(size.X + 16f, size.Y * 0.5f);
 	}
 
 	private void PositionFrog()
@@ -196,7 +236,7 @@ public partial class Main : Node2D
 	/// <summary>Размер видимой области (в координатах сцены).</summary>
 	public Vector2 ViewSize => GetViewportRect().Size;
 
-	public override void _Process(double delta)
+	public override void _PhysicsProcess(double delta)
 	{
 		if (_state != GameState.Playing || _items == null || _frog == null)
 		{
@@ -205,10 +245,17 @@ public partial class Main : Node2D
 
 		float dt = (float)delta;
 		_runTime += dt;
+		foreach (Node child in _items.GetChildren())
+		{
+			if (child is FallingItem item) item.SyncFromPhysics();
+		}
 
 		// Перки: модификаторы лягушки и таймеры.
 		_perkPlayer.Update(dt, _frog);
+		if (_state != GameState.Playing) return;
 		_frog.UpdateMovement(dt);
+		_frog.UpdateArms(dt);
+		if (_state != GameState.Playing) return;
 
 		Vector2 viewSize = GetViewportRect().Size;
 		Vector2[]? hands = _frog.IsCatching ? _frog.GetHandPositions() : null;
@@ -216,6 +263,7 @@ public partial class Main : Node2D
 
 		foreach (Node child in _items.GetChildren())
 		{
+			if (_state != GameState.Playing) break;
 			if (child is not FallingItem item)
 			{
 				continue;
@@ -253,7 +301,7 @@ public partial class Main : Node2D
 			for (int i = 0; i < handHitboxes.Length; i++)
 			{
 				// Рука может держать один предмет (или два — перк «Липкие ладони»); занятую пропускаем.
-				if (!_frog.CanHold(i))
+				if (!_frog.IsHandCatching(i) || !_frog.CanHold(i))
 				{
 					continue;
 				}
@@ -265,9 +313,6 @@ public partial class Main : Node2D
 				}
 			}
 		}
-
-		// Падающие предметы отталкиваются друг от друга.
-		ResolveItemCollisions();
 	}
 
 	/// <summary>Сброс при рестарте партии (опыт не сохраняется между партиями).</summary>
@@ -288,60 +333,6 @@ public partial class Main : Node2D
 		_perkPlayer.OnPicked(id);
 	}
 
-	/// <summary>
-	/// Попарное отталкивание падающих предметов: раздвигает пересекающиеся объекты
-	/// и разворачивает их скорости вдоль нормали (мягкий рикошет). Пойманные не участвуют.
-	/// </summary>
-	private void ResolveItemCollisions()
-	{
-		var moving = new List<FallingItem>();
-		foreach (Node child in _items!.GetChildren())
-		{
-			if (child is FallingItem fi && !fi.IsCaught && !fi.IsQueuedForDeletion())
-			{
-				moving.Add(fi);
-			}
-		}
-
-		const float restitution = 0.6f;
-		for (int i = 0; i < moving.Count; i++)
-		{
-			for (int j = i + 1; j < moving.Count; j++)
-			{
-				FallingItem a = moving[i];
-				FallingItem b = moving[j];
-				Vector2 delta = a.GlobalPosition - b.GlobalPosition;
-				float distSq = delta.LengthSquared();
-				if (distSq <= 0.0001f)
-				{
-					continue;
-				}
-				float dist = Mathf.Sqrt(distSq);
-				Vector2 n = delta / dist;
-				// Порог касания считается по эллипсам формы обоих предметов вдоль нормали.
-				float minDist = a.GetHitbox().RadiusAlong(n) + b.GetHitbox().RadiusAlong(n);
-				if (distSq > minDist * minDist)
-				{
-					continue;
-				}
-
-				// Раздвигаем, чтобы предметы не проникали друг в друга.
-				float overlap = minDist - dist;
-				a.GlobalPosition += n * (overlap * 0.5f);
-				b.GlobalPosition -= n * (overlap * 0.5f);
-
-				// Импульс вдоль нормали (равные массы): отталкиваем, только если сближаются.
-				float relN = (a.Velocity - b.Velocity).Dot(n);
-				if (relN < 0f)
-				{
-					float impulse = -(1f + restitution) * relN * 0.5f;
-					a.Velocity += n * impulse;
-					b.Velocity -= n * impulse;
-				}
-			}
-		}
-	}
-
 	private void CatchItem(FallingItem item, int handIndex)
 	{
 		// Мусор нельзя нести в руках: отскок/камень либо урон и исчезновение.
@@ -355,7 +346,7 @@ public partial class Main : Node2D
 		if (item.ItemType == ItemType.Healing)
 		{
 			RestoreLife(item.GlobalPosition);
-			item.QueueFree();
+			item.Despawn();
 			return;
 		}
 
@@ -451,6 +442,7 @@ public partial class Main : Node2D
 		// Базовый масштаб предмета; случайный разброс и золото применяет FallingItem._Ready.
 		item.Scale = Vector2.One * ScreenScale;
 		_items!.AddChild(item);
+		item.ConstrainToViewport(size);
 
 		// Учёт спавна фрукта: счётчик золотых и заморозка «Зоны замедления» ур. 5.
 		if (type == ItemType.Fruit)
@@ -548,7 +540,11 @@ public partial class Main : Node2D
 	{
 		if (_items != null)
 		{
-			foreach (Node child in _items.GetChildren()) child.QueueFree();
+			foreach (Node child in _items.GetChildren())
+			{
+				if (child is FallingItem item) item.Despawn();
+				else child.QueueFree();
+			}
 		}
 		_frog?.ClearCaughtItems();
 	}
@@ -570,6 +566,13 @@ public partial class Main : Node2D
 	private void GameOver()
 	{
 		_state = GameState.GameOver;
+		if (_items != null)
+		{
+			foreach (Node child in _items.GetChildren())
+			{
+				if (child is FallingItem item) item.FreezeForRoundEnd();
+			}
+		}
 		// На случай завершения во время паузы выбора перка (теоретически невозможно).
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();

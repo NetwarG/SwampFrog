@@ -71,7 +71,7 @@ public partial class Frog : Node2D
 	private float _moveTurnTimer;
 	private bool _randomMovement;
 	/// <summary>Длины рук в «мировых» единицах экрана.</summary>
-	private float _armLengthWorld;
+	private readonly float[] _armLengthsWorld = new float[2];
 	private float _armGrowSpeedWorld;
 	private float _armRetractSpeedWorld;
 	private bool _holding;
@@ -121,11 +121,15 @@ public partial class Frog : Node2D
 	public void SyncUiScale(float uiScale)
 	{
 		_currentUiScale = uiScale;
+		ConstrainHands();
 		UpdateBodyState();
 	}
 
 	/// <summary>Идёт ли ловля прямо сейчас: руки достаточно вытянуты (во время роста, удержания или втягивания).</summary>
-	public bool IsCatching => _armLengthWorld >= MinCatchLengthPx * _currentUiScale;
+	public bool IsCatching => IsHandCatching(0) || IsHandCatching(1);
+
+	public bool IsHandCatching(int handIndex) => handIndex >= 0 && handIndex < _armLengthsWorld.Length
+		&& _armLengthsWorld[handIndex] >= MinCatchLengthPx * _currentUiScale;
 
 	/// <summary>Движение тела до проверки столкновений ладоней в Main.</summary>
 	public void UpdateMovement(float dt)
@@ -191,6 +195,7 @@ public partial class Frog : Node2D
 			// Палец может стоять на месте, пока лягушка движется под ним.
 			UpdateDirection(_aimTarget);
 		}
+		ConstrainHands();
 	}
 
 	/// <summary>Новая партия начинается без движения и оставшегося удержания рук.</summary>
@@ -201,7 +206,7 @@ public partial class Frog : Node2D
 		_randomMovement = false;
 		_direction = Vector2.Right;
 		_holding = false;
-		_armLengthWorld = 0f;
+		Array.Clear(_armLengthsWorld);
 		_flash = 0f;
 		_eatingTimer = 0f;
 		_pulsing = false;
@@ -303,31 +308,6 @@ public partial class Frog : Node2D
 			return;
 		}
 
-		// Пересчитываем длины рук под текущее разрешение экрана (скорости — от глобального максимума).
-		UpdateArmLengths(ComputeMaxArmLength(Game.ViewSize));
-
-		// Максимальная длина в текущем направлении, чтобы ладони не выходили за пределы экрана.
-		float maxForDir = ComputeMaxArmLengthInDirection(Game.ViewSize);
-
-		if (_holding && CanAct)
-		{
-			_armLengthWorld = Mathf.Min(maxForDir, _armLengthWorld + _armGrowSpeedWorld * dt);
-		}
-		else if (_armLengthWorld > 0f)
-		{
-			_armLengthWorld = Mathf.Max(0f, _armLengthWorld - _armRetractSpeedWorld * dt);
-		}
-
-		// Ограничение по границе экрана: если длина оказалась больше допустимой для текущего
-		// направления (например, направление резко сменилось), плавно втягиваем её до границы.
-		if (_armLengthWorld > maxForDir)
-		{
-			_armLengthWorld = Mathf.Max(maxForDir, _armLengthWorld - _armRetractSpeedWorld * dt);
-		}
-
-		// Пока руки не вернулись до конца — пойманный фрукт едет за ладонью.
-		UpdateCaughtItems();
-
 		_flash = Mathf.Max(0f, _flash - dt);
 		_eatingTimer = Mathf.Max(0f, _eatingTimer - dt);
 
@@ -347,6 +327,39 @@ public partial class Frog : Node2D
 		}
 
 		UpdateBodyState();
+		QueueRedraw();
+	}
+
+	/// <summary>Обе руки обновляются на физическом такте до проверки ловли в Main.</summary>
+	public void UpdateArms(float dt)
+	{
+		if (!CanAct || Game == null) return;
+		UpdateArmLengths(ComputeMaxArmLength(Game.ViewSize));
+		for (int i = 0; i < _armLengthsWorld.Length; i++)
+		{
+			_armLengthsWorld[i] = _holding
+				? _armLengthsWorld[i] + _armGrowSpeedWorld * dt
+				: Mathf.Max(0f, _armLengthsWorld[i] - _armRetractSpeedWorld * dt);
+		}
+		ConstrainHands();
+		UpdateCaughtItems();
+	}
+
+	/// <summary>Каждая рука имеет свой предел; поворот, движение и ресайз не выпускают ладони за экран.</summary>
+	public void ConstrainHands()
+	{
+		if (Game == null || DecorativeOnly) return;
+		for (int i = 0; i < _armLengthsWorld.Length; i++)
+		{
+			_armLengthsWorld[i] = Mathf.Min(_armLengthsWorld[i], ComputeMaxArmLengthInDirection(Game.ViewSize, i));
+		}
+		foreach (CaughtItem entry in _caughtItems)
+		{
+			if (IsInstanceValid(entry.Item) && !entry.Item.IsQueuedForDeletion())
+			{
+				entry.Item.GlobalPosition = HandPositionWorld(entry.HandIndex);
+			}
+		}
 		QueueRedraw();
 	}
 
@@ -393,37 +406,31 @@ public partial class Frog : Node2D
 	}
 
 	/// <summary>
-	/// Максимальная длина рук в текущем направлении при условии, что обе ладони
-	/// (включая разброс пальцев по HandSpreadDeg) остаются внутри видимой области —
-	/// с отступом HandScreenMargin от каждого края. Возвращает >= 0.
+	/// Максимальная длина одной руки до края с запасом под пальцы и увеличенный хитбокс перка.
 	/// </summary>
-	private float ComputeMaxArmLengthInDirection(Vector2 viewSize)
+	private float ComputeMaxArmLengthInDirection(Vector2 viewSize, int handIndex)
 	{
-		float margin = HandScreenMargin * _currentUiScale;
+		float margin = Mathf.Max(HandScreenMargin * _currentUiScale, HandHitRadiusWorld);
 		Vector2 o = GlobalPosition;
-		float spread = Mathf.DegToRad(HandSpreadDeg);
+		Vector2 dir = HandDirection(handIndex);
 		float maxLen = float.PositiveInfinity;
 
-		// Берём обе руки (верхнюю и нижнюю), чтобы ни одна не вышла за экран.
-		foreach (Vector2 dir in new[] { _direction.Rotated(spread), _direction.Rotated(-spread) })
+		if (dir.X > 0.0001f)
 		{
-			if (dir.X > 0.0001f)
-			{
-				maxLen = Mathf.Min(maxLen, (viewSize.X - margin - o.X) / dir.X);
-			}
-			else if (dir.X < -0.0001f)
-			{
-				maxLen = Mathf.Min(maxLen, (margin - o.X) / dir.X);
-			}
+			maxLen = Mathf.Min(maxLen, (viewSize.X - margin - o.X) / dir.X);
+		}
+		else if (dir.X < -0.0001f)
+		{
+			maxLen = Mathf.Min(maxLen, (margin - o.X) / dir.X);
+		}
 
-			if (dir.Y > 0.0001f)
-			{
-				maxLen = Mathf.Min(maxLen, (viewSize.Y - margin - o.Y) / dir.Y);
-			}
-			else if (dir.Y < -0.0001f)
-			{
-				maxLen = Mathf.Min(maxLen, (margin - o.Y) / dir.Y);
-			}
+		if (dir.Y > 0.0001f)
+		{
+			maxLen = Mathf.Min(maxLen, (viewSize.Y - margin - o.Y) / dir.Y);
+		}
+		else if (dir.Y < -0.0001f)
+		{
+			maxLen = Mathf.Min(maxLen, (margin - o.Y) / dir.Y);
 		}
 
 		return Mathf.Max(0f, maxLen);
@@ -432,7 +439,7 @@ public partial class Frog : Node2D
 	/// <summary>Мировые позиции обеих ладоней (в координатах сцены).</summary>
 	public Vector2[] GetHandPositions()
 	{
-		if (_armLengthWorld <= 2f)
+		if (_armLengthsWorld[0] <= 2f && _armLengthsWorld[1] <= 2f)
 		{
 			return Array.Empty<Vector2>();
 		}
@@ -450,7 +457,7 @@ public partial class Frog : Node2D
 	/// </summary>
 	public CircleHitbox[] GetHandHitboxes()
 	{
-		if (_armLengthWorld <= 2f)
+		if (_armLengthsWorld[0] <= 2f && _armLengthsWorld[1] <= 2f)
 		{
 			return Array.Empty<CircleHitbox>();
 		}
@@ -465,10 +472,10 @@ public partial class Frog : Node2D
 	/// <summary>Мировая позиция ладони (0 — верхняя, 1 — нижняя). Общая для ловли и для «прилипших» фруктов.</summary>
 	private Vector2 HandPositionWorld(int handIndex)
 	{
-		float spread = Mathf.DegToRad(HandSpreadDeg);
-		Vector2 dir = handIndex == 0 ? _direction.Rotated(spread) : _direction.Rotated(-spread);
-		return GlobalPosition + dir * _armLengthWorld;
+		return GlobalPosition + HandDirection(handIndex) * _armLengthsWorld[handIndex];
 	}
+
+	private Vector2 HandDirection(int handIndex) => _direction.Rotated(Mathf.DegToRad(handIndex == 0 ? HandSpreadDeg : -HandSpreadDeg));
 
 	/// <summary>Реакция на урон мусором: на короткое время включает позу «злая».</summary>
 	public void Flash() => _flash = 0.45f;
@@ -490,6 +497,7 @@ public partial class Frog : Node2D
 		}
 		item.IsCaught = true;
 		_caughtItems.Add(new CaughtItem { Item = item, HandIndex = handIndex });
+		item.GlobalPosition = HandPositionWorld(handIndex);
 		return true;
 	}
 
@@ -521,30 +529,25 @@ public partial class Frog : Node2D
 	/// </summary>
 	private void UpdateCaughtItems()
 	{
-		if (_armLengthWorld <= 0f)
+		List<FallingItem>? returned = null;
+		for (int i = _caughtItems.Count - 1; i >= 0; i--)
 		{
-			if (_caughtItems.Count == 0)
+			CaughtItem entry = _caughtItems[i];
+			if (!IsInstanceValid(entry.Item) || entry.Item.IsQueuedForDeletion())
 			{
-				return;
+				_caughtItems.RemoveAt(i);
+				continue;
 			}
-			CaughtItem[] held = _caughtItems.ToArray();
-			_caughtItems.Clear();
-			foreach (CaughtItem entry in held)
+			if (_armLengthsWorld[entry.HandIndex] <= 0f)
 			{
-				CaughtItemReturned?.Invoke(entry.Item);
-			}
-			// Предмет «съеден» — включаем короткую позу eating.
-			_eatingTimer = EatingStateTime;
-			return;
-		}
-
-		foreach (CaughtItem entry in _caughtItems)
-		{
-			if (IsInstanceValid(entry.Item))
-			{
-				entry.Item.GlobalPosition = HandPositionWorld(entry.HandIndex);
+				_caughtItems.RemoveAt(i);
+				(returned ??= new List<FallingItem>()).Add(entry.Item);
 			}
 		}
+		if (returned == null) return;
+		_eatingTimer = EatingStateTime;
+		// Сначала убираем доставленные фрукты из рук: награда может открыть меню перков.
+		foreach (FallingItem item in returned) CaughtItemReturned?.Invoke(item);
 	}
 
 	private void UpdateArmLengths(float maxWorld)
@@ -561,6 +564,7 @@ public partial class Frog : Node2D
 		if (to.LengthSquared() > 4f)
 		{
 			_direction = to.Normalized();
+			ConstrainHands();
 			UpdateBodyState();
 			QueueRedraw();
 		}
@@ -571,33 +575,23 @@ public partial class Frog : Node2D
 
 	public override void _Draw()
 	{
-		float ui = _currentUiScale;
-
-		// --- Руки и ладони (за телом): динамически следуют за пальцем ---
-		if (_armLengthWorld > 2f || (DecorativeOnly && ThrowPose))
+		// Геометрия ладоней — в мировых единицах. Pulse увеличивает тело, не сдвигая руки за край.
+		float unit = _currentUiScale / Mathf.Max(0.001f, Mathf.Abs(GlobalScale.X));
+		for (int i = 0; i < _armLengthsWorld.Length; i++)
 		{
-			float spread = Mathf.DegToRad(HandSpreadDeg);
-			Vector2 upperDir = _direction.Rotated(spread);
-			Vector2 lowerDir = _direction.Rotated(-spread);
-			// Локальная длина руки в координатах ноды (одна и та же для обеих рук).
-			float armLocal = DecorativeOnly ? 54f : _armLengthWorld / ui;
+			if (!(DecorativeOnly && ThrowPose) && _armLengthsWorld[i] <= 2f) continue;
+			Vector2 dir = HandDirection(i).Rotated(-GlobalRotation);
+			Vector2 handLocal = DecorativeOnly ? dir * 54f : ToLocal(HandPositionWorld(i));
+			DrawLine(Vector2.Zero, handLocal, SkinDark, 10f * unit);
+			DrawLine(Vector2.Zero, handLocal, Skin, 5f * unit);
+			DrawCircle(handLocal, 15f * unit, HandDark);
+			DrawCircle(handLocal, 12f * unit, Hand);
 
-			foreach (Vector2 dir in new[] { upperDir, lowerDir })
+			float angle = dir.Angle();
+			for (int fingerIndex = -1; fingerIndex <= 1; fingerIndex++)
 			{
-				Vector2 handLocal = dir * armLocal;
-				DrawLine(Vector2.Zero, handLocal, SkinDark, 10f * ui);
-				DrawLine(Vector2.Zero, handLocal, Skin, 5f * ui);
-
-				DrawCircle(handLocal, 15f * ui, HandDark);
-				DrawCircle(handLocal, 12f * ui, Hand);
-
-				// Пальчики вокруг ладони.
-				float angle = dir.Angle();
-				for (int i = -1; i <= 1; i++)
-				{
-					Vector2 finger = Vector2.FromAngle(angle + i * 0.75f);
-					DrawCircle(handLocal + finger * (14f * ui), 4.5f * ui, Hand);
-				}
+				Vector2 finger = Vector2.FromAngle(angle + fingerIndex * 0.75f);
+				DrawCircle(handLocal + finger * (14f * unit), 4.5f * unit, Hand);
 			}
 		}
 	}

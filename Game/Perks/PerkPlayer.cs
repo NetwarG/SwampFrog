@@ -246,7 +246,7 @@ public sealed class PerkPlayer
 		if (item.Frozen)
 		{
 			Game.HudNode?.SpawnPopup(item.GlobalPosition, "Камень!");
-			item.QueueFree();
+			item.Despawn();
 			return;
 		}
 
@@ -260,7 +260,7 @@ public sealed class PerkPlayer
 		}
 
 		TakeDamage();
-		item.QueueFree();
+		item.Despawn();
 	}
 
 	/// <summary>Фрукт/золотой упал мимо: штраф за промах и сброс комбо.</summary>
@@ -275,7 +275,7 @@ public sealed class PerkPlayer
 				_combo = 0;
 			}
 		}
-		item.QueueFree();
+		item.Despawn();
 	}
 
 	/// <summary>Урон по лягушке: неуязвимость, «Панцирь», возрождение.</summary>
@@ -329,7 +329,7 @@ public sealed class PerkPlayer
 		{
 			if (child is FallingItem item && item.ItemType == ItemType.Trash)
 			{
-				item.QueueFree();
+				item.Despawn();
 			}
 		}
 	}
@@ -354,7 +354,7 @@ public sealed class PerkPlayer
 	{
 		if (Game == null)
 		{
-			item.QueueFree();
+			item.Despawn();
 			return;
 		}
 		if (item.ItemType == ItemType.Fruit && !fromExplosion)
@@ -363,7 +363,7 @@ public sealed class PerkPlayer
 		}
 		if (!Game.IsPlaying)
 		{
-			item.QueueFree();
+			item.Despawn();
 			return;
 		}
 
@@ -421,7 +421,7 @@ public sealed class PerkPlayer
 			TriggerExplosion(item, PerkEffects.ExplosionRadius(_perks), PerkEffects.ExplosionCascades(_perks));
 		}
 
-		item.QueueFree();
+		item.Despawn();
 	}
 
 	/// <summary>Добавляет очки комбо и проверяет награду +1 HP («Комбо-мастер» ур. 4).</summary>
@@ -523,7 +523,7 @@ public sealed class PerkPlayer
 					// lvl4+: взрыв уничтожает мусор рядом.
 					if (PerkEffects.ExplosionDestroysTrash(_perks))
 					{
-						item.QueueFree();
+						item.Despawn();
 					}
 					continue;
 				}
@@ -610,7 +610,7 @@ public sealed class PerkPlayer
 			if (trash != null)
 			{
 				Game.HudNode?.SpawnPopup(trash.GlobalPosition, "⚡");
-				trash.QueueFree();
+				trash.Despawn();
 			}
 		}
 	}
@@ -676,8 +676,10 @@ public sealed class PerkPlayer
 		{
 			return;
 		}
-		foreach (Vector2 hand in hands)
+		for (int i = 0; i < hands.Length; i++)
 		{
+			if (Game?.FrogNode?.IsHandCatching(i) != true) continue;
+			Vector2 hand = hands[i];
 			Vector2 toHand = hand - item.GlobalPosition;
 			float distSq = toHand.LengthSquared();
 			if (distSq > radius * radius)

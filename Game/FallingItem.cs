@@ -37,7 +37,16 @@ public partial class FallingItem : Node2D
 	public float FallSpeed { get; set; } = 160f;
 
 	/// <summary>Пойманный предмет больше не падает, а следует за ладонью лягушки.</summary>
-	public bool IsCaught { get; set; }
+	public bool IsCaught
+	{
+		get => _isCaught;
+		set
+		{
+			if (_isCaught == value) return;
+			_isCaught = value;
+			UpdatePhysicsState();
+		}
+	}
 
 	/// <summary>Золотой фрукт: модификатор любого фрукта — крупнее и даёт больше очков.</summary>
 	public bool IsGolden { get; set; }
@@ -46,12 +55,29 @@ public partial class FallingItem : Node2D
 	/// Предмет обездвижен: заморозка «Взгляда василиска», остановка «Зоны замедления»
 	/// или пауза выбора перка. Поймать такой предмет всё ещё можно.
 	/// </summary>
-	public bool Frozen { get; set; }
+	public bool Frozen
+	{
+		get => _frozen;
+		set
+		{
+			if (_frozen == value) return;
+			_frozen = value;
+			UpdatePhysicsState();
+		}
+	}
 
 	/// <summary>Текущая скорость движения в мировых единицах в секунду.</summary>
-	public Vector2 Velocity { get; set; }
+	public Vector2 Velocity
+	{
+		get => _physicsBody == null || _physicsBody.Freeze ? _velocity : _physicsBody.LinearVelocity;
+		set
+		{
+			_velocity = value;
+			if (_physicsBody != null && !_physicsBody.Freeze) _physicsBody.LinearVelocity = value;
+		}
+	}
 
-	/// <summary>Отключает встроенное падение, когда объект управляется физикой Suika.</summary>
+	/// <summary>Только изображение, когда физическое тело создаёт Suika.</summary>
 	public bool ManualPhysics { get; set; }
 
 	/// <summary>Полуоси эллипса коллизии в мировых единицах (учитывают масштаб и форму спрайта).</summary>
@@ -62,14 +88,18 @@ public partial class FallingItem : Node2D
 	/// Хитбокс предмета: эллипс по форме тела фрукта в мировых координатах.
 	/// Ловля срабатывает только при пересечении эллипса с хитбоксом ладони.
 	/// </summary>
-	public EllipseHitbox GetHitbox() => new(GlobalPosition, HitRadiusX, HitRadiusY, Rotation);
-
-	private const float WallRestitution = 0.85f;
+	public EllipseHitbox GetHitbox() => new(GlobalPosition, HitRadiusX, HitRadiusY, GlobalRotation);
 
 	/// <summary>Насколько золотой фрукт крупнее обычного (умножение масштаба).</summary>
 	private const float GoldenSizeFactor = 1.35f;
 
 	private float _rotationSpeed;
+	private Vector2 _velocity;
+	private bool _isCaught;
+	private bool _frozen;
+	private bool _roundFrozen;
+	private bool _despawning;
+	private RigidBody2D? _physicsBody;
 
 	/// <summary>Спрайт предмета (фрукт или мусор).</summary>
 	private Sprite2D? _sprite;
@@ -116,6 +146,95 @@ public partial class FallingItem : Node2D
 			_glow = new GoldenGlow { Radius = BaseRadius };
 			AddChild(_glow);
 		}
+		if (!ManualPhysics) CreatePhysicsBody();
+	}
+
+	private void CreatePhysicsBody()
+	{
+		_physicsBody = new RigidBody2D
+		{
+			Name = "PhysicsBody",
+			// Родитель хранит изображение и API предмета; его масштаб не меняет форму тела.
+			TopLevel = true,
+			CollisionLayer = ItemPhysics.ClassicLayer,
+			CollisionMask = ItemPhysics.ClassicLayer,
+			Mass = Mathf.Max(0.25f, HitRadiusX * HitRadiusY / 400f),
+			PhysicsMaterialOverride = new PhysicsMaterial { Friction = 0.2f, Bounce = 0.3f },
+			// Баланс задаёт скорость падения, а Rapier — движение и реакцию на столкновения.
+			GravityScale = 0f,
+			LinearDampMode = RigidBody2D.DampMode.Replace,
+			LinearDamp = 0f,
+			AngularDampMode = RigidBody2D.DampMode.Replace,
+			AngularDamp = 0f,
+			ContinuousCd = RigidBody2D.CcdMode.CastShape,
+			CanSleep = false,
+			LinearVelocity = _velocity,
+			AngularVelocity = _rotationSpeed
+		};
+		_physicsBody.AddChild(new CollisionShape2D { Shape = ItemPhysics.Ellipse(HitRadiusX, HitRadiusY) });
+		AddChild(_physicsBody);
+		_physicsBody.GlobalPosition = GlobalPosition;
+		_physicsBody.GlobalRotation = GlobalRotation;
+		UpdatePhysicsState();
+	}
+
+	private void UpdatePhysicsState()
+	{
+		if (_physicsBody == null) return;
+		bool detached = _isCaught || _despawning;
+		_physicsBody.CollisionLayer = detached ? 0u : ItemPhysics.ClassicLayer;
+		_physicsBody.CollisionMask = detached ? 0u : ItemPhysics.ClassicLayer;
+		bool freeze = detached || _frozen || _roundFrozen;
+		if (_physicsBody.Freeze == freeze) return;
+		if (freeze)
+		{
+			_velocity = _physicsBody.LinearVelocity;
+			_rotationSpeed = _physicsBody.AngularVelocity;
+			_physicsBody.Freeze = true;
+		}
+		else
+		{
+			_physicsBody.Freeze = false;
+			_physicsBody.LinearVelocity = _velocity;
+			_physicsBody.AngularVelocity = _rotationSpeed;
+			_physicsBody.Sleeping = false;
+		}
+	}
+
+	/// <summary>Синхронизация изображения и хитбокса перед ловлей; координаты тела задаёт Rapier.</summary>
+	public void SyncFromPhysics()
+	{
+		if (_physicsBody == null || IsCaught || _despawning) return;
+		GlobalPosition = _physicsBody.GlobalPosition;
+		GlobalRotation = _physicsBody.GlobalRotation;
+	}
+
+	public void FreezeForRoundEnd()
+	{
+		_roundFrozen = true;
+		UpdatePhysicsState();
+	}
+
+	/// <summary>Сразу исключает предмет из физики, удаление ноды произойдёт в конце кадра.</summary>
+	public void Despawn()
+	{
+		_despawning = true;
+		UpdatePhysicsState();
+		QueueFree();
+	}
+
+	/// <summary>При сужении окна один раз переносит тело внутрь новых боковых стен.</summary>
+	public void ConstrainToViewport(Vector2 size)
+	{
+		if (_physicsBody == null || IsCaught || _despawning) return;
+		float angle = _physicsBody.GlobalRotation;
+		float halfWidth = new Vector2(HitRadiusX * Mathf.Cos(angle), HitRadiusY * Mathf.Sin(angle)).Length();
+		halfWidth = Mathf.Min(halfWidth + 1f, size.X * 0.5f);
+		Vector2 position = _physicsBody.GlobalPosition;
+		position.X = Mathf.Clamp(position.X, halfWidth, size.X - halfWidth);
+		_physicsBody.GlobalPosition = position;
+		_physicsBody.ResetPhysicsInterpolation();
+		SyncFromPhysics();
 	}
 
 	/// <summary>Базовый радиус предмета без учёта масштаба.</summary>
@@ -183,39 +302,7 @@ public partial class FallingItem : Node2D
 
 	public override void _Process(double delta)
 	{
-		// Предмет заморожен (эффект перка или пауза) — не двигается.
-		if (Frozen)
-		{
-			return;
-		}
-		if (ManualPhysics)
-		{
-			return;
-		}
-		// Пойманный предмет управляется лягушкой: не падает и не вращается.
-		if (IsCaught)
-		{
-			return;
-		}
-
-		float dt = (float)delta;
-
-		Position += Velocity * dt;
-
-		// Отталкивание от боковых стен экрана: ладонь полностью в границах, скорость разворачиваем.
-		float viewWidth = GetViewportRect().Size.X;
-		if (Position.X < HitRadiusX)
-		{
-			Position = new Vector2(HitRadiusX, Position.Y);
-			Velocity = new Vector2(Mathf.Abs(Velocity.X) * WallRestitution, Velocity.Y);
-		}
-		else if (Position.X > viewWidth - HitRadiusX)
-		{
-			Position = new Vector2(viewWidth - HitRadiusX, Position.Y);
-			Velocity = new Vector2(-Mathf.Abs(Velocity.X) * WallRestitution, Velocity.Y);
-		}
-
-		Rotation += _rotationSpeed * dt;
+		SyncFromPhysics();
 	}
 
 	public override void _Draw()

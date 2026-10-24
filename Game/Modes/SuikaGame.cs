@@ -25,8 +25,7 @@ public partial class SuikaGame : Node2D
 
 	private const float Restitution = 0.12f;
 	private const float FruitFriction = 0.65f;
-	private const int FruitShapeSegments = 24;
-	private const uint SuikaCollisionLayer = 1u << 1;
+	private const uint SuikaCollisionLayer = ItemPhysics.SuikaLayer;
 	private const float WallThickness = 12f;
 	private const float BowlWallInset = 18f;
 	private const float FloorInset = 4f;
@@ -729,13 +728,7 @@ public partial class SuikaGame : Node2D
 			LinearVelocity = velocity
 		};
 		var piece = new Piece { Body = body, Kind = kind, RadiusX = radius * shape.HitX, RadiusY = radius * shape.HitY };
-		var points = new Vector2[FruitShapeSegments];
-		for (int i = 0; i < points.Length; i++)
-		{
-			float angle = Mathf.Tau * i / points.Length;
-			points[i] = new Vector2(Mathf.Cos(angle) * piece.RadiusX, Mathf.Sin(angle) * piece.RadiusY);
-		}
-		body.AddChild(new CollisionShape2D { Shape = new ConvexPolygonShape2D { Points = points } });
+		body.AddChild(new CollisionShape2D { Shape = ItemPhysics.Ellipse(piece.RadiusX, piece.RadiusY) });
 		body.Position = FitPieceInsideBowl(piece, position);
 		body.BodyEntered += other => QueueMerge(piece, other);
 		_pieces.Add(piece);
