@@ -5,8 +5,7 @@ namespace SwampFrog;
 /// <summary>
 /// Модель сложности классического режима. Чистый C#-класс без Godot-нод,
 /// все балансные константы собраны здесь, чтобы их было легко менять.
-/// Прогресс считается от времени партии, а не от очков, чтобы хорошая игра
-/// не наказывалась ростом сложности.
+/// Падение предметов усложняется со временем, движение лягушки — с ростом счёта.
 /// </summary>
 public sealed class Difficulty
 {
@@ -24,6 +23,29 @@ public sealed class Difficulty
 	/// <summary>Шанс выпадения мусора, 0..1: начальный → максимальный.</summary>
 	public const float InitialTrashChance = 0.10f;
 	public const float MaxTrashChance = 0.22f;
+
+	/// <summary>Пороги движения лягушки: по осям → в произвольном направлении.</summary>
+	public const int FrogMovementScore = 100;
+	public const int FrogRandomMovementScore = 500;
+
+	/// <summary>Скорость лягушки в базовых единицах/сек и счёт достижения максимума.</summary>
+	public const float InitialFrogSpeed = 45f;
+	public const float MaxFrogSpeed = 180f;
+	public const int FrogMaxSpeedScore = 3000;
+
+	/// <summary>Интервалы смены направления лягушки, секунды.</summary>
+	public const float FrogAxisTurnInterval = 2.4f;
+	public const float FrogRandomTurnInterval = 1.6f;
+
+	public static float FrogSpeed(int score)
+	{
+		if (score < FrogMovementScore)
+		{
+			return 0f;
+		}
+		float t = Mathf.Clamp((score - FrogMovementScore) / (float)(FrogMaxSpeedScore - FrogMovementScore), 0f, 1f);
+		return Mathf.Lerp(InitialFrogSpeed, MaxFrogSpeed, t);
+	}
 
 	/// <summary>Прогресс сложности по времени партии, 0..1.</summary>
 	public static float Progress(float runTime)

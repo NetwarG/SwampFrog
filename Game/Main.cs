@@ -155,8 +155,15 @@ public partial class Main : Node2D
 	private void OnViewportResized()
 	{
 		QueueRedraw();
-		PositionFrog();
 		_frog?.SyncUiScale(ScreenScale);
+		if (_score >= Difficulty.FrogMovementScore)
+		{
+			_frog?.ConstrainMovement();
+		}
+		else
+		{
+			PositionFrog();
+		}
 	}
 
 	private void PositionFrog()
@@ -201,6 +208,7 @@ public partial class Main : Node2D
 
 		// Перки: модификаторы лягушки и таймеры.
 		_perkPlayer.Update(dt, _frog);
+		_frog.UpdateMovement(dt);
 
 		Vector2 viewSize = GetViewportRect().Size;
 		Vector2[]? hands = _frog.IsCatching ? _frog.GetHandPositions() : null;
@@ -549,6 +557,8 @@ public partial class Main : Node2D
 	{
 		_score = 0;
 		_runTime = 0f;
+		_frog?.ResetForRound();
+		PositionFrog();
 		_perkPlayer.Reset();
 		_lives = MaxLives;
 		ResetXp();

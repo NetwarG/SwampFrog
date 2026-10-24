@@ -66,6 +66,10 @@ public partial class Frog : Node2D
 	public bool ThrowPose { get; set; }
 
 	private Vector2 _direction = Vector2.Right;
+	private Vector2 _aimTarget;
+	private Vector2 _moveDirection;
+	private float _moveTurnTimer;
+	private bool _randomMovement;
 	/// <summary>Длины рук в «мировых» единицах экрана.</summary>
 	private float _armLengthWorld;
 	private float _armGrowSpeedWorld;
@@ -122,6 +126,90 @@ public partial class Frog : Node2D
 
 	/// <summary>Идёт ли ловля прямо сейчас: руки достаточно вытянуты (во время роста, удержания или втягивания).</summary>
 	public bool IsCatching => _armLengthWorld >= MinCatchLengthPx * _currentUiScale;
+
+	/// <summary>Движение тела до проверки столкновений ладоней в Main.</summary>
+	public void UpdateMovement(float dt)
+	{
+		if (!CanAct || Game == null || dt <= 0f)
+		{
+			return;
+		}
+		float speed = Difficulty.FrogSpeed(Game.Score);
+		if (speed <= 0f)
+		{
+			return;
+		}
+
+		bool randomMovement = Game.Score >= Difficulty.FrogRandomMovementScore;
+		_moveTurnTimer -= dt;
+		if (_moveDirection == Vector2.Zero || _moveTurnTimer <= 0f || randomMovement != _randomMovement)
+		{
+			if (randomMovement)
+			{
+				_moveDirection = Vector2.FromAngle(Game.GameRng.RandfRange(0f, Mathf.Tau));
+			}
+			else
+			{
+				// Чередуем горизонтальные и вертикальные отрезки, без диагоналей.
+				float sign = Game.GameRng.Randf() < 0.5f ? -1f : 1f;
+				_moveDirection = _moveDirection.X == 0f ? Vector2.Right * sign : Vector2.Down * sign;
+			}
+			_randomMovement = randomMovement;
+			_moveTurnTimer = randomMovement ? Difficulty.FrogRandomTurnInterval : Difficulty.FrogAxisTurnInterval;
+		}
+
+		Position += _moveDirection * speed * _currentUiScale * dt;
+		ConstrainMovement();
+	}
+
+	/// <summary>Удерживает тело на игровом поле и отражает движение от краёв.</summary>
+	public void ConstrainMovement()
+	{
+		if (Game == null || DecorativeOnly)
+		{
+			return;
+		}
+		Vector2 size = Game.ViewSize;
+		// Тело масштабируется и в Sprite2D, и в родительской ноде; учитываем также Pulse.
+		float bodyMargin = BodyVisualHeight * 0.7f * _currentUiScale * _currentUiScale;
+		Vector2 margin = new(bodyMargin, bodyMargin + 90f * _currentUiScale);
+		margin.X = Mathf.Min(margin.X, size.X * 0.5f);
+		margin.Y = Mathf.Min(margin.Y, size.Y * 0.5f);
+		Vector2 end = size - margin;
+		Vector2 position = Position;
+		if ((position.X <= margin.X && _moveDirection.X < 0f) || (position.X >= end.X && _moveDirection.X > 0f))
+		{
+			_moveDirection.X = -_moveDirection.X;
+		}
+		if ((position.Y <= margin.Y && _moveDirection.Y < 0f) || (position.Y >= end.Y && _moveDirection.Y > 0f))
+		{
+			_moveDirection.Y = -_moveDirection.Y;
+		}
+		Position = new Vector2(Mathf.Clamp(position.X, margin.X, end.X), Mathf.Clamp(position.Y, margin.Y, end.Y));
+		if (_holding)
+		{
+			// Палец может стоять на месте, пока лягушка движется под ним.
+			UpdateDirection(_aimTarget);
+		}
+	}
+
+	/// <summary>Новая партия начинается без движения и оставшегося удержания рук.</summary>
+	public void ResetForRound()
+	{
+		_moveDirection = Vector2.Zero;
+		_moveTurnTimer = 0f;
+		_randomMovement = false;
+		_direction = Vector2.Right;
+		_holding = false;
+		_armLengthWorld = 0f;
+		_flash = 0f;
+		_eatingTimer = 0f;
+		_pulsing = false;
+		Scale = Vector2.One * _currentUiScale;
+		ClearCaughtItems();
+		UpdateBodyState();
+		QueueRedraw();
+	}
 
 	private static string TexturePath(FrogPose pose) => pose switch
 	{
@@ -273,6 +361,7 @@ public partial class Frog : Node2D
 					return;
 				}
 				_holding = true;
+				_aimTarget = touch.Position;
 				UpdateDirection(touch.Position);
 			}
 			else
@@ -284,6 +373,7 @@ public partial class Frog : Node2D
 		{
 			if (_holding && CanAct)
 			{
+				_aimTarget = drag.Position;
 				UpdateDirection(drag.Position);
 			}
 		}
