@@ -8,23 +8,28 @@ namespace SwampFrog;
 /// Мини-игра Suika: лягушка двигается по верхней границе и бросает фрукты в кувшин.
 /// Фрукты используют тот же FallingItem, что и основной режим, поэтому их внешний вид
 /// и последовательность развития всегда остаются синхронизированы с FruitCatalog.
+/// Движение и столкновения считает Rapier2D через стандартные физические тела Godot.
 /// </summary>
 public partial class SuikaGame : Node2D
 {
 	private sealed class Piece
 	{
-		public required FallingItem View;
+		public required RigidBody2D Body;
 		public FruitKind Kind;
-		public Vector2 Position;
-		public Vector2 Velocity;
-		/// <summary>Полуоси эллипса коллизии (форма тела фрукта из FruitCatalog).</summary>
+		/// <summary>Локальные полуоси формы фрукта; поворот задаёт физическое тело.</summary>
 		public float RadiusX;
 		public float RadiusY;
 		public float Age;
+		public bool Removed;
 	}
 
-	private const float Gravity = 980f;
 	private const float Restitution = 0.12f;
+	private const float FruitFriction = 0.65f;
+	private const int FruitShapeSegments = 24;
+	private const uint SuikaCollisionLayer = 1u << 1;
+	private const float WallThickness = 12f;
+	private const float BowlWallInset = 18f;
+	private const float FloorInset = 4f;
 	/// <summary>Ширина кувшина в долях от ширины экрана.</summary>
 	private const float BowlWidthRatio = 0.80f;
 	/// <summary>Высота кувшина в долях от высоты экрана.</summary>
@@ -56,6 +61,13 @@ public partial class SuikaGame : Node2D
 
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly List<Piece> _pieces = new();
+	private readonly Dictionary<ulong, Piece> _piecesByBody = new();
+	private readonly Queue<(Piece A, Piece B)> _pendingMerges = new();
+	private readonly PhysicsMaterial _fruitMaterial = new() { Friction = FruitFriction, Bounce = Restitution };
+	private StaticBody2D? _bowlBody;
+	private CollisionPolygon2D? _leftWall;
+	private CollisionPolygon2D? _rightWall;
+	private CollisionPolygon2D? _floor;
 	private FruitKind _currentKind = FruitKind.Cherry;
 	private FruitKind _nextKind = FruitKind.Cherry;
 	private Rect2 _bowl;
@@ -107,6 +119,7 @@ public partial class SuikaGame : Node2D
 		_rng.Randomize();
 		_bestScore = LoadBestScore();
 		BuildUi();
+		BuildBowlPhysics();
 
 		_frog = new Frog { DecorativeOnly = true };
 		AddChild(_frog);
@@ -179,18 +192,19 @@ public partial class SuikaGame : Node2D
 	public override void _Process(double delta)
 	{
 		if (!_active) return;
-		float dt = Mathf.Min((float)delta, 0.033f);
-		_dropCooldown = Mathf.Max(0f, _dropCooldown - dt);
+		float dt = (float)delta;
 		_throwTimer = Mathf.Max(0f, _throwTimer - dt);
-		UpdateBowl();
 		UpdateFrog(dt);
-		if (_gameOver) return;
+	}
 
-		SimulatePieces(dt);
-		ResolveCollisions();
-		TryMergePieces();
-		ClampToBowl();
-		UpdatePieceViews(dt);
+	public override void _PhysicsProcess(double delta)
+	{
+		if (!_active || _gameOver) return;
+		float dt = (float)delta;
+		_dropCooldown = Mathf.Max(0f, _dropCooldown - dt);
+		foreach (Piece piece in _pieces) piece.Age += dt;
+		// Сигналы контакта только ставят слияния в очередь. Меняем тела вне callback физики.
+		MergeContactingPieces();
 		CheckOverflow(dt);
 		CheckStockEnd(dt);
 	}
@@ -271,9 +285,9 @@ public partial class SuikaGame : Node2D
 		// Стеклянное тело кувшина и его толстый контур.
 		DrawRect(_bowl, new Color(0.03f, 0.14f, 0.16f, 0.72f));
 		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y), new Vector2(_bowl.End.X, _bowl.Position.Y), new Color("9ee4c3"), 3f);
-		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y), new Vector2(_bowl.Position.X + 18f, _bowl.End.Y), new Color("7acbb2"), 6f);
-		DrawLine(new Vector2(_bowl.End.X, _bowl.Position.Y), new Vector2(_bowl.End.X - 18f, _bowl.End.Y), new Color("7acbb2"), 6f);
-		DrawLine(new Vector2(_bowl.Position.X + 18f, _bowl.End.Y), new Vector2(_bowl.End.X - 18f, _bowl.End.Y), new Color("9ee4c3"), 8f);
+		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y), new Vector2(_bowl.Position.X + BowlWallInset, _bowl.End.Y), new Color("7acbb2"), 6f);
+		DrawLine(new Vector2(_bowl.End.X, _bowl.Position.Y), new Vector2(_bowl.End.X - BowlWallInset, _bowl.End.Y), new Color("7acbb2"), 6f);
+		DrawLine(new Vector2(_bowl.Position.X + BowlWallInset, _bowl.End.Y), new Vector2(_bowl.End.X - BowlWallInset, _bowl.End.Y), new Color("9ee4c3"), 8f);
 		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y + 30f), new Vector2(_bowl.End.X, _bowl.Position.Y + 30f), new Color(0.62f, 0.93f, 0.8f, 0.18f), 2f);
 
 		// Линия переполнения помогает понять, когда кувшин уже заполнен.
@@ -466,12 +480,67 @@ public partial class SuikaGame : Node2D
 		return style;
 	}
 
+	private void BuildBowlPhysics()
+	{
+		_bowlBody = new StaticBody2D
+		{
+			Name = "BowlBody",
+			CollisionLayer = SuikaCollisionLayer,
+			CollisionMask = SuikaCollisionLayer,
+			PhysicsMaterialOverride = new PhysicsMaterial { Friction = FruitFriction, Bounce = 0f }
+		};
+		AddChild(_bowlBody);
+		_leftWall = new CollisionPolygon2D { Name = "LeftWall" };
+		_rightWall = new CollisionPolygon2D { Name = "RightWall" };
+		_floor = new CollisionPolygon2D { Name = "Floor" };
+		_bowlBody.AddChild(_leftWall);
+		_bowlBody.AddChild(_rightWall);
+		_bowlBody.AddChild(_floor);
+	}
+
 	private void UpdateBowl()
 	{
 		Vector2 view = GetViewportRect().Size;
 		float width = Mathf.Max(BowlMinWidth, view.X * BowlWidthRatio);
 		float height = Mathf.Max(BowlMinHeight, view.Y * BowlHeightRatio);
+		Rect2 previous = _bowl;
 		_bowl = new Rect2((view.X - width) * 0.5f, view.Y - BowlBottom - height, width, height);
+		if (_bowl == previous) return;
+
+		// Внутренние грани повторяют наклон нарисованных стенок. Верх кувшина открыт.
+		float left = _bowl.Position.X;
+		float right = _bowl.End.X;
+		float top = _bowl.Position.Y;
+		float bottom = _bowl.End.Y;
+		_leftWall!.Polygon = new[]
+		{
+			new Vector2(left - WallThickness, top), new Vector2(left, top),
+			new Vector2(left + BowlWallInset, bottom), new Vector2(left + BowlWallInset - WallThickness, bottom)
+		};
+		_rightWall!.Polygon = new[]
+		{
+			new Vector2(right, top), new Vector2(right + WallThickness, top),
+			new Vector2(right - BowlWallInset + WallThickness, bottom), new Vector2(right - BowlWallInset, bottom)
+		};
+		_floor!.Polygon = new[]
+		{
+			new Vector2(left + BowlWallInset - WallThickness, bottom - FloorInset),
+			new Vector2(right - BowlWallInset + WallThickness, bottom - FloorInset),
+			new Vector2(right - BowlWallInset + WallThickness, bottom + WallThickness),
+			new Vector2(left + BowlWallInset - WallThickness, bottom + WallThickness)
+		};
+
+		if (previous.HasArea())
+		{
+			foreach (Piece piece in _pieces)
+			{
+				// При ресайзе переносим тела в новый кувшин один раз, затем ими снова управляет Rapier.
+				Vector2 relative = (piece.Body.Position - previous.Position) / previous.Size;
+				piece.Body.Position = FitPieceInsideBowl(piece, _bowl.Position + relative * _bowl.Size);
+				piece.Body.ResetPhysicsInterpolation();
+				piece.Body.Sleeping = false;
+			}
+		}
 		QueueRedraw();
 	}
 
@@ -619,7 +688,10 @@ public partial class SuikaGame : Node2D
 		float maxSpeed = 0f;
 		foreach (Piece piece in _pieces)
 		{
-			maxSpeed = Mathf.Max(maxSpeed, piece.Velocity.Length());
+			if (piece.Body.Sleeping) continue;
+			float speed = piece.Body.LinearVelocity.Length()
+				+ Mathf.Abs(piece.Body.AngularVelocity) * Mathf.Max(piece.RadiusX, piece.RadiusY);
+			maxSpeed = Mathf.Max(maxSpeed, speed);
 		}
 		if (maxSpeed < SettleSpeed)
 		{
@@ -638,19 +710,45 @@ public partial class SuikaGame : Node2D
 	private Piece CreatePiece(FruitKind kind, Vector2 position, Vector2 velocity)
 	{
 		float radius = FruitRadius(kind);
-		var item = CreateVisualFruit(kind, radius);
 		FruitBody shape = FruitCatalog.Get(kind).Body;
-		item.Position = position;
-		item.Rotation = _rng.RandfRange(-0.2f, 0.2f);
-		var piece = new Piece { View = item, Kind = kind, Position = position, Velocity = velocity, RadiusX = radius * shape.HitX, RadiusY = radius * shape.HitY };
+		var body = new RigidBody2D
+		{
+			Name = $"Fruit_{kind}",
+			CollisionLayer = SuikaCollisionLayer,
+			CollisionMask = SuikaCollisionLayer,
+			Mass = Mathf.Pow(radius / FruitRadius(FruitKind.Cherry), 2f),
+			PhysicsMaterialOverride = _fruitMaterial,
+			LinearDampMode = RigidBody2D.DampMode.Replace,
+			LinearDamp = 0.2f,
+			AngularDampMode = RigidBody2D.DampMode.Replace,
+			AngularDamp = 1.5f,
+			ContinuousCd = RigidBody2D.CcdMode.CastShape,
+			ContactMonitor = true,
+			MaxContactsReported = 16,
+			CanSleep = true,
+			LinearVelocity = velocity
+		};
+		var piece = new Piece { Body = body, Kind = kind, RadiusX = radius * shape.HitX, RadiusY = radius * shape.HitY };
+		var points = new Vector2[FruitShapeSegments];
+		for (int i = 0; i < points.Length; i++)
+		{
+			float angle = Mathf.Tau * i / points.Length;
+			points[i] = new Vector2(Mathf.Cos(angle) * piece.RadiusX, Mathf.Sin(angle) * piece.RadiusY);
+		}
+		body.AddChild(new CollisionShape2D { Shape = new ConvexPolygonShape2D { Points = points } });
+		body.Position = FitPieceInsideBowl(piece, position);
+		body.BodyEntered += other => QueueMerge(piece, other);
 		_pieces.Add(piece);
+		_piecesByBody.Add(body.GetInstanceId(), piece);
+		AddChild(body);
+		CreateVisualFruit(kind, radius, body);
 		return piece;
 	}
 
-	private FallingItem CreateVisualFruit(FruitKind kind, float radius)
+	private FallingItem CreateVisualFruit(FruitKind kind, float radius, Node2D? parent = null)
 	{
 		var item = new FallingItem { ItemType = ItemType.Fruit, Kind = kind, ManualPhysics = true };
-		AddChild(item);
+		(parent ?? this).AddChild(item);
 		float baseRadius = FruitCatalog.Get(kind).BaseRadius;
 		item.Scale = Vector2.One * (radius / baseRadius);
 		return item;
@@ -664,13 +762,23 @@ public partial class SuikaGame : Node2D
 		return 32f * Mathf.Pow(1.18f, order);
 	}
 
-	/// <summary>Эффективный радиус эллипса вдоль направления dir (для столкновений кусков).</summary>
-	private static float EffectiveRadius(Piece piece, Vector2 dir)
+	/// <summary>Проекция повёрнутой формы на ось: для линии переполнения и размещения новых тел.</summary>
+	private static float ShapeExtent(Piece piece, Vector2 axis)
 	{
-		float nx = dir.X / piece.RadiusX;
-		float ny = dir.Y / piece.RadiusY;
-		float len = Mathf.Sqrt(nx * nx + ny * ny);
-		return len < 0.0001f ? Mathf.Min(piece.RadiusX, piece.RadiusY) : 1f / len;
+		Vector2 local = axis.Rotated(-piece.Body.Rotation);
+		return new Vector2(local.X * piece.RadiusX, local.Y * piece.RadiusY).Length();
+	}
+
+	/// <summary>Размещение при создании/ресайзе; текущие столкновения решает только физический сервер.</summary>
+	private Vector2 FitPieceInsideBowl(Piece piece, Vector2 position)
+	{
+		position.Y = Mathf.Min(position.Y, _bowl.End.Y - FloorInset - ShapeExtent(piece, Vector2.Down) - 1f);
+		float slope = BowlWallInset / _bowl.Size.Y;
+		float inset = Mathf.Clamp((position.Y - _bowl.Position.Y) * slope, 0f, BowlWallInset);
+		float left = _bowl.Position.X + inset + ShapeExtent(piece, new Vector2(1f, -slope)) + 1f;
+		float right = _bowl.End.X - inset - ShapeExtent(piece, new Vector2(1f, slope)) - 1f;
+		position.X = left <= right ? Mathf.Clamp(position.X, left, right) : _bowl.GetCenter().X;
+		return position;
 	}
 
 	/// <summary>
@@ -686,138 +794,47 @@ public partial class SuikaGame : Node2D
 		return Mathf.Clamp(x, left, right);
 	}
 
-	private void SimulatePieces(float dt)
+	private void QueueMerge(Piece piece, Node other)
 	{
-		foreach (Piece piece in _pieces)
-		{
-			piece.Age += dt;
-			piece.Velocity.Y += Gravity * dt;
-			piece.Velocity.X *= Mathf.Pow(0.997f, dt * 60f);
-			piece.Position += piece.Velocity * dt;
-		}
+		if (!_active || _gameOver || piece.Removed || piece.Kind == FruitKind.Watermelon) return;
+		if (!_piecesByBody.TryGetValue(other.GetInstanceId(), out Piece? partner)
+			|| partner.Removed || partner.Kind != piece.Kind) return;
+
+		// Достаточно сигнала от любого тела. Повторные записи отсекаются флагом Removed.
+		_pendingMerges.Enqueue((piece, partner));
 	}
 
-	/// <summary>
-	/// Возвращает все куски внутрь кувшина после столкновений и слияний,
-	/// чтобы фрукты не выпирали за стены и дно.
-	/// </summary>
-	private void ClampToBowl()
+	private void MergeContactingPieces()
 	{
-		foreach (Piece piece in _pieces) ClampPieceToBowl(piece);
-	}
-
-	/// <summary>Упирает один кусок в стены и дно кувшина, гася скорость.</summary>
-	private void ClampPieceToBowl(Piece piece)
-	{
-		float left = _bowl.Position.X + piece.RadiusX;
-		float right = _bowl.End.X - piece.RadiusX;
-		// Кусок шире кувшина: диапазон вырождается, поэтому центр прижимается
-		// к середине, чтобы фрукт свисал за обе стенки равномерно.
-		if (left > right)
+		while (_pendingMerges.TryDequeue(out var pair))
 		{
-			piece.Position.X = _bowl.Position.X + _bowl.Size.X * 0.5f;
-			piece.Velocity.X = 0f;
-		}
-		else if (piece.Position.X < left)
-		{
-			piece.Position.X = left;
-			piece.Velocity.X = Mathf.Abs(piece.Velocity.X) * 0.35f;
-		}
-		else if (piece.Position.X > right)
-		{
-			piece.Position.X = right;
-			piece.Velocity.X = -Mathf.Abs(piece.Velocity.X) * 0.35f;
-		}
-
-		float floor = _bowl.End.Y - piece.RadiusY - 6f;
-		if (piece.Position.Y > floor)
-		{
-			piece.Position.Y = floor;
-			if (Mathf.Abs(piece.Velocity.Y) > 16f) piece.Velocity.Y = -Mathf.Abs(piece.Velocity.Y) * Restitution;
-			else piece.Velocity.Y = 0f;
-			piece.Velocity.X *= 0.86f;
-		}
-	}
-
-	private void ResolveCollisions()
-	{
-		for (int pass = 0; pass < 2; pass++)
-		{
-			for (int i = 0; i < _pieces.Count; i++)
-			{
-				for (int j = i + 1; j < _pieces.Count; j++)
-				{
-					Piece a = _pieces[i];
-					Piece b = _pieces[j];
-					Vector2 delta = a.Position - b.Position;
-					float distanceSquared = delta.LengthSquared();
-					// Порог контакта — по эллипсам формы обоих кусков вдоль нормали.
-					Vector2 normal = distanceSquared > 0.0001f ? delta / Mathf.Sqrt(distanceSquared) : Vector2.Up;
-					float minDistance = EffectiveRadius(a, normal) + EffectiveRadius(b, normal);
-					if (distanceSquared >= minDistance * minDistance) continue;
-					float distance = Mathf.Sqrt(Mathf.Max(distanceSquared, 0.0001f));
-					float overlap = minDistance - distance;
-					a.Position += normal * (overlap * 0.5f);
-					b.Position -= normal * (overlap * 0.5f);
-					float relativeNormal = (a.Velocity - b.Velocity).Dot(normal);
-					if (relativeNormal < 0f)
-					{
-						float impulse = -(1f + Restitution) * relativeNormal * 0.5f;
-						a.Velocity += normal * impulse;
-						b.Velocity -= normal * impulse;
-					}
-				}
-			}
-		}
-	}
-
-	private void TryMergePieces()
-	{
-		for (int i = 0; i < _pieces.Count; i++)
-		{
-			Piece a = _pieces[i];
-			if ((int)a.Kind >= (int)FruitKind.Watermelon) continue;
-			for (int j = i + 1; j < _pieces.Count; j++)
-			{
-				Piece b = _pieces[j];
-				if (a.Kind != b.Kind) continue;
-				// ResolveCollisions оставляет соприкасающиеся куски ровно на границе
-				// контакта эллипсов, поэтому слияние проверяется по факту касания.
-				Vector2 delta = a.Position - b.Position;
-				float distSq = delta.LengthSquared();
-				if (distSq > 0.0001f)
-				{
-					Vector2 normal = delta / Mathf.Sqrt(distSq);
-					float touchDist = (EffectiveRadius(a, normal) + EffectiveRadius(b, normal)) * 1.06f;
-					if (distSq > touchDist * touchDist) continue;
-				}
-
-				FruitKind mergedKind = (FruitKind)((int)a.Kind + 1);
-				Vector2 position = (a.Position + b.Position) * 0.5f;
-				Vector2 velocity = (a.Velocity + b.Velocity) * 0.5f;
-				RemovePiece(a);
-				RemovePiece(b);
-				CreatePiece(mergedKind, position, velocity * 0.45f);
-				_score += 10 * ((int)mergedKind + 1);
-				_scoreLabel!.Text = $"Счёт  {_score}";
-				return;
-			}
+			Piece a = pair.A;
+			Piece b = pair.B;
+			// Одновременное касание трёх фруктов не должно использовать один фрукт дважды.
+			if (a.Removed || b.Removed) continue;
+			FruitKind mergedKind = (FruitKind)((int)a.Kind + 1);
+			Vector2 position = (a.Body.Position + b.Body.Position) * 0.5f;
+			Vector2 velocity = (a.Body.LinearVelocity + b.Body.LinearVelocity) * 0.5f;
+			RemovePiece(a);
+			RemovePiece(b);
+			CreatePiece(mergedKind, position, velocity * 0.45f);
+			_settleTime = 0f;
+			_score += 10 * ((int)mergedKind + 1);
+			_scoreLabel!.Text = $"Счёт  {_score}";
 		}
 	}
 
 	private void RemovePiece(Piece piece)
 	{
+		piece.Removed = true;
 		_pieces.Remove(piece);
-		piece.View.QueueFree();
-	}
-
-	private void UpdatePieceViews(float dt)
-	{
-		foreach (Piece piece in _pieces)
-		{
-			piece.View.Position = piece.Position;
-			piece.View.Rotation += Mathf.Clamp(piece.Velocity.X / Mathf.Max(30f, piece.RadiusX * 4f), -1.4f, 1.4f) * dt;
-		}
+		_piecesByBody.Remove(piece.Body.GetInstanceId());
+		// QueueFree отложен до конца кадра: сразу исключаем старые тела из столкновений.
+		piece.Body.CollisionLayer = 0;
+		piece.Body.CollisionMask = 0;
+		piece.Body.Freeze = true;
+		piece.Body.Hide();
+		piece.Body.QueueFree();
 	}
 
 	private void CheckOverflow(float dt)
@@ -828,7 +845,10 @@ public partial class SuikaGame : Node2D
 		{
 			// Новый фрукт пересекает линию по пути вниз, поэтому учитываем только
 			// объект, который уже пробыл в кувшине заметное время.
-			if (piece.Age > 0.45f && piece.Position.Y - piece.RadiusY < danger)
+			Vector2 position = piece.Body.Position;
+			bool aboveLine = position.Y - ShapeExtent(piece, Vector2.Down) < danger;
+			bool outsideBowl = position.X < _bowl.Position.X || position.X > _bowl.End.X || position.Y > _bowl.End.Y;
+			if (piece.Age > 0.45f && (aboveLine || outsideBowl))
 			{
 				overflowing = true;
 				break;
@@ -842,6 +862,11 @@ public partial class SuikaGame : Node2D
 	{
 		_gameOver = true;
 		_active = true;
+		_pendingMerges.Clear();
+		foreach (Piece piece in _pieces)
+		{
+			piece.Body.Freeze = true;
+		}
 		if (_score > _bestScore)
 		{
 			_bestScore = _score;
@@ -881,8 +906,9 @@ public partial class SuikaGame : Node2D
 
 	private void ClearPieces()
 	{
-		foreach (Piece piece in _pieces) piece.View.QueueFree();
-		_pieces.Clear();
+		for (int i = _pieces.Count - 1; i >= 0; i--) RemovePiece(_pieces[i]);
+		_pendingMerges.Clear();
+		_piecesByBody.Clear();
 	}
 
 	private static int LoadBestScore()
