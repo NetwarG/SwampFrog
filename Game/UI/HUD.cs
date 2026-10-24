@@ -7,7 +7,7 @@ namespace SwampFrog;
 /// HUD поверх игрового мира: счёт, сердечки жизней, красная вспышка от мусора,
 /// оверлей «Игра окончена» и всплывающие надписи «+10».
 /// </summary>
-public partial class HUD : CanvasLayer
+public partial class HUD : Control
 {
 	private const float HintDuration = 3.4f;
 
@@ -23,6 +23,8 @@ public partial class HUD : CanvasLayer
 	private Label? _finalScore;
 	private Label? _finalHigh;
 	private PerkBar? _perkBar;
+	private Label? _hint;
+	private Control? _popups;
 
 	/// <summary>Оверлей выбора перка (работает и на паузе игры).</summary>
 	private PerkSelectionOverlay? _perkOverlay;
@@ -36,27 +38,16 @@ public partial class HUD : CanvasLayer
 	/// <summary>Игрок выбрал перк в оверлее выбора.</summary>
 	public event Action<PerkId>? PerkPicked;
 
-	/// <summary>
-	/// Адаптивный масштаб HUD: кламп min(видимая/540, видимая/960) так же, как в Main.
-	/// Нужен, чтобы элементы не становились крошечными на больших экранах.
-	/// </summary>
-	public float UiScale
-	{
-		get
-		{
-			Vector2 vp = GetViewport().GetVisibleRect().Size;
-			if (vp.X <= 0f || vp.Y <= 0f)
-			{
-				return 1f;
-			}
-			return Mathf.Clamp(Mathf.Min(vp.X / 540f, vp.Y / 960f), 0.85f, 2f);
-		}
-	}
+	/// <summary>Масштаб интерфейса задаётся один раз родителем GameScreen.</summary>
+	public float UiScale => 1f;
+	public Func<Vector2, Vector2>? WorldToUi { get; set; }
 
 	public override void _Ready()
 	{
+		MouseFilter = MouseFilterEnum.Ignore;
+		SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 		BuildUI();
-		GetViewport().SizeChanged += OnViewportResized;
+		Resized += OnViewportResized;
 
 		_perkOverlay = new PerkSelectionOverlay { ZIndex = 80 };
 		AddChild(_perkOverlay);
@@ -80,6 +71,14 @@ public partial class HUD : CanvasLayer
 		_xpBar?.SetUiScale(ui);
 		_perkBar?.SetUiScale(ui);
 		_perkOverlay?.RecenterIfVisible();
+		UpdatePopupTransform();
+	}
+
+	private void UpdatePopupTransform()
+	{
+		if (_popups == null) return;
+		_popups.Position = WorldToUi?.Invoke(Vector2.Zero) ?? Vector2.Zero;
+		_popups.Scale = WorldToUi == null ? Vector2.One : WorldToUi(Vector2.One) - WorldToUi(Vector2.Zero);
 	}
 
 	private void BuildUI()
@@ -115,6 +114,9 @@ public partial class HUD : CanvasLayer
 
 		BuildGameOver();
 		BuildStart();
+		_popups = new Control { MouseFilter = MouseFilterEnum.Ignore, ZIndex = 50 };
+		AddChild(_popups);
+		UpdatePopupTransform();
 	}
 
 	/// <summary>Скрывает игровые показатели, пока открыт главное меню или мини-игра.</summary>
@@ -124,6 +126,13 @@ public partial class HUD : CanvasLayer
 		if (_hearts != null) _hearts.Visible = visible;
 		if (_xpBar != null) _xpBar.Visible = visible;
 		if (_perkBar != null && _perkBar.HasIcons) _perkBar.Visible = visible;
+		if (!visible)
+		{
+			if (IsInstanceValid(_hint)) _hint!.QueueFree();
+			_hint = null;
+			if (_popups != null)
+				foreach (Node child in _popups.GetChildren()) child.QueueFree();
+		}
 	}
 
 	private void BuildStart()
@@ -133,7 +142,7 @@ public partial class HUD : CanvasLayer
 			Visible = true,
 			MouseFilter = Control.MouseFilterEnum.Stop
 		};
-		_startRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_startRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_startRoot);
 
 		var backdrop = new ColorRect
@@ -141,22 +150,12 @@ public partial class HUD : CanvasLayer
 			Color = new Color(0.02f, 0.12f, 0.09f, 0.55f),
 			MouseFilter = Control.MouseFilterEnum.Ignore
 		};
-		backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		backdrop.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		_startRoot.AddChild(backdrop);
 
-		// Центрирующий контейнер держит меню строго по центру экрана
-		// независимо от разрешения и режима растяжения (aspect expand).
-		var center = new CenterContainer();
-		center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		center.MouseFilter = Control.MouseFilterEnum.Ignore;
-		_startRoot.AddChild(center);
-
-		var box = new VBoxContainer
-		{
-			Alignment = BoxContainer.AlignmentMode.Center
-		};
+		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
-		center.AddChild(box);
+		ModalContent.Mount(_startRoot, box, 36);
 
 		float ui = UiScale;
 
@@ -184,8 +183,8 @@ public partial class HUD : CanvasLayer
 		madeByText.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
 		madeByText.AnchorTop = 1f;
 		madeByText.AnchorBottom = 1f;
-		madeByText.OffsetTop = -(int)Mathf.Round(26f * ui);
-		madeByText.OffsetBottom = -(int)Mathf.Round(6f * ui);
+		madeByText.OffsetTop = -(int)Mathf.Round(42f * ui);
+		madeByText.OffsetBottom = -(int)Mathf.Round(10f * ui);
 		madeByText.HorizontalAlignment = HorizontalAlignment.Center;
 		_startRoot.AddChild(madeByText);
 	}
@@ -250,7 +249,7 @@ public partial class HUD : CanvasLayer
 		// Позиционируем над кнопкой «Мини-игра: Suika» по её верхнему краю.
 		if (_miniGameButton != null)
 		{
-			Vector2 btn = _miniGameButton.GetGlobalPosition();
+			Vector2 btn = GetGlobalTransform().AffineInverse() * _miniGameButton.GlobalPosition;
 			Vector2 btnSize = _miniGameButton.Size;
 			_suikaHintLabel.Position = new Vector2(
 				btn.X + btnSize.X * 0.5f - _suikaHintLabel.Size.X * 0.5f,
@@ -259,7 +258,7 @@ public partial class HUD : CanvasLayer
 		else
 		{
 			// Запасной вариант: центр экрана, чуть выше средней зоны.
-			Vector2 vp = GetViewport().GetVisibleRect().Size;
+			Vector2 vp = Size;
 			_suikaHintLabel.Position = new Vector2(
 				vp.X * 0.5f - _suikaHintLabel.Size.X * 0.5f,
 				vp.Y * 0.24f);
@@ -283,7 +282,7 @@ public partial class HUD : CanvasLayer
 			Visible = false,
 			MouseFilter = Control.MouseFilterEnum.Stop
 		};
-		_gameOverRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_gameOverRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_gameOverRoot);
 
 		var backdrop = new ColorRect
@@ -291,7 +290,7 @@ public partial class HUD : CanvasLayer
 			Color = new Color(0.02f, 0.12f, 0.09f, 0.62f),
 			MouseFilter = Control.MouseFilterEnum.Ignore
 		};
-		backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		backdrop.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		_gameOverRoot.AddChild(backdrop);
 
 		var box = new VBoxContainer
@@ -299,11 +298,7 @@ public partial class HUD : CanvasLayer
 			Alignment = BoxContainer.AlignmentMode.Center
 		};
 		box.AddThemeConstantOverride("separation", 16);
-		var center = new CenterContainer();
-		center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		center.MouseFilter = Control.MouseFilterEnum.Ignore;
-		_gameOverRoot.AddChild(center);
-		center.AddChild(box);
+		ModalContent.Mount(_gameOverRoot, box);
 
 		float ui = UiScale;
 
@@ -327,6 +322,7 @@ public partial class HUD : CanvasLayer
 		var label = new Label
 		{
 			Text = text,
+			MouseFilter = MouseFilterEnum.Ignore,
 			HorizontalAlignment = HorizontalAlignment.Center
 		};
 		label.AddThemeFontSizeOverride("font_size", fontSize);
@@ -339,7 +335,8 @@ public partial class HUD : CanvasLayer
 		var button = new Button
 		{
 			Text = text,
-			CustomMinimumSize = new Vector2(330f * ui, 56f * ui),
+			CustomMinimumSize = new Vector2(330f * ui, 80f * ui),
+			MouseFilter = MouseFilterEnum.Pass,
 			FocusMode = Control.FocusModeEnum.None,
 			MouseDefaultCursorShape = Control.CursorShape.PointingHand
 		};
@@ -377,6 +374,7 @@ public partial class HUD : CanvasLayer
 	/// <summary>Мимолётная подсказка «держи палец» после старта.</summary>
 	public void ShowHint()
 	{
+		if (IsInstanceValid(_hint)) _hint!.QueueFree();
 		float ui = UiScale;
 		var hint = new Label
 		{
@@ -387,8 +385,8 @@ public partial class HUD : CanvasLayer
 			AnchorBottom = 1f,
 			OffsetLeft = -240f * ui,
 			OffsetRight = 240f * ui,
-			OffsetTop = -46f * ui,
-			OffsetBottom = -14f * ui,
+			OffsetTop = -130f * ui,
+			OffsetBottom = -94f * ui,
 			HorizontalAlignment = HorizontalAlignment.Center
 		};
 		hint.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(18f * ui));
@@ -397,8 +395,9 @@ public partial class HUD : CanvasLayer
 		hint.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
 		hint.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(2f * ui));
 		AddChild(hint);
+		_hint = hint;
 
-		Tween tween = CreateTween();
+		Tween tween = hint.CreateTween();
 		tween.TweenInterval(HintDuration);
 		tween.TweenProperty(hint, "modulate:a", 0f, 0.7f);
 		tween.TweenCallback(Callable.From(hint.QueueFree));
@@ -463,17 +462,17 @@ public partial class HUD : CanvasLayer
 		var popup = new Label
 		{
 			Text = text,
-			GlobalPosition = globalPos
+			Position = globalPos,
+			MouseFilter = MouseFilterEnum.Ignore
 		};
 		popup.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(30f * ui));
 		popup.AddThemeColorOverride("font_color", new Color("fff45e"));
 		popup.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
 		popup.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
 		popup.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(2f * ui));
-		popup.ZIndex = 50;
-		AddChild(popup);
+		_popups!.AddChild(popup);
 
-		Tween tween = CreateTween();
+		Tween tween = popup.CreateTween();
 		tween.SetParallel(true);
 		tween.TweenProperty(popup, "position:y", popup.Position.Y - 80f, 0.9f);
 		tween.TweenProperty(popup, "modulate:a", 0f, 0.9f);

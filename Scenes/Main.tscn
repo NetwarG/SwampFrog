@@ -17,5 +17,10 @@ script = ExtResource("2_frog")
 visible = false
 script = ExtResource("4_suika")
 
-[node name="HUD" type="CanvasLayer" parent="."]
+[node name="HUD" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
 script = ExtResource("3_hud")

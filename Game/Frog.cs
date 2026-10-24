@@ -75,6 +75,7 @@ public partial class Frog : Node2D
 	private float _armGrowSpeedWorld;
 	private float _armRetractSpeedWorld;
 	private bool _holding;
+	private int _pointerIndex = -1;
 	private float _flash;
 	private bool _pulsing;
 	private float _pulseT;
@@ -121,6 +122,7 @@ public partial class Frog : Node2D
 	public void SyncUiScale(float uiScale)
 	{
 		_currentUiScale = uiScale;
+		if (!_pulsing) Scale = Vector2.One * uiScale;
 		ConstrainHands();
 		UpdateBodyState();
 	}
@@ -174,8 +176,8 @@ public partial class Frog : Node2D
 			return;
 		}
 		Vector2 size = Game.ViewSize;
-		// Тело масштабируется и в Sprite2D, и в родительской ноде; учитываем также Pulse.
-		float bodyMargin = BodyVisualHeight * 0.7f * _currentUiScale * _currentUiScale;
+		// Размер тела задаёт только родитель; запас учитывает также Pulse.
+		float bodyMargin = BodyVisualHeight * 0.7f * _currentUiScale;
 		Vector2 margin = new(bodyMargin, bodyMargin + 90f * _currentUiScale);
 		margin.X = Mathf.Min(margin.X, size.X * 0.5f);
 		margin.Y = Mathf.Min(margin.Y, size.Y * 0.5f);
@@ -205,7 +207,7 @@ public partial class Frog : Node2D
 		_moveTurnTimer = 0f;
 		_randomMovement = false;
 		_direction = Vector2.Right;
-		_holding = false;
+		CancelInput();
 		Array.Clear(_armLengthsWorld);
 		_flash = 0f;
 		_eatingTimer = 0f;
@@ -284,11 +286,11 @@ public partial class Frog : Node2D
 		{
 			return;
 		}
-		float unit = BodyVisualHeight * _currentUiScale / BodyTextureHeight;
+		float unit = BodyVisualHeight / BodyTextureHeight;
 		float flip = _direction.X < -0.01f ? -1f : 1f;
 		_body.Scale = new Vector2(unit * flip, unit);
 		// Лёгкое покачивание как в старом процедурном рисунке.
-		float bob = Mathf.Sin((float)Time.GetTicksMsec() / 380f) * 2.2f * _currentUiScale;
+		float bob = Mathf.Sin((float)Time.GetTicksMsec() / 380f) * 2.2f;
 		_body.Position = new Vector2(0f, bob);
 	}
 
@@ -363,32 +365,34 @@ public partial class Frog : Node2D
 		QueueRedraw();
 	}
 
-	public override void _UnhandledInput(InputEvent @event)
+	public void CancelInput()
 	{
-		if (@event is InputEventScreenTouch touch)
+		_holding = false;
+		_pointerIndex = -1;
+	}
+
+	public override void _UnhandledInput(InputEvent input) => HandleGameInput(input);
+
+	public void HandleGameInput(InputEvent input)
+	{
+		if (input is InputEventScreenTouch touch)
 		{
-			if (touch.Pressed)
+			if (touch.Canceled || !touch.Pressed)
 			{
-				if (!CanAct)
-				{
-					return;
-				}
+				if (touch.Index == _pointerIndex) CancelInput();
+			}
+			else if (CanAct && !_holding && Playfield.Bounds.HasPoint(touch.Position))
+			{
+				_pointerIndex = touch.Index;
 				_holding = true;
 				_aimTarget = touch.Position;
 				UpdateDirection(touch.Position);
 			}
-			else
-			{
-				_holding = false;
-			}
 		}
-		else if (@event is InputEventScreenDrag drag)
+		else if (input is InputEventScreenDrag drag && _holding && CanAct && drag.Index == _pointerIndex)
 		{
-			if (_holding && CanAct)
-			{
-				_aimTarget = drag.Position;
-				UpdateDirection(drag.Position);
-			}
+			_aimTarget = drag.Position;
+			UpdateDirection(drag.Position);
 		}
 	}
 

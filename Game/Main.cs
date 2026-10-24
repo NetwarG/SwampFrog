@@ -68,6 +68,7 @@ public partial class Main : Node2D
 	/// <summary>Ставит игру на паузу выбора перка.</summary>
 	public void StartPerkPause()
 	{
+		CancelGameInput();
 		_state = GameState.PerkSelect;
 		_spawnTimer?.Stop();
 		GetTree().Paused = true;
@@ -110,6 +111,34 @@ public partial class Main : Node2D
 	public void GameOverFromPerk() => GameOver();
 	public void RegisterFruitFromPerk(FruitKind kind) => RegisterCollectedFruit(kind);
 
+	public Control? UiHost { get; set; }
+	public Func<Vector2, Vector2>? WorldToUi { get; set; }
+
+	public override void _EnterTree()
+	{
+		_hud = GetNode<HUD>("HUD");
+		_hud.WorldToUi = WorldToUi;
+		if (UiHost != null) _hud.Reparent(UiHost, false);
+		GetNode<SuikaGame>("Suika").Game = this;
+	}
+
+	public void HandleGameInput(InputEvent input)
+	{
+		if (_state == GameState.Playing) _frog?.HandleGameInput(input);
+		else if (_state == GameState.Suika) _suika?.HandleGameInput(input);
+	}
+
+	public void CancelGameInput()
+	{
+		_frog?.CancelInput();
+		_suika?.CancelInput();
+	}
+
+	public override void _ExitTree()
+	{
+		if (UiHost != null && IsInstanceValid(_hud)) _hud!.QueueFree();
+	}
+
 	public override void _Ready()
 	{
 		_rng.Randomize();
@@ -122,7 +151,6 @@ public partial class Main : Node2D
 		_xp.LevelUp += OnLevelUp;
 		_items = GetNode<Node2D>("Items");
 		BuildClassicWalls();
-		_hud = GetNode<HUD>("HUD");
 		_suika = GetNode<SuikaGame>("Suika");
 		_suika.Game = this;
 		_suika.ExitRequested += CloseSuika;
@@ -143,8 +171,6 @@ public partial class Main : Node2D
 		_spawnTimer.Timeout += OnSpawnTimerTimeout;
 		// Не запускаем: стартовая кнопка управляет запуском партии.
 
-		GetViewport().SizeChanged += OnViewportResized;
-
 		PositionFrog();
 		_hud.SetScore(0);
 		_hud.SetLives(_lives);
@@ -153,29 +179,6 @@ public partial class Main : Node2D
 		_hud.SetGameplayVisible(false);
 		_hud.SetXp(_xp.Level, _xp.LevelProgress);
 		_suika.Visible = false;
-	}
-
-	private void OnViewportResized()
-	{
-		QueueRedraw();
-		UpdateClassicWalls();
-		_frog?.SyncUiScale(ScreenScale);
-		if (_score >= Difficulty.FrogMovementScore)
-		{
-			_frog?.ConstrainMovement();
-		}
-		else
-		{
-			PositionFrog();
-		}
-		_frog?.ConstrainHands();
-		if (_items != null)
-		{
-			foreach (Node child in _items.GetChildren())
-			{
-				if (child is FallingItem item) item.ConstrainToViewport(ViewSize);
-			}
-		}
 	}
 
 	private void BuildClassicWalls()
@@ -212,29 +215,13 @@ public partial class Main : Node2D
 		{
 			return;
 		}
-		Vector2 size = GetViewportRect().Size;
+		Vector2 size = ViewSize;
 		_frog.Position = new Vector2(Mathf.Min(180f * ScreenScale, size.X * 0.30f), size.Y * 0.56f);
 	}
 
-	/// <summary>
-	/// База для UI/игрового мира: во сколько раз видимая область больше или меньше
-	/// эталонного портретного разрешения 540×960. Кламп по соображениям разумных границ.
-	/// </summary>
-	public float ScreenScale
-	{
-		get
-		{
-			Vector2 size = GetViewportRect().Size;
-			if (size.X <= 0f || size.Y <= 0f)
-			{
-				return 1f;
-			}
-			return Mathf.Clamp(Mathf.Min(size.X / 540f, size.Y / 960f), 0.85f, 2.2f);
-		}
-	}
-
-	/// <summary>Размер видимой области (в координатах сцены).</summary>
-	public Vector2 ViewSize => GetViewportRect().Size;
+	/// <summary>Совместимость с API предметов: масштаб мира всегда единичный.</summary>
+	public float ScreenScale => 1f;
+	public Vector2 ViewSize => Playfield.Size;
 
 	public override void _PhysicsProcess(double delta)
 	{
@@ -257,7 +244,7 @@ public partial class Main : Node2D
 		_frog.UpdateArms(dt);
 		if (_state != GameState.Playing) return;
 
-		Vector2 viewSize = GetViewportRect().Size;
+		Vector2 viewSize = ViewSize;
 		Vector2[]? hands = _frog.IsCatching ? _frog.GetHandPositions() : null;
 		CircleHitbox[]? handHitboxes = _frog.IsCatching ? _frog.GetHandHitboxes() : null;
 
@@ -390,7 +377,7 @@ public partial class Main : Node2D
 	private void SpawnItem()
 	{
 		var item = new FallingItem();
-		Vector2 size = GetViewportRect().Size;
+		Vector2 size = ViewSize;
 
 		float trashWeight = Difficulty.TrashChance(_runTime);
 		float goldenChance = Mathf.Min(0.34f, _perkPlayer.GoldenSpawnChance());
@@ -439,8 +426,7 @@ public partial class Main : Node2D
 		item.IsGolden = golden;
 		item.FallSpeed = speed;
 		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), -70f);
-		// Базовый масштаб предмета; случайный разброс и золото применяет FallingItem._Ready.
-		item.Scale = Vector2.One * ScreenScale;
+		// Случайный разброс и золото применяет FallingItem._Ready; экран не влияет на размер.
 		_items!.AddChild(item);
 		item.ConstrainToViewport(size);
 
@@ -748,7 +734,7 @@ public partial class Main : Node2D
 
 	public override void _Draw()
 	{
-		Vector2 size = GetViewportRect().Size;
+		Vector2 size = ViewSize;
 		if (size.X <= 0f || size.Y <= 0f)
 		{
 			return;

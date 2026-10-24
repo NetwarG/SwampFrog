@@ -118,7 +118,7 @@ public partial class FallingItem : Node2D
 		_rotationSpeed = _rng.RandfRange(-1.3f, 1.3f);
 
 		float baseScale = Mathf.Max(Scale.X, 0.01f);
-		// Масштаб: базовый (ScreenScale от Main или 1 по умолчанию) умножается на случайный
+		// Масштаб в координатах мира умножается на случайный
 		// разброс, чтобы одинаковые предметы отличались размером; золотой — крупнее.
 		float scale = baseScale * _rng.RandfRange(0.85f, 1.08f);
 		if (IsGolden)

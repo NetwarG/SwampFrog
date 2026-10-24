@@ -47,7 +47,7 @@ public partial class HoldCardButton : Button
 	{
 		if (@event is InputEventScreenTouch touch)
 		{
-			if (touch.Pressed)
+			if (touch.Pressed && !touch.Canceled)
 			{
 				BeginHold(touch.Position, touch.Index);
 			}
@@ -71,58 +71,23 @@ public partial class HoldCardButton : Button
 		base._GuiInput(@event);
 	}
 
-	public override void _Input(InputEvent @event)
+	public override void _Input(InputEvent input)
 	{
-		if (@event is InputEventScreenTouch touch)
-		{
-			if (touch.Pressed)
-			{
-				if (!_holding && GetGlobalRect().HasPoint(touch.Position))
-				{
-					BeginHold(touch.Position, touch.Index);
-				}
-			}
-			else if (_holding && _holdPointerIndex == touch.Index)
-			{
-				CancelHold();
-			}
-			return;
-		}
+		if (!_holding) return;
+		if (input is InputEventScreenTouch touch && touch.Index == _holdPointerIndex && (!touch.Pressed || touch.Canceled))
+			CancelHold();
+		else if (input is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false } && _holdPointerIndex == -1)
+			CancelHold();
+		else if (input is InputEventScreenDrag drag && drag.Index == _holdPointerIndex)
+			UpdateHoldPointer(GetGlobalTransformWithCanvas().AffineInverse() * drag.Position, drag.Index);
+		else if (input is InputEventMouseMotion motion && _holdPointerIndex == -1)
+			UpdateHoldPointer(GetGlobalTransformWithCanvas().AffineInverse() * motion.Position, -1);
+	}
 
-		if (@event is InputEventMouseButton mouse && mouse.ButtonIndex == MouseButton.Left)
-		{
-			if (mouse.Pressed)
-			{
-				if (!_holding && GetGlobalRect().HasPoint(mouse.Position))
-				{
-					BeginHold(mouse.Position, -1);
-				}
-			}
-			else if (_holding && _holdPointerIndex == -1)
-			{
-				CancelHold();
-			}
-			return;
-		}
-
-		if (!_holding)
-		{
-			return;
-		}
-
-		if (_holdPointerIndex == -1)
-		{
-			_holdPointerPosition = GetGlobalMousePosition();
-		}
-
-		if (@event is InputEventScreenDrag drag && drag.Index == _holdPointerIndex)
-		{
-			UpdateHoldPointer(drag.Position, drag.Index);
-		}
-		else if (@event is InputEventMouseMotion motion && _holdPointerIndex == -1)
-		{
-			UpdateHoldPointer(motion.Position, -1);
-		}
+	public override void _Notification(int what)
+	{
+		if (what == NotificationApplicationFocusOut || what == NotificationWMWindowFocusOut || what == NotificationScrollBegin)
+			CancelHold();
 	}
 
 	public override void _Process(double delta)
@@ -132,7 +97,7 @@ public partial class HoldCardButton : Button
 			return;
 		}
 
-		if (!GetGlobalRect().HasPoint(_holdPointerPosition))
+		if (!IsVisibleInTree() || !new Rect2(Vector2.Zero, Size).HasPoint(_holdPointerPosition))
 		{
 			CancelHold();
 			return;
@@ -149,7 +114,7 @@ public partial class HoldCardButton : Button
 
 	private void BeginHold(Vector2 pointerPosition, int pointerIndex)
 	{
-		if (_holding)
+		if (_holding || !IsVisibleInTree())
 		{
 			return;
 		}
@@ -190,7 +155,7 @@ public partial class HoldCardButton : Button
 		float ui = Mathf.Max(0.85f, UiScale);
 		float diameter = 64f * ui;
 		_holdRing.Size = new Vector2(diameter, diameter);
-		_holdRing.GlobalPosition = _holdPointerPosition - new Vector2(diameter, diameter) * 0.5f;
+		_holdRing.Position = _holdPointerPosition - new Vector2(diameter, diameter) * 0.5f;
 		_holdRing.Progress = progress;
 		_holdRing.RingColor = BarColor;
 		_holdRing.Visible = _holding;

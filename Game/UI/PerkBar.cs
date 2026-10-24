@@ -83,7 +83,7 @@ public partial class PerkBar : Control
 			_icons[i].Size = new Vector2(s, s);
 		}
 
-		Vector2 vp = GetViewport().GetVisibleRect().Size;
+		Vector2 vp = GetParentAreaSize();
 		Position = new Vector2(vp.X * 0.5f - totalWidth * 0.5f, vp.Y - BottomPadding * _uiScale - s);
 	}
 }

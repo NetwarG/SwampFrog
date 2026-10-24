@@ -91,7 +91,7 @@ public partial class SuikaGame : Node2D
 	private Frog? _frog;
 	private FallingItem? _heldFruit;
 	private FallingItem? _nextFruit;
-	private CanvasLayer? _uiLayer;
+	private int _pointerIndex = -1;
 	private Control? _uiRoot;
 	private Label? _scoreLabel;
 	private Label? _bestLabel;
@@ -127,11 +127,10 @@ public partial class SuikaGame : Node2D
 		_heldFruit = CreateVisualFruit(FruitKind.Cherry, 14f);
 		_heldFruit.ZIndex = 4;
 		_nextFruit = CreateVisualFruit(FruitKind.Cherry, 15f);
+		_nextFruit.Reparent(_uiRoot!, false);
 		_nextFruit.ZIndex = 4;
-		GetViewport().SizeChanged += OnViewportResized;
 		UpdateBowl();
 		if (_uiRoot != null) _uiRoot.Visible = false;
-		if (_uiLayer != null) _uiLayer.Visible = false;
 		Visible = false;
 	}
 
@@ -143,7 +142,6 @@ public partial class SuikaGame : Node2D
 	{
 		Visible = true;
 		_uiRoot!.Visible = true;
-		_uiLayer!.Visible = true;
 		_active = true;
 		_gameOver = false;
 		_stockEmpty = false;
@@ -154,7 +152,7 @@ public partial class SuikaGame : Node2D
 		_overflowTime = 0f;
 		_dropCooldown = 0.25f;
 		_throwTimer = 0f;
-		_aimX = GetViewportRect().Size.X * 0.5f;
+		_aimX = Playfield.Size.X * 0.5f;
 		ClearPieces();
 		UpdateBowl();
 		_currentKind = PickStartFruit();
@@ -175,6 +173,7 @@ public partial class SuikaGame : Node2D
 
 	public void Close()
 	{
+		CancelInput();
 		_active = false;
 		_gameOver = false;
 		_stockExhausted = false;
@@ -184,7 +183,6 @@ public partial class SuikaGame : Node2D
 		if (_gameOverRoot != null) _gameOverRoot.Visible = false;
 		if (_stockRoot != null) _stockRoot.Visible = false;
 		if (_uiRoot != null) _uiRoot.Visible = false;
-		if (_uiLayer != null) _uiLayer.Visible = false;
 		Visible = false;
 	}
 
@@ -208,65 +206,65 @@ public partial class SuikaGame : Node2D
 		CheckStockEnd(dt);
 	}
 
-	public override void _UnhandledInput(InputEvent @event)
-	{
-		if (!_active) return;
+	public void CancelInput() => _pointerIndex = -1;
 
-		if (@event is InputEventScreenTouch touch)
+	public override void _UnhandledInput(InputEvent input) => HandleGameInput(input);
+
+	public void HandleGameInput(InputEvent input)
+	{
+		if (!_active || _gameOver) return;
+		if (input is InputEventScreenTouch touch)
 		{
-			if (touch.Pressed)
+			if (touch.Canceled)
 			{
+				if (_pointerIndex == touch.Index) CancelInput();
+			}
+			else if (touch.Pressed && _pointerIndex == -1 && Playfield.Bounds.HasPoint(touch.Position))
+			{
+				_pointerIndex = touch.Index;
 				_aimX = touch.Position.X;
 			}
-			else
+			else if (!touch.Pressed && _pointerIndex == touch.Index)
 			{
+				_aimX = touch.Position.X;
+				CancelInput();
 				DropFruit();
 			}
-			GetViewport().SetInputAsHandled();
-			return;
 		}
-
-		if (@event is InputEventScreenDrag drag)
-		{
+		else if (input is InputEventScreenDrag drag && drag.Index == _pointerIndex)
 			_aimX = drag.Position.X;
-			GetViewport().SetInputAsHandled();
-			return;
-		}
-
-		if (@event is InputEventMouseMotion motion)
-		{
+		else if (input is InputEventMouseMotion motion && _pointerIndex < 0)
 			_aimX = motion.Position.X;
-			return;
+		else if (input is InputEventMouseButton { ButtonIndex: MouseButton.Left } mouse)
+		{
+			if (mouse.Canceled) CancelInput();
+			else if (mouse.Pressed && _pointerIndex == -1 && Playfield.Bounds.HasPoint(mouse.Position))
+			{
+				_pointerIndex = -2;
+				_aimX = mouse.Position.X;
+			}
+			else if (!mouse.Pressed && _pointerIndex == -2)
+			{
+				_aimX = mouse.Position.X;
+				CancelInput();
+				DropFruit();
+			}
 		}
+		else if (input is InputEventKey { Pressed: true, Echo: false } key)
+		{
+			if (key.Keycode == Key.Escape) ExitRequested?.Invoke();
+			else if (key.Keycode is Key.Space or Key.Enter) DropFruit();
+		}
+	}
 
-		if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mouseDown)
-		{
-			_aimX = mouseDown.Position.X;
-			return;
-		}
-
-		if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false })
-		{
-			DropFruit();
-			GetViewport().SetInputAsHandled();
-			return;
-		}
-
-		if (@event is InputEventKey { Pressed: true, Keycode: Key.Escape })
-		{
-			ExitRequested?.Invoke();
-			GetViewport().SetInputAsHandled();
-		}
-		else if (@event is InputEventKey { Pressed: true, Keycode: Key.Space or Key.Enter })
-		{
-			DropFruit();
-			GetViewport().SetInputAsHandled();
-		}
+	public override void _ExitTree()
+	{
+		if (Game?.UiHost != null && IsInstanceValid(_uiRoot)) _uiRoot!.QueueFree();
 	}
 
 	public override void _Draw()
 	{
-		Vector2 size = GetViewportRect().Size;
+		Vector2 size = Playfield.Size;
 		if (size.X <= 0f || size.Y <= 0f) return;
 
 		Color top = new("234f54");
@@ -296,36 +294,41 @@ public partial class SuikaGame : Node2D
 
 	private void BuildUi()
 	{
-		_uiLayer = new CanvasLayer { Layer = 20 };
-		AddChild(_uiLayer);
-		var root = new Control { MouseFilter = Control.MouseFilterEnum.Pass };
-		root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		var root = new Control { Name = "SuikaUI", MouseFilter = Control.MouseFilterEnum.Ignore };
 		_uiRoot = root;
-		_uiLayer.AddChild(root);
+		if (Game?.UiHost != null) Game.UiHost.AddChild(root);
+		else
+		{
+			var layer = new CanvasLayer { Layer = 20 };
+			AddChild(layer);
+			layer.AddChild(root);
+		}
+		root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+		root.Resized += UpdateVisuals;
 
 		_scoreLabel = MakeLabel("Счёт  0", 26, new Color("ffffff"));
 		_scoreLabel.Position = new Vector2(18f, 16f);
 		root.AddChild(_scoreLabel);
-		_bestLabel = MakeLabel($"Рекорд  {_bestScore}", 17, new Color(1f, 1f, 1f, 0.62f));
+		_bestLabel = MakeLabel($"Рекорд  {_bestScore}", 20, new Color(1f, 1f, 1f, 0.62f));
 		_bestLabel.Position = new Vector2(20f, 50f);
 		root.AddChild(_bestLabel);
 
-		_stockLabel = MakeLabel("Фрукты: 0", 17, new Color("ffd45e"));
-		_stockLabel.Position = new Vector2(20f, 74f);
+		_stockLabel = MakeLabel("Фрукты: 0", 20, new Color("ffd45e"));
+		_stockLabel.Position = new Vector2(20f, 78f);
 		root.AddChild(_stockLabel);
 
-		_nextLabel = MakeLabel("Следующий", 17, new Color("b4e863"));
+		_nextLabel = MakeLabel("Следующий", 22, new Color("b4e863"));
 		_nextLabel.Position = new Vector2(0f, 15f);
 		_nextLabel.SetAnchorsPreset(Control.LayoutPreset.TopRight);
 		_nextLabel.AnchorLeft = 1f;
 		_nextLabel.AnchorRight = 1f;
-		_nextLabel.OffsetLeft = -112f;
+		_nextLabel.OffsetLeft = -162f;
 		_nextLabel.OffsetRight = -18f;
 		_nextLabel.HorizontalAlignment = HorizontalAlignment.Center;
 		root.AddChild(_nextLabel);
 
-		Button back = MakeButton("В меню", 17, new Color("ffd45e"), new Vector2(112f, 42f));
-		back.Position = new Vector2(16f, 108f);
+		Button back = MakeButton("В меню", 24, new Color("ffd45e"), new Vector2(138f, 80f));
+		back.Position = new Vector2(16f, 112f);
 		back.Pressed += () => ExitRequested?.Invoke();
 		root.AddChild(back);
 
@@ -345,19 +348,15 @@ public partial class SuikaGame : Node2D
 	private void BuildGameOver(Control parent)
 	{
 		_gameOverRoot = new Control { Visible = false, MouseFilter = Control.MouseFilterEnum.Stop };
-		_gameOverRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_gameOverRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		parent.AddChild(_gameOverRoot);
 		var shade = new ColorRect { Color = new Color(0.02f, 0.08f, 0.1f, 0.82f), MouseFilter = Control.MouseFilterEnum.Ignore };
-		shade.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		shade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		_gameOverRoot.AddChild(shade);
 
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
-		var center = new CenterContainer();
-		center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		center.MouseFilter = Control.MouseFilterEnum.Ignore;
-		_gameOverRoot.AddChild(center);
-		center.AddChild(box);
+		ModalContent.Mount(_gameOverRoot, box);
 		_gameOverTitle = MakeLabel("Кувшин полон", 42, new Color("ffd45e"));
 		box.AddChild(_gameOverTitle);
 		_gameOverScore = MakeLabel("Счёт: 0", 28, new Color("ffffff"));
@@ -374,20 +373,16 @@ public partial class SuikaGame : Node2D
 	private void BuildStockDialog(Control parent)
 	{
 		_stockRoot = new Control { Visible = false, MouseFilter = Control.MouseFilterEnum.Stop };
-		_stockRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_stockRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		parent.AddChild(_stockRoot);
 
 		var shade = new ColorRect { Color = new Color(0.02f, 0.08f, 0.1f, 0.82f), MouseFilter = Control.MouseFilterEnum.Ignore };
-		shade.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		shade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		_stockRoot.AddChild(shade);
 
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 12);
-		var center = new CenterContainer();
-		center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		center.MouseFilter = Control.MouseFilterEnum.Ignore;
-		_stockRoot.AddChild(center);
-		center.AddChild(box);
+		ModalContent.Mount(_stockRoot, box);
 
 		Label title = MakeLabel("Собранные фрукты", 34, new Color("ffd45e"));
 		box.AddChild(title);
@@ -441,7 +436,7 @@ public partial class SuikaGame : Node2D
 
 	private Label MakeLabel(string text, int size, Color color)
 	{
-		var label = new Label { Text = text, HorizontalAlignment = HorizontalAlignment.Center };
+		var label = new Label { Text = text, MouseFilter = Control.MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center };
 		label.AddThemeFontSizeOverride("font_size", size);
 		label.AddThemeColorOverride("font_color", color);
 		label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
@@ -455,7 +450,8 @@ public partial class SuikaGame : Node2D
 		var button = new Button
 		{
 			Text = text,
-			CustomMinimumSize = minSize,
+			CustomMinimumSize = new Vector2(minSize.X, Mathf.Max(80f, minSize.Y)),
+			MouseFilter = Control.MouseFilterEnum.Pass,
 			FocusMode = Control.FocusModeEnum.None,
 			MouseDefaultCursorShape = Control.CursorShape.PointingHand
 		};
@@ -499,7 +495,7 @@ public partial class SuikaGame : Node2D
 
 	private void UpdateBowl()
 	{
-		Vector2 view = GetViewportRect().Size;
+		Vector2 view = Playfield.Size;
 		float width = Mathf.Max(BowlMinWidth, view.X * BowlWidthRatio);
 		float height = Mathf.Max(BowlMinHeight, view.Y * BowlHeightRatio);
 		Rect2 previous = _bowl;
@@ -529,24 +525,7 @@ public partial class SuikaGame : Node2D
 			new Vector2(left + BowlWallInset - WallThickness, bottom + WallThickness)
 		};
 
-		if (previous.HasArea())
-		{
-			foreach (Piece piece in _pieces)
-			{
-				// При ресайзе переносим тела в новый кувшин один раз, затем ими снова управляет Rapier.
-				Vector2 relative = (piece.Body.Position - previous.Position) / previous.Size;
-				piece.Body.Position = FitPieceInsideBowl(piece, _bowl.Position + relative * _bowl.Size);
-				piece.Body.ResetPhysicsInterpolation();
-				piece.Body.Sleeping = false;
-			}
-		}
 		QueueRedraw();
-	}
-
-	private void OnViewportResized()
-	{
-		UpdateBowl();
-		UpdateVisuals();
 	}
 
 	private void UpdateFrog(float dt)
@@ -555,8 +534,7 @@ public partial class SuikaGame : Node2D
 		float x = Mathf.Clamp(_aimX, _bowl.Position.X + 45f, _bowl.End.X - 45f);
 		_aimX = x;
 		_frog.Position = new Vector2(x, 103f);
-		float scale = Mathf.Clamp(Mathf.Min(GetViewportRect().Size.X / 540f, GetViewportRect().Size.Y / 960f), 0.85f, 1.7f);
-		_frog.SyncUiScale(0.56f * scale);
+		_frog.SyncUiScale(0.56f);
 		_frog.ThrowPose = _throwTimer > 0f;
 		_frog.SetLookTarget(new Vector2(x, _bowl.Position.Y));
 		if (_heldFruit != null)
@@ -572,7 +550,7 @@ public partial class SuikaGame : Node2D
 		_heldFruit.QueueRedraw();
 		_nextFruit.Kind = _nextKind;
 		_nextFruit.QueueRedraw();
-		_nextFruit.Position = new Vector2(GetViewportRect().Size.X - 65f, 67f);
+		_nextFruit.Position = new Vector2(_uiRoot!.Size.X - 90f, 67f);
 	}
 
 	/// <summary>Случайный фрукт из текущего запаса (только виды с остатком &gt; 0).</summary>
