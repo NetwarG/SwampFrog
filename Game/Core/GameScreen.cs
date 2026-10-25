@@ -16,6 +16,9 @@ public partial class GameScreen : Control
 	// Используется проверками разных вырезов экрана без изменения физических устройств.
 	public Rect2? SafeAreaOverride { get; set; }
 
+	/// <summary>Высота верхней полосы UI (счёт, сердечки): над рамкой поля всегда оставляется это место.</summary>
+	private const float TopHudInset = 80f;
+
 	public override void _Ready()
 	{
 		ProcessMode = ProcessModeEnum.Always;
@@ -42,6 +45,9 @@ public partial class GameScreen : Control
 		Game = GD.Load<PackedScene>("res://Scenes/Main.tscn").Instantiate<Main>();
 		Game.UiHost = _ui;
 		Game.WorldToUi = WorldToUi;
+		// Мировая координата верхней кромки экрана: 0, если верх поля совпадает с верхом экрана,
+		// отрицательная на высоких экранах. Используется для спавна предметов за краем.
+		Game.ScreenTopWorldY = () => -FieldRect.Position.Y / FieldRect.Size.Y * Playfield.Size.Y;
 		Game.ProcessMode = ProcessModeEnum.Pausable;
 		_world.AddChild(Game);
 	}
@@ -72,13 +78,16 @@ public partial class GameScreen : Control
 		if (safe == _lastSafeArea && pixelScale == _lastPixelScale) return;
 		_lastSafeArea = safe;
 		_lastPixelScale = pixelScale;
-		FieldRect = Playfield.Fit(safe);
+		// Счёт и сердечки живут над рамкой поля: поле вписывается в безопасную область за вычетом верхней полосы UI.
+		float uiScale = Mathf.Max(0.01f, Mathf.Min(safe.Size.X / 540f, safe.Size.Y / 960f));
+		float inset = Mathf.Min(TopHudInset * uiScale, safe.Size.Y * 0.5f);
+		Rect2 fieldArea = new(safe.Position.X, safe.Position.Y + inset, safe.Size.X, safe.Size.Y - inset);
+		FieldRect = Playfield.Fit(fieldArea);
 		_image.Position = FieldRect.Position;
 		_image.Size = FieldRect.Size;
 		// Нативное разрешение картинки при неизменных 540×960 координатах мира.
 		_world.Size = new Vector2I(Mathf.Max(2, Mathf.RoundToInt(FieldRect.Size.X * pixelScale.X)),
 			Mathf.Max(2, Mathf.RoundToInt(FieldRect.Size.Y * pixelScale.Y)));
-		float uiScale = Mathf.Max(0.01f, Mathf.Min(safe.Size.X / 540f, safe.Size.Y / 960f));
 		_ui.Position = safe.Position;
 		_ui.Scale = Vector2.One * uiScale;
 		_ui.Size = safe.Size / uiScale;
@@ -120,7 +129,23 @@ public partial class GameScreen : Control
 
 	public override void _Draw()
 	{
-		DrawRect(new Rect2(Vector2.Zero, Size), new Color("0a352f"));
+		Rect2 full = new(Vector2.Zero, Size);
+		if (FieldRect.HasArea()) DrawPondBackground(full);
+		else DrawRect(full, Playfield.PondBottom);
 		if (FieldRect.HasArea()) DrawRect(FieldRect.Grow(2f), new Color("408773"), false, 2f);
+	}
+
+	/// <summary>Продолжает градиент воды за границы поля, чтобы свободное место выглядело водой, а не полосой.</summary>
+	private void DrawPondBackground(Rect2 full)
+	{
+		const int steps = 64;
+		float strip = full.Size.Y / steps;
+		for (int i = 0; i < steps; i++)
+		{
+			float y = full.Position.Y + i * strip;
+			// Выше поля вода светлеет (поверхность), ниже границы — глубже и темнее.
+			float t = (y - FieldRect.Position.Y) / FieldRect.Size.Y;
+			DrawRect(new Rect2(full.Position.X, y, full.Size.X, strip + 1f), Playfield.PondTop.Lerp(Playfield.PondBottom, t));
+		}
 	}
 }

@@ -24,6 +24,9 @@ public partial class Main : Node2D
 	/// <summary>Очень маленький шанс выпадения хилки при неполном HP.</summary>
 	private const float HealSpawnChance = 0.05f;
 
+	/// <summary>Дистанция спавна предмета выше верхней кромки экрана (в мировых единицах).</summary>
+	private const float SpawnAboveScreen = 70f;
+
 	private Frog? _frog;
 	private Node2D? _items;
 	private HUD? _hud;
@@ -113,6 +116,9 @@ public partial class Main : Node2D
 
 	public Control? UiHost { get; set; }
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
+
+	/// <summary>Мировая координата Y верхней кромки экрана (0 или отрицательная на высоких экранах). Задаётся GameScreen.</summary>
+	public Func<float>? ScreenTopWorldY { get; set; }
 
 	public override void _EnterTree()
 	{
@@ -425,7 +431,9 @@ public partial class Main : Node2D
 		item.ItemType = type;
 		item.IsGolden = golden;
 		item.FallSpeed = speed;
-		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), -70f);
+		// Спавн за верхней кромкой экрана: на высоких экранах поле ниже, поэтому кромка в мировых координатах отрицательная.
+		float spawnY = (ScreenTopWorldY?.Invoke() ?? 0f) - SpawnAboveScreen;
+		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), spawnY);
 		// Случайный разброс и золото применяет FallingItem._Ready; экран не влияет на размер.
 		_items!.AddChild(item);
 		item.ConstrainToViewport(size);
@@ -742,13 +750,11 @@ public partial class Main : Node2D
 
 		// Вертикальный градиент «глубина пруда».
 		const int steps = 64;
-		Color top = new("1f7a6b");
-		Color bottom = new("0a352f");
 		float strip = size.Y / steps;
 		for (int i = 0; i < steps; i++)
 		{
 			float t = i / (float)(steps - 1);
-			DrawRect(new Rect2(0f, i * strip, size.X, strip + 1f), top.Lerp(bottom, t));
+			DrawRect(new Rect2(0f, i * strip, size.X, strip + 1f), Playfield.PondTop.Lerp(Playfield.PondBottom, t));
 		}
 
 		float s = ScreenScale;
