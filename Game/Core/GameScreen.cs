@@ -10,14 +10,15 @@ public partial class GameScreen : Control
 	private Control _ui = null!;
 	private Rect2 _lastSafeArea;
 	private Vector2 _lastPixelScale;
+	private GameState _lastLayoutState;
 	public Main Game { get; private set; } = null!;
 	public Rect2 FieldRect { get; private set; }
 	public Control UiRoot => _ui;
 	// Используется проверками разных вырезов экрана без изменения физических устройств.
 	public Rect2? SafeAreaOverride { get; set; }
 
-	/// <summary>Высота верхней полосы UI (счёт, сердечки): над рамкой поля всегда оставляется это место.</summary>
-	private const float TopHudInset = 80f;
+	/// <summary>Высота резерва для счёта и сердечек над рамкой в игровых режимах.</summary>
+	private const float TopHudInset = 68f;
 
 	public override void _Ready()
 	{
@@ -75,14 +76,18 @@ public partial class GameScreen : Control
 		if (!safe.HasArea() || _world == null) return;
 		Transform2D screen = GetScreenTransform();
 		Vector2 pixelScale = new(screen.X.Length(), screen.Y.Length());
-		if (safe == _lastSafeArea && pixelScale == _lastPixelScale) return;
+		GameState state = Game == null ? GameState.Menu : Game.State;
+		if (safe == _lastSafeArea && pixelScale == _lastPixelScale && state == _lastLayoutState) return;
 		_lastSafeArea = safe;
 		_lastPixelScale = pixelScale;
-		// Счёт и сердечки живут над рамкой поля: поле вписывается в безопасную область за вычетом верхней полосы UI.
+		_lastLayoutState = state;
+		// В меню поле и меню центрируются по всей безопасной области; в режимах игры оставляем место для HUD.
 		float uiScale = Mathf.Max(0.01f, Mathf.Min(safe.Size.X / 540f, safe.Size.Y / 960f));
-		float inset = Mathf.Min(TopHudInset * uiScale, safe.Size.Y * 0.5f);
+		float inset = state == GameState.Menu ? 0f : Mathf.Min(TopHudInset * uiScale, safe.Size.Y * 0.5f);
 		Rect2 fieldArea = new(safe.Position.X, safe.Position.Y + inset, safe.Size.X, safe.Size.Y - inset);
 		FieldRect = Playfield.Fit(fieldArea);
+		if (state != GameState.Menu && FieldRect.Size.Y < fieldArea.Size.Y)
+			FieldRect = new Rect2(FieldRect.Position.X, fieldArea.Position.Y, FieldRect.Size);
 		_image.Position = FieldRect.Position;
 		_image.Size = FieldRect.Size;
 		// Нативное разрешение картинки при неизменных 540×960 координатах мира.
@@ -132,7 +137,18 @@ public partial class GameScreen : Control
 		Rect2 full = new(Vector2.Zero, Size);
 		if (FieldRect.HasArea()) DrawPondBackground(full);
 		else DrawRect(full, Playfield.PondBottom);
-		if (FieldRect.HasArea()) DrawRect(FieldRect.Grow(2f), new Color("408773"), false, 2f);
+		if (FieldRect.HasArea()) DrawFieldBorder();
+	}
+
+	private void DrawFieldBorder()
+	{
+		Rect2 border = FieldRect.Grow(2f);
+		Color color = new("408773");
+		DrawLine(border.Position, new Vector2(border.Position.X, border.End.Y), color, 2f);
+		DrawLine(new Vector2(border.End.X, border.Position.Y), border.End, color, 2f);
+		DrawLine(new Vector2(border.Position.X, border.End.Y), border.End, color, 2f);
+		if (Game != null && Game.State != GameState.Menu)
+			DrawLine(border.Position, new Vector2(border.End.X, border.Position.Y), color, 2f);
 	}
 
 	/// <summary>Продолжает градиент воды за границы поля, чтобы свободное место выглядело водой, а не полосой.</summary>

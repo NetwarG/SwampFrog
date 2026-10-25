@@ -155,7 +155,7 @@ public partial class HUD : Control
 
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
-		ModalContent.Mount(_startRoot, box, 36);
+		ModalContent.Mount(_startRoot, box, 24, allowScroll: false);
 
 		float ui = UiScale;
 
