@@ -113,6 +113,16 @@ public partial class SuikaGame : Node2D
 	public Main? Game { get; set; }
 	public event Action? ExitRequested;
 
+	private Vector2 ViewSize => Game?.ViewSize ?? Playfield.Size;
+	private Rect2 ViewBounds => new(Vector2.Zero, ViewSize);
+
+	public void RefreshViewSize()
+	{
+		UpdateBowl();
+		UpdateFrog(0f);
+		UpdateVisuals();
+	}
+
 	public override void _Ready()
 	{
 		_rng.Randomize();
@@ -152,7 +162,7 @@ public partial class SuikaGame : Node2D
 		_overflowTime = 0f;
 		_dropCooldown = 0.25f;
 		_throwTimer = 0f;
-		_aimX = Playfield.Size.X * 0.5f;
+		_aimX = ViewSize.X * 0.5f;
 		ClearPieces();
 		UpdateBowl();
 		_currentKind = PickStartFruit();
@@ -219,7 +229,7 @@ public partial class SuikaGame : Node2D
 			{
 				if (_pointerIndex == touch.Index) CancelInput();
 			}
-			else if (touch.Pressed && _pointerIndex == -1 && Playfield.Bounds.HasPoint(touch.Position))
+			else if (touch.Pressed && _pointerIndex == -1 && ViewBounds.HasPoint(touch.Position))
 			{
 				_pointerIndex = touch.Index;
 				_aimX = touch.Position.X;
@@ -238,7 +248,7 @@ public partial class SuikaGame : Node2D
 		else if (input is InputEventMouseButton { ButtonIndex: MouseButton.Left } mouse)
 		{
 			if (mouse.Canceled) CancelInput();
-			else if (mouse.Pressed && _pointerIndex == -1 && Playfield.Bounds.HasPoint(mouse.Position))
+			else if (mouse.Pressed && _pointerIndex == -1 && ViewBounds.HasPoint(mouse.Position))
 			{
 				_pointerIndex = -2;
 				_aimX = mouse.Position.X;
@@ -264,7 +274,7 @@ public partial class SuikaGame : Node2D
 
 	public override void _Draw()
 	{
-		Vector2 size = Playfield.Size;
+		Vector2 size = ViewSize;
 		if (size.X <= 0f || size.Y <= 0f) return;
 
 		Color top = new("234f54");
@@ -495,7 +505,7 @@ public partial class SuikaGame : Node2D
 
 	private void UpdateBowl()
 	{
-		Vector2 view = Playfield.Size;
+		Vector2 view = ViewSize;
 		float width = Mathf.Max(BowlMinWidth, view.X * BowlWidthRatio);
 		float height = Mathf.Max(BowlMinHeight, view.Y * BowlHeightRatio);
 		Rect2 previous = _bowl;
@@ -524,6 +534,19 @@ public partial class SuikaGame : Node2D
 			new Vector2(right - BowlWallInset + WallThickness, bottom + WallThickness),
 			new Vector2(left + BowlWallInset - WallThickness, bottom + WallThickness)
 		};
+
+		if (previous.HasArea())
+		{
+			foreach (Piece piece in _pieces)
+			{
+				if (piece.Removed || piece.Body.IsQueuedForDeletion()) continue;
+				// Переносим стопку вместе с дном, сохраняя размеры и скорости тел.
+				Vector2 position = piece.Body.Position + new Vector2(0f, _bowl.End.Y - previous.End.Y);
+				piece.Body.Position = FitPieceInsideBowl(piece, position);
+				piece.Body.ResetPhysicsInterpolation();
+				piece.Body.Sleeping = false;
+			}
+		}
 
 		QueueRedraw();
 	}
@@ -859,7 +882,7 @@ public partial class SuikaGame : Node2D
 			_retryButton.Visible = !_stockEmpty;
 		}
 
-		// Панель заново центрируется автоматически: раскладкой занимается CenterContainer.
+		// ModalContent обновит положение и масштаб после изменения содержимого.
 	}
 
 	private void Restart()

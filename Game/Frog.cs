@@ -381,7 +381,7 @@ public partial class Frog : Node2D
 			{
 				if (touch.Index == _pointerIndex) CancelInput();
 			}
-			else if (CanAct && !_holding && Playfield.Bounds.HasPoint(touch.Position))
+			else if (CanAct && !_holding && Game != null && Game.ViewBounds.HasPoint(touch.Position))
 			{
 				_pointerIndex = touch.Index;
 				_holding = true;

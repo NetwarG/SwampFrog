@@ -1,26 +1,28 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://d2hjbwq0tdadu"]
 
-[ext_resource type="Script" path="res://Game/Main.cs" id="1_main"]
-[ext_resource type="Script" path="res://Game/Frog.cs" id="2_frog"]
-[ext_resource type="Script" path="res://Game/UI/HUD.cs" id="3_hud"]
-[ext_resource type="Script" path="res://Game/Modes/SuikaGame.cs" id="4_suika"]
+[ext_resource type="Script" uid="uid://bkgmks5ncbdmc" path="res://Game/Main.cs" id="1_main"]
+[ext_resource type="Script" uid="uid://cfpc2qksy43xw" path="res://Game/Frog.cs" id="2_frog"]
+[ext_resource type="Script" uid="uid://bbd3gidbmwdsa" path="res://Game/UI/HUD.cs" id="3_hud"]
+[ext_resource type="Script" uid="uid://dkogmiyudcsg" path="res://Game/Modes/SuikaGame.cs" id="4_suika"]
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" unique_id=36827886]
 script = ExtResource("1_main")
 
-[node name="Frog" type="Node2D" parent="."]
+[node name="Frog" type="Node2D" parent="." unique_id=1066531334]
 script = ExtResource("2_frog")
 
-[node name="Items" type="Node2D" parent="."]
+[node name="Items" type="Node2D" parent="." unique_id=163720685]
 
-[node name="Suika" type="Node2D" parent="."]
+[node name="Suika" type="Node2D" parent="." unique_id=1830895219]
 visible = false
 script = ExtResource("4_suika")
 
-[node name="HUD" type="Control" parent="."]
+[node name="HUD" type="Control" parent="." unique_id=1220703758]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3_hud")

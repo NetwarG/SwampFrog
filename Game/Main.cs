@@ -43,6 +43,7 @@ public partial class Main : Node2D
 	private int _lives = 3;
 	private int _highScore;
 	private GameState _state = GameState.Menu;
+	private Vector2 _viewSize = Playfield.Size;
 	private readonly XpSystem _xp = new();
 	/// <summary>
 	/// Запас фруктов, собранных в классическом режиме: вид → количество штук.
@@ -98,6 +99,7 @@ public partial class Main : Node2D
 	public void SetLivesFromPerk(int lives)
 	{
 		_lives = lives;
+		_hud?.SetMaxLives(MaxLives);
 		_hud?.SetLives(lives);
 	}
 
@@ -116,8 +118,9 @@ public partial class Main : Node2D
 
 	public Control? UiHost { get; set; }
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
+	public Rect2 ViewBounds => new(Vector2.Zero, ViewSize);
 
-	/// <summary>Мировая координата Y верхней кромки экрана (0 или отрицательная на высоких экранах). Задаётся GameScreen.</summary>
+	/// <summary>Мировая координата Y верхней кромки экрана с учётом HUD и безопасных отступов. Задаётся GameScreen.</summary>
 	public Func<float>? ScreenTopWorldY { get; set; }
 
 	public override void _EnterTree()
@@ -159,6 +162,7 @@ public partial class Main : Node2D
 		BuildClassicWalls();
 		_suika = GetNode<SuikaGame>("Suika");
 		_suika.Game = this;
+		_suika.RefreshViewSize();
 		_suika.ExitRequested += CloseSuika;
 		_hud.PlayPressed += StartGame;
 		_hud.MiniGamePressed += OpenSuika;
@@ -227,7 +231,29 @@ public partial class Main : Node2D
 
 	/// <summary>Совместимость с API предметов: масштаб мира всегда единичный.</summary>
 	public float ScreenScale => 1f;
-	public Vector2 ViewSize => Playfield.Size;
+	public Vector2 ViewSize => _viewSize;
+
+	/// <summary>Настраивает вертикальный размер мира под безопасную область экрана.</summary>
+	public void ConfigureViewSize(Vector2 size)
+	{
+		if (size.X <= 0f || size.Y <= 0f)
+		{
+			return;
+		}
+
+		if (_viewSize.IsEqualApprox(size))
+		{
+			return;
+		}
+
+		_viewSize = size;
+		if (!IsNodeReady()) return;
+		UpdateClassicWalls();
+		if (_state == GameState.Menu) PositionFrog();
+		_frog?.ConstrainMovement();
+		_suika?.RefreshViewSize();
+		QueueRedraw();
+	}
 
 	public override void _PhysicsProcess(double delta)
 	{
@@ -431,7 +457,7 @@ public partial class Main : Node2D
 		item.ItemType = type;
 		item.IsGolden = golden;
 		item.FallSpeed = speed;
-		// Спавн за верхней кромкой экрана: на высоких экранах поле ниже, поэтому кромка в мировых координатах отрицательная.
+		// Спавн за верхней кромкой экрана с учётом отступов HUD и безопасной области.
 		float spawnY = (ScreenTopWorldY?.Invoke() ?? 0f) - SpawnAboveScreen;
 		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), spawnY);
 		// Случайный разброс и золото применяет FallingItem._Ready; экран не влияет на размер.

@@ -10,15 +10,14 @@ public partial class GameScreen : Control
 	private Control _ui = null!;
 	private Rect2 _lastSafeArea;
 	private Vector2 _lastPixelScale;
-	private GameState _lastLayoutState;
+	private Vector2 _worldSize = Playfield.Size;
 	public Main Game { get; private set; } = null!;
+	/// <summary>Общая безопасная колонка HUD и игрового поля.</summary>
+	public Rect2 ArenaRect { get; private set; }
 	public Rect2 FieldRect { get; private set; }
 	public Control UiRoot => _ui;
 	// Используется проверками разных вырезов экрана без изменения физических устройств.
 	public Rect2? SafeAreaOverride { get; set; }
-
-	/// <summary>Высота резерва для счёта и сердечек над рамкой в игровых режимах.</summary>
-	private const float TopHudInset = 68f;
 
 	public override void _Ready()
 	{
@@ -44,17 +43,20 @@ public partial class GameScreen : Control
 		AddChild(_ui);
 		RefreshLayout();
 		Game = GD.Load<PackedScene>("res://Scenes/Main.tscn").Instantiate<Main>();
+		Game.ConfigureViewSize(_worldSize);
 		Game.UiHost = _ui;
 		Game.WorldToUi = WorldToUi;
-		// Мировая координата верхней кромки экрана: 0, если верх поля совпадает с верхом экрана,
-		// отрицательная на высоких экранах. Используется для спавна предметов за краем.
-		Game.ScreenTopWorldY = () => -FieldRect.Position.Y / FieldRect.Size.Y * Playfield.Size.Y;
+		// Мировая координата верхней кромки экрана: отрицательная, если поле начинается
+		// ниже верхнего края безопасной области. Используется для спавна за краем поля.
+		Game.ScreenTopWorldY = () => !FieldRect.HasArea()
+			? 0f
+			: -FieldRect.Position.Y / FieldRect.Size.Y * _worldSize.Y;
 		Game.ProcessMode = ProcessModeEnum.Pausable;
 		_world.AddChild(Game);
 	}
 
-	public Vector2 ScreenToWorld(Vector2 point) => (point - FieldRect.Position) * Playfield.Size / FieldRect.Size;
-	public Vector2 WorldToScreen(Vector2 point) => FieldRect.Position + point * FieldRect.Size / Playfield.Size;
+	public Vector2 ScreenToWorld(Vector2 point) => (point - FieldRect.Position) * _worldSize / FieldRect.Size;
+	public Vector2 WorldToScreen(Vector2 point) => FieldRect.Position + point * FieldRect.Size / _worldSize;
 	public Vector2 WorldToUi(Vector2 point) => (WorldToScreen(point) - _ui.Position) / _ui.Scale;
 
 	private Rect2 ReadSafeArea()
@@ -76,26 +78,27 @@ public partial class GameScreen : Control
 		if (!safe.HasArea() || _world == null) return;
 		Transform2D screen = GetScreenTransform();
 		Vector2 pixelScale = new(screen.X.Length(), screen.Y.Length());
-		GameState state = Game == null ? GameState.Menu : Game.State;
-		if (safe == _lastSafeArea && pixelScale == _lastPixelScale && state == _lastLayoutState) return;
+		if (safe == _lastSafeArea && pixelScale == _lastPixelScale) return;
 		_lastSafeArea = safe;
 		_lastPixelScale = pixelScale;
-		_lastLayoutState = state;
-		// В меню поле и меню центрируются по всей безопасной области; в режимах игры оставляем место для HUD.
-		float uiScale = Mathf.Max(0.01f, Mathf.Min(safe.Size.X / 540f, safe.Size.Y / 960f));
-		float inset = state == GameState.Menu ? 0f : Mathf.Min(TopHudInset * uiScale, safe.Size.Y * 0.5f);
-		Rect2 fieldArea = new(safe.Position.X, safe.Position.Y + inset, safe.Size.X, safe.Size.Y - inset);
-		FieldRect = Playfield.Fit(fieldArea);
-		if (state != GameState.Menu && FieldRect.Size.Y < fieldArea.Size.Y)
-			FieldRect = new Rect2(FieldRect.Position.X, fieldArea.Position.Y, FieldRect.Size);
+		// Поле и HUD занимают одну колонку: на высоких телефонах растёт её высота,
+		// на широких экранах по бокам остаётся декоративный фон.
+		ArenaRect = Playfield.ArenaFor(safe);
+		float uiScale = Mathf.Max(0.01f, ArenaRect.Size.X / Playfield.Size.X);
+		// Интерфейс обоих режимов лежит поверх поля, без отдельной верхней полосы.
+		_worldSize = Playfield.SizeFor(ArenaRect);
+		FieldRect = Playfield.Fit(ArenaRect, _worldSize);
 		_image.Position = FieldRect.Position;
 		_image.Size = FieldRect.Size;
-		// Нативное разрешение картинки при неизменных 540×960 координатах мира.
+		_world.Size2DOverride = (Vector2I)_worldSize;
+		// Нативный размер текстуры соответствует фактическому размеру поля.
 		_world.Size = new Vector2I(Mathf.Max(2, Mathf.RoundToInt(FieldRect.Size.X * pixelScale.X)),
 			Mathf.Max(2, Mathf.RoundToInt(FieldRect.Size.Y * pixelScale.Y)));
-		_ui.Position = safe.Position;
+		_ui.Position = ArenaRect.Position;
 		_ui.Scale = Vector2.One * uiScale;
-		_ui.Size = safe.Size / uiScale;
+		_ui.Size = ArenaRect.Size / uiScale;
+		Game?.ConfigureViewSize(_worldSize);
+		Game?.HudNode?.UpdatePopupTransform();
 		QueueRedraw();
 	}
 
@@ -120,7 +123,7 @@ public partial class GameScreen : Control
 		};
 		bool pressed = @event is InputEventScreenTouch { Pressed: true } or InputEventMouseButton { Pressed: true };
 		if (pressed && point.HasValue && !FieldRect.HasPoint(point.Value)) return;
-		Vector2 scale = Playfield.Size / FieldRect.Size;
+		Vector2 scale = _worldSize / FieldRect.Size;
 		var transform = new Transform2D(new Vector2(scale.X, 0), new Vector2(0, scale.Y), -FieldRect.Position * scale);
 		using InputEvent mapped = @event.XformedBy(transform);
 		Game.HandleGameInput(mapped);
@@ -135,23 +138,15 @@ public partial class GameScreen : Control
 	public override void _Draw()
 	{
 		Rect2 full = new(Vector2.Zero, Size);
-		if (FieldRect.HasArea()) DrawPondBackground(full);
+		if (FieldRect.HasArea())
+		{
+			DrawPondBackground(full);
+			DrawSideDividers(full);
+		}
 		else DrawRect(full, Playfield.PondBottom);
-		if (FieldRect.HasArea()) DrawFieldBorder();
 	}
 
-	private void DrawFieldBorder()
-	{
-		Rect2 border = FieldRect.Grow(2f);
-		Color color = new("408773");
-		DrawLine(border.Position, new Vector2(border.Position.X, border.End.Y), color, 2f);
-		DrawLine(new Vector2(border.End.X, border.Position.Y), border.End, color, 2f);
-		DrawLine(new Vector2(border.Position.X, border.End.Y), border.End, color, 2f);
-		if (Game != null && Game.State != GameState.Menu)
-			DrawLine(border.Position, new Vector2(border.End.X, border.Position.Y), color, 2f);
-	}
-
-	/// <summary>Продолжает градиент воды за границы поля, чтобы свободное место выглядело водой, а не полосой.</summary>
+	/// <summary>Продолжает градиент воды под HUD и фоном по бокам арены.</summary>
 	private void DrawPondBackground(Rect2 full)
 	{
 		const int steps = 64;
@@ -160,8 +155,34 @@ public partial class GameScreen : Control
 		{
 			float y = full.Position.Y + i * strip;
 			// Выше поля вода светлеет (поверхность), ниже границы — глубже и темнее.
-			float t = (y - FieldRect.Position.Y) / FieldRect.Size.Y;
+			float t = Mathf.Clamp((y - FieldRect.Position.Y) / FieldRect.Size.Y, 0f, 1f);
 			DrawRect(new Rect2(full.Position.X, y, full.Size.X, strip + 1f), Playfield.PondTop.Lerp(Playfield.PondBottom, t));
 		}
+	}
+
+	/// <summary>Только визуальные разделители: не добавляют Control, коллизии или ограничения ввода.</summary>
+	private void DrawSideDividers(Rect2 full)
+	{
+		// Вырезы телефона сами по себе не включают боковые панели.
+		if (_lastSafeArea.Size.X - ArenaRect.Size.X <= 1f) return;
+		float left = ArenaRect.Position.X;
+		float right = ArenaRect.End.X;
+		Color shade = new(0.01f, 0.05f, 0.05f, 0.68f);
+		DrawRect(new Rect2(full.Position.X, full.Position.Y, left - full.Position.X, full.Size.Y), shade);
+		DrawRect(new Rect2(right, full.Position.Y, full.End.X - right, full.Size.Y), shade);
+
+		float scale = ArenaRect.Size.X / Playfield.Size.X;
+		float line = 2f * scale;
+		float shadow = 16f * scale;
+		for (int i = 0; i < 8; i++)
+		{
+			float offset = i * shadow / 8f;
+			Color edgeShadow = new(0f, 0f, 0f, 0.26f * (1f - i / 8f));
+			DrawRect(new Rect2(left - offset - shadow / 8f, full.Position.Y, shadow / 8f, full.Size.Y), edgeShadow);
+			DrawRect(new Rect2(right + offset, full.Position.Y, shadow / 8f, full.Size.Y), edgeShadow);
+		}
+		Color divider = new("70bba1");
+		DrawRect(new Rect2(left - line, full.Position.Y, line, full.Size.Y), divider);
+		DrawRect(new Rect2(right, full.Position.Y, line, full.Size.Y), divider);
 	}
 }

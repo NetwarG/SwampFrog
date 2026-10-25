@@ -4,15 +4,16 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// HUD поверх игрового мира: счёт, сердечки жизней, красная вспышка от мусора,
+/// HUD поверх игрового мира: счёт и HP, красная вспышка от мусора,
 /// оверлей «Игра окончена» и всплывающие надписи «+10».
 /// </summary>
 public partial class HUD : Control
 {
 	private const float HintDuration = 3.4f;
-
 	private Label? _scoreLabel;
-	private HeartsIndicator? _hearts;
+	private Label? _hpLabel;
+	private int _lives = 3;
+	private int _maxLives = 3;
 	private FlashOverlay? _flash;
 	private XpBar? _xpBar;
 	private Control? _gameOverRoot;
@@ -63,18 +64,14 @@ public partial class HUD : Control
 	{
 		// Обновляем адаптивные размеры HUD-элементов.
 		float ui = UiScale;
-		if (_scoreLabel != null)
-		{
-			_scoreLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(44f * ui));
-		}
-		_hearts?.SetUiScale(ui);
+		UpdateCounterPositions();
 		_xpBar?.SetUiScale(ui);
 		_perkBar?.SetUiScale(ui);
 		_perkOverlay?.RecenterIfVisible();
 		UpdatePopupTransform();
 	}
 
-	private void UpdatePopupTransform()
+	public void UpdatePopupTransform()
 	{
 		if (_popups == null) return;
 		_popups.Position = WorldToUi?.Invoke(Vector2.Zero) ?? Vector2.Zero;
@@ -84,26 +81,11 @@ public partial class HUD : Control
 	private void BuildUI()
 	{
 		float ui = UiScale;
-
-		_scoreLabel = new Label
-		{
-			Text = "0",
-			Position = new Vector2(18f, 12f)
-		};
-		_scoreLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(44f * ui));
-		_scoreLabel.AddThemeColorOverride("font_color", new Color("ffffff"));
-		_scoreLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
-		_scoreLabel.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(3f * ui));
-		_scoreLabel.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(3f * ui));
-		AddChild(_scoreLabel);
+		BuildCounters();
 
 		_perkBar = new PerkBar();
 		_perkBar.SetUiScale(ui);
 		AddChild(_perkBar);
-
-		_hearts = new HeartsIndicator();
-		_hearts.SetUiScale(ui);
-		AddChild(_hearts);
 
 		_flash = new FlashOverlay();
 		AddChild(_flash);
@@ -119,11 +101,48 @@ public partial class HUD : Control
 		UpdatePopupTransform();
 	}
 
+	private void BuildCounters()
+	{
+		// Две самостоятельные надписи поверх поля, без панели и контейнеров.
+		_scoreLabel = MakeCounter("Score", "Score: 0");
+		_hpLabel = MakeCounter("HP", $"HP: {_lives}/{_maxLives}");
+		AddChild(_scoreLabel);
+		AddChild(_hpLabel);
+		UpdateCounterPositions();
+	}
+
+	private static Label MakeCounter(string name, string text)
+	{
+		var label = new Label { Name = name, Text = text, MouseFilter = MouseFilterEnum.Ignore, ZIndex = 10 };
+		label.AddThemeFontSizeOverride("font_size", 32);
+		label.AddThemeColorOverride("font_color", Colors.White);
+		label.AddThemeColorOverride("font_outline_color", new Color(0.02f, 0.12f, 0.09f, 0.85f));
+		label.AddThemeConstantOverride("outline_size", 4);
+		label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
+		label.AddThemeConstantOverride("shadow_offset_y", 2);
+		return label;
+	}
+
+	private void UpdateCounterPositions()
+	{
+		if (_scoreLabel == null || _hpLabel == null) return;
+		_scoreLabel.ResetSize();
+		_hpLabel.ResetSize();
+		_scoreLabel.Position = new Vector2(20f, 16f);
+		_hpLabel.Position = new Vector2(Size.X - 20f - _hpLabel.Size.X, 16f);
+	}
+
+	private void UpdateHp()
+	{
+		if (_hpLabel != null) _hpLabel.Text = $"HP: {_lives}/{_maxLives}";
+		UpdateCounterPositions();
+	}
+
 	/// <summary>Скрывает игровые показатели, пока открыт главное меню или мини-игра.</summary>
 	public void SetGameplayVisible(bool visible)
 	{
 		if (_scoreLabel != null) _scoreLabel.Visible = visible;
-		if (_hearts != null) _hearts.Visible = visible;
+		if (_hpLabel != null) _hpLabel.Visible = visible;
 		if (_xpBar != null) _xpBar.Visible = visible;
 		if (_perkBar != null && _perkBar.HasIcons) _perkBar.Visible = visible;
 		if (!visible)
@@ -155,7 +174,7 @@ public partial class HUD : Control
 
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
-		ModalContent.Mount(_startRoot, box, 24, allowScroll: false);
+		ModalContent.Mount(_startRoot, box);
 
 		float ui = UiScale;
 
@@ -229,15 +248,16 @@ public partial class HUD : Control
 		float ui = UiScale;
 		if (_suikaHintLabel == null)
 		{
-            _suikaHintLabel = new Label
-            {
+			_suikaHintLabel = new Label
+			{
 
-                Text = "Сначала собери фрукты в основном режиме!",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                ZIndex = 60
+				Text = "Сначала собери фрукты в основном режиме!",
+				MouseFilter = MouseFilterEnum.Ignore,
+				HorizontalAlignment = HorizontalAlignment.Center,
+				ZIndex = 60
 
-            };
-            _suikaHintLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(22f * ui));
+			};
+			_suikaHintLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(22f * ui));
 			_suikaHintLabel.AddThemeColorOverride("font_color", new Color("ffd45e"));
 			_suikaHintLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
 			_suikaHintLabel.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
@@ -379,6 +399,7 @@ public partial class HUD : Control
 		var hint = new Label
 		{
 			Text = "Держи палец на экране — руки растут",
+			MouseFilter = MouseFilterEnum.Ignore,
 			AnchorLeft = 0.5f,
 			AnchorRight = 0.5f,
 			AnchorTop = 1f,
@@ -407,17 +428,27 @@ public partial class HUD : Control
 	{
 		if (_scoreLabel != null)
 		{
-			_scoreLabel.Text = score.ToString();
+			_scoreLabel.Text = $"Score: {score}";
+			UpdateCounterPositions();
 		}
 	}
 
-	public void SetLives(int lives) => _hearts?.SetLives(lives);
+	public void SetLives(int lives)
+	{
+		_lives = Mathf.Clamp(lives, 0, _maxLives);
+		UpdateHp();
+	}
 
 	/// <summary>Обновляет панель выбранных перков внизу экрана.</summary>
 	public void SetPickedPerks(PerkIconInfo[] perks) => _perkBar?.SetPerks(perks);
 
-	/// <summary>Обновляет максимум жизней (перк «Панцирь» увеличивает число сердечек).</summary>
-	public void SetMaxLives(int max) => _hearts?.SetMaxLives(max);
+	/// <summary>Обновляет максимум жизней с учётом перка «Панцирь».</summary>
+	public void SetMaxLives(int max)
+	{
+		_maxLives = Mathf.Max(3, max);
+		_lives = Mathf.Min(_lives, _maxLives);
+		UpdateHp();
+	}
 
 	/// <summary>Показывает оверлей выбора перка с карточками.</summary>
 	public void ShowPerkSelection(int level, PerkOffer[] cards)
@@ -666,90 +697,6 @@ public partial class XpBar : Control
 		DrawCircle(new Vector2(w - h * 0.5f, y + h * 0.5f), h * 0.5f, TrackOutline, false, 1f);
 	}
 }
-/// <summary>Сердечки жизней в правом верхнем углу (до 7 — перк «Панцирь»).</summary>
-public partial class HeartsIndicator : Control
-{
-	private static readonly Color FullHeart = new("f7454a");
-	private static readonly Color EmptyHeart = new Color(1f, 1f, 1f, 0.22f);
-
-	private int _lives = 3;
-	private int _maxLives = 3;
-	private float _uiScale = 1f;
-
-	public override void _Ready()
-	{
-		MouseFilter = MouseFilterEnum.Ignore;
-		UpdateLayout();
-	}
-
-	public void SetLives(int lives)
-	{
-		_lives = Mathf.Clamp(lives, 0, _maxLives);
-		QueueRedraw();
-	}
-
-	/// <summary>Обновляет максимум жизней (число нарисованных сердечек).</summary>
-	public void SetMaxLives(int max)
-	{
-		_maxLives = Mathf.Max(3, max);
-		UpdateLayout();
-		QueueRedraw();
-	}
-
-	/// <summary>Обновляет масштаб сердечек (вызывается при ресайзе).</summary>
-	public void SetUiScale(float uiScale)
-	{
-		_uiScale = uiScale;
-		UpdateLayout();
-		QueueRedraw();
-	}
-
-	/// <summary>Коэффициент размера сердечка: при большом числе жизней — компактнее.</summary>
-	private float HeartScale()
-	{
-		if (_maxLives > 6) return 0.62f;
-		if (_maxLives > 4) return 0.78f;
-		return 1f;
-	}
-
-	private void UpdateLayout()
-	{
-		AnchorLeft = 1f;
-		AnchorRight = 1f;
-		AnchorTop = 0f;
-		AnchorBottom = 0f;
-		float s = 30f * _uiScale * HeartScale();
-		float w = 12f * _uiScale + _maxLives * s * 0.98f;
-		OffsetLeft = -(w + 16f * _uiScale);
-		OffsetRight = -14f * _uiScale;
-		OffsetTop = 14f * _uiScale;
-		OffsetBottom = 74f * _uiScale;
-		Size = new Vector2(w + 30f * _uiScale, 64f * _uiScale);
-	}
-
-	public override void _Draw()
-	{
-		float s = 30f * _uiScale * HeartScale();
-		for (int i = 0; i < _maxLives; i++)
-		{
-			Color color = i < _lives ? FullHeart : EmptyHeart;
-			Vector2 c = new(12f * _uiScale + i * s * 0.98f, 22f * _uiScale);
-
-			DrawCircle(c + new Vector2(-s * 0.26f, -s * 0.22f), s * 0.32f, color);
-			DrawCircle(c + new Vector2(s * 0.26f, -s * 0.22f), s * 0.32f, color);
-			DrawRect(new Rect2(c.X - s * 0.54f, c.Y - s * 0.30f, s * 1.08f, s * 0.58f), color);
-
-			Vector2[] tri =
-			{
-				c + new Vector2(-s * 0.52f, -s * 0.02f),
-				c + new Vector2(s * 0.52f, -s * 0.02f),
-				c + new Vector2(0f, s * 0.62f),
-			};
-			DrawColoredPolygon(tri, color);
-		}
-	}
-}
-
 /// <summary>Красная вспышка на весь экран при попадании мусором.</summary>
 public partial class FlashOverlay : Control
 {
