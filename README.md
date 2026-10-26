@@ -402,6 +402,10 @@ Game/
     ├── PerkSelectionOverlay.cs — оверлей выбора перка
     ├── HoldCardButton.cs — карточка перка (выбор удержанием 1 сек)
     └── PerkBar.cs       — панель выбранных перков (квадратики внизу экрана)
+
+Tools/
+├── build_android.ps1    — сборка Android-APK, установка на эмулятор/телефон и запуск
+└── build_android.bat    — обёртка для двойного клика
 ```
 
 ### Как добавить новый перк
@@ -446,6 +450,56 @@ godot --path .
 Главная сцена — `Scenes/GameScreen.tscn`. Она создаёт `Scenes/Main.tscn` внутри
 игрового мира с шириной 540 и высотой, рассчитанной по безопасной области,
 а интерфейс размещает отдельно в этой области.
+
+### Сборка и запуск на Android
+
+Пресет **Android** уже настроен в `export_presets.cfg` (APK: `build/SwampFrog.apk`,
+архитектура `arm64-v8a`). Сборку, установку на эмулятор/телефон и запуск делает скрипт
+в `Tools/`:
+
+```powershell
+Tools\build_android.ps1                     # собрать, установить и запустить
+Tools\build_android.ps1 -AvdName Pixel_10 -Logs   # поднять эмулятор и показать лог игры
+Tools\build_android.ps1 -NoInstall -NoLaunch      # только собрать APK
+Tools\build_android.ps1 -NoBuild                  # поставить и запустить уже собранный APK
+Tools\build_android.ps1 -DryRun                   # проверить окружение и показать команды
+```
+
+`Tools\build_android.bat` — та же команда для двойного клика. Скрипт находит Godot и `adb`
+(или берёт пути из `-Godot`/`-Adb`), читает путь экспорта из пресета, при необходимости
+поднимает эмулятор (`-AvdName` или единственный найденный AVD), собирает APK
+(`--export-debug`, релиз — `-Mode release`), ставит его через `adb install -r` и запускает.
+Ключи: `-NoInstall`, `-NoLaunch`, `-NoBuild`, `-Logs`, `-DryRun`, `-FixArch`,
+`-BuildTimeout` (предел времени сборки, по умолчанию 900 с), `-ConsoleWrapper`.
+
+**Почему сборка может выглядеть зависшей.** Скрипт экспортирует основным исполняемым файлом
+Godot (`Godot_vX_win64.exe`), а не `*_console.exe`. Console-обёртка запускает движок внутри
+Job Object и ждёт завершения всего дерева процессов, а экспорт C#-проекта вызывает
+`dotnet publish`, который оставляет после себя серверные процессы (MSBuild-ноды, Roslyn
+`VBCSCompiler`) — обёртка продолжает висеть уже после записи APK
+([godotengine/godot#110101](https://github.com/godotengine/godot/issues/110101)).
+Вывод сборки печатается по мере появления, а если процесс Godot всё же не завершится после
+записи APK, скрипт снимет его дерево процессов и продолжит установку. Ключ `-ConsoleWrapper`
+возвращает прежнее поведение с console-обёрткой.
+
+**Архитектура.** Пресет собирает `arm64-v8a`. Скрипт сверяет её с ABI устройства
+(`adb shell getprop ro.product.cpu.abi`): если не совпадает (например, эмулятор x86_64),
+он предупредит про `INSTALL_FAILED_NO_MATCHING_ABIS` и предложит либо arm64-устройство,
+либо ключ `-FixArch` (включит нужную архитектуру в `export_presets.cfg`).
+
+**Что нужно установить** (Editor Settings → Export → Android: Android SDK Path и Java SDK Path):
+
+- JDK 17 (в 4.8+ Godot настраивает SDK сам, в 4.7 пути задаются вручную);
+- Android SDK: `platform-tools`, свежие `build-tools` и `platform` — иначе Godot подпишет
+  APK старой версией и предупредит об этом;
+- .NET SDK 9 для Android (в `SwampFrog.csproj` для Android указан `net9.0`);
+- шаблоны экспорта: Editor → Manage Export Templates.
+
+**Rapier2D.** Каталог `addons/godot-rapier2d` исключён из Git и в текущей рабочей копии
+пуст (нет ни `.gdextension`, ни библиотек), поэтому расширение не подключается и физика
+идёт на встроенном движке Godot. Чтобы использовать Rapier (в том числе на Android),
+нужно положить файлы расширения в `addons/godot-rapier2d/bin/`, включая `.so` под
+`arm64-v8a` и `x86_64`.
 
 Проверки обоих режимов запускаются на настоящем Rapier2D и не меняют сохранение игрока:
 
