@@ -13,6 +13,9 @@ public enum GameState
 
 	/// <summary>Игра на паузе с оверлеем выбора перка.</summary>
 	PerkSelect,
+
+	/// <summary>Партия на паузе: поле замерло, открыт оверлей паузы.</summary>
+	Paused,
 }
 
 /// <summary>
@@ -32,6 +35,9 @@ public partial class Main : Node2D
 	private HUD? _hud;
 	private SuikaGame? _suika;
 	private Timer? _spawnTimer;
+
+	/// <summary>Остаток интервала спавна на момент паузы.</summary>
+	private float _spawnTimerLeft;
 	private CollisionShape2D? _leftWall;
 	private CollisionShape2D? _rightWall;
 	private readonly RandomNumberGenerator _rng = new();
@@ -43,6 +49,9 @@ public partial class Main : Node2D
 	private int _lives = 3;
 	private int _highScore;
 	private GameState _state = GameState.Menu;
+
+	/// <summary>Кадр последнего «Назад»: защита от дублей мышь/касание.</summary>
+	private ulong _lastBackRequestFrame = ulong.MaxValue;
 	private Vector2 _viewSize = Playfield.Size;
 	private readonly XpSystem _xp = new();
 	/// <summary>
@@ -68,6 +77,7 @@ public partial class Main : Node2D
 	public XpSystem Xp => _xp;
 	public bool IsPlaying => _state == GameState.Playing;
 	public bool IsChoosingPerk => _state == GameState.PerkSelect;
+	public bool IsPaused => _state == GameState.Paused;
 
 	/// <summary>Ставит игру на паузу выбора перка.</summary>
 	public void StartPerkPause()
@@ -84,6 +94,87 @@ public partial class Main : Node2D
 		GetTree().Paused = false;
 		_state = GameState.Playing;
 		_spawnTimer?.Start();
+	}
+
+	/// <summary>
+	/// Ставит партию на паузу: поле и физика замирают, открывается оверлей паузы.
+	/// Пауза доступна только в классическом режиме.
+	/// </summary>
+	public void PauseGame()
+	{
+		if (_state != GameState.Playing)
+		{
+			return;
+		}
+		CancelGameInput();
+		_state = GameState.Paused;
+		// Остаток интервала спавна сохраняем: пауза не должна его «съедать».
+		_spawnTimerLeft = (float)(_spawnTimer?.TimeLeft ?? 0.0);
+		_spawnTimer?.Stop();
+		GetTree().Paused = true;
+		_hud?.ShowPause(_score, _lives);
+	}
+
+	/// <summary>Снимает паузу и возвращает партию.</summary>
+	public void ResumeGame()
+	{
+		if (_state != GameState.Paused)
+		{
+			return;
+		}
+		GetTree().Paused = false;
+		_hud?.HidePause();
+		_state = GameState.Playing;
+		if (_spawnTimer != null)
+		{
+			_spawnTimer.Start(_spawnTimerLeft > 0f ? _spawnTimerLeft : _spawnTimer.WaitTime);
+		}
+	}
+
+	/// <summary>
+	/// Escape и системная кнопка/жест «Назад»: в партии — пауза, на паузе — продолжение,
+	/// в Suika и на экране итогов — меню, в меню — выход из приложения.
+	/// </summary>
+	public void HandleBackRequest()
+	{
+		// Одно нажатие может прийти дважды (мышь и эмулированное касание) — реагируем раз.
+		ulong frame = Engine.GetProcessFrames();
+		if (frame == _lastBackRequestFrame) return;
+		_lastBackRequestFrame = frame;
+
+		switch (_state)
+		{
+			case GameState.Playing:
+				PauseGame();
+				break;
+			case GameState.Paused:
+				ResumeGame();
+				break;
+			case GameState.Suika:
+				CloseSuika();
+				break;
+			case GameState.GameOver:
+				GoToMenu();
+				break;
+			case GameState.Menu:
+				GetTree().Quit();
+				break;
+		}
+	}
+
+	/// <summary>
+	/// Выход в меню из паузы: партия очищается, но без экрана «Игра окончена»
+	/// и без записи рекорда.
+	/// </summary>
+	public void PauseToMenu()
+	{
+		if (_state != GameState.Paused)
+		{
+			return;
+		}
+		GetTree().Paused = false;
+		_hud?.HidePause();
+		GoToMenu();
 	}
 
 	public void AddScore(int amount)
@@ -133,8 +224,15 @@ public partial class Main : Node2D
 
 	public void HandleGameInput(InputEvent input)
 	{
+		if (_state != GameState.Playing && _state != GameState.Suika) return;
+		// На ПК каждое нажатие мыши дублируется эмулированным касанием: игровой ввод
+		// обрабатывает только исходное событие, иначе интерфейс и жест ломаются.
+		if (input.Device == InputEvent.DeviceIdEmulation) return;
+		// Любое касание поля сворачивает выдвижную панель паузы.
+		if (input is InputEventScreenTouch { Pressed: true } or InputEventMouseButton { Pressed: true })
+			_hud?.HidePauseMenu();
 		if (_state == GameState.Playing) _frog?.HandleGameInput(input);
-		else if (_state == GameState.Suika) _suika?.HandleGameInput(input);
+		else _suika?.HandleGameInput(input);
 	}
 
 	public void CancelGameInput()
@@ -170,6 +268,10 @@ public partial class Main : Node2D
 		_hud.RestartPressed += Restart;
 		_hud.MenuPressed += GoToMenu;
 		_hud.PerkPicked += OnPerkPicked;
+		_hud.PausePressed += PauseGame;
+		_hud.BackRequested += HandleBackRequest;
+		_hud.ResumePressed += ResumeGame;
+		_hud.PauseMenuPressed += PauseToMenu;
 
 		_highScore = LoadHighScore();
 		LoadCollectedFruits();
@@ -492,6 +594,7 @@ public partial class Main : Node2D
 		_suika?.Close();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HidePause();
 		if (_frog != null) _frog.Visible = true;
 		_state = GameState.Playing;
 		_hud?.HideStart();
@@ -521,6 +624,7 @@ public partial class Main : Node2D
 		_frog!.Visible = false;
 		_hud?.HideStart();
 		_hud?.HideGameOver();
+		_hud?.HidePause();
 		_hud?.SetGameplayVisible(false);
 		_suika?.Open();
 	}
@@ -530,6 +634,7 @@ public partial class Main : Node2D
 		_suika?.Close();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HidePause();
 		UpdateSuikaButton();
 		ResetMainRoundData();
 		_state = GameState.Menu;
@@ -545,6 +650,7 @@ public partial class Main : Node2D
 		_spawnTimer?.Stop();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HidePause();
 		ClearMainRound();
 		ResetMainRoundData();
 		_state = GameState.Menu;
@@ -596,6 +702,7 @@ public partial class Main : Node2D
 		// На случай завершения во время паузы выбора перка (теоретически невозможно).
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HidePause();
 		if (_score > _highScore)
 		{
 			_highScore = _score;
@@ -610,6 +717,7 @@ public partial class Main : Node2D
 		ClearMainRound();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HidePause();
 		_frog!.Visible = true;
 
 		ResetMainRoundData();

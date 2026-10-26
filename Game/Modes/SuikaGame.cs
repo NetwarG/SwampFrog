@@ -262,8 +262,8 @@ public partial class SuikaGame : Node2D
 		}
 		else if (input is InputEventKey { Pressed: true, Echo: false } key)
 		{
-			if (key.Keycode == Key.Escape) ExitRequested?.Invoke();
-			else if (key.Keycode is Key.Space or Key.Enter) DropFruit();
+			// Escape централизован в HUD: он работает и на паузе, когда Suika уже не получает ввод.
+			if (key.Keycode is Key.Space or Key.Enter) DropFruit();
 		}
 	}
 

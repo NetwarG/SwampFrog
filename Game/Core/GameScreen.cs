@@ -133,6 +133,8 @@ public partial class GameScreen : Control
 	{
 		if (what == NotificationApplicationFocusOut || what == NotificationWMWindowFocusOut)
 			Game?.CancelGameInput();
+		else if (what == NotificationWMGoBackRequest)
+			Game?.HandleBackRequest();
 	}
 
 	public override void _Draw()

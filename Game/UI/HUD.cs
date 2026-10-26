@@ -30,11 +30,30 @@ public partial class HUD : Control
 	/// <summary>Оверлей выбора перка (работает и на паузе игры).</summary>
 	private PerkSelectionOverlay? _perkOverlay;
 
+	/// <summary>Оверлей паузы (работает и на паузе игры).</summary>
+	private PauseOverlay? _pauseOverlay;
+
+	/// <summary>Выпадающее меню паузы у правого края поля.</summary>
+	private PauseMenu? _pauseMenu;
+	private bool _gameplayVisible;
+
 	public event Action? PlayPressed;
 	public event Action? MiniGamePressed;
 	public event Action? ExitPressed;
 	public event Action? RestartPressed;
 	public event Action? MenuPressed;
+
+	/// <summary>Круглая кнопка паузы в выдвижной панели.</summary>
+	public event Action? PausePressed;
+
+	/// <summary>Escape на клавиатуре: как системная кнопка «Назад».</summary>
+	public event Action? BackRequested;
+
+	/// <summary>Игрок продолжил игру из оверлея паузы.</summary>
+	public event Action? ResumePressed;
+
+	/// <summary>Игрок вышел в меню из оверлея паузы.</summary>
+	public event Action? PauseMenuPressed;
 
 	/// <summary>Игрок выбрал перк в оверлее выбора.</summary>
 	public event Action<PerkId>? PerkPicked;
@@ -53,6 +72,22 @@ public partial class HUD : Control
 		_perkOverlay = new PerkSelectionOverlay { ZIndex = 80 };
 		AddChild(_perkOverlay);
 		_perkOverlay.PerkPicked += OnPerkPicked;
+
+		_pauseOverlay = new PauseOverlay { ZIndex = 70 };
+		AddChild(_pauseOverlay);
+		_pauseOverlay.ResumePressed += () => ResumePressed?.Invoke();
+		_pauseOverlay.MenuPressed += () => PauseMenuPressed?.Invoke();
+	}
+
+	/// <summary>
+	/// Escape работает как системная кнопка «Назад». Обрабатывает HUD, а не игровой узел:
+	/// HUD продолжает получать ввод и на паузе (ProcessMode.Always).
+	/// </summary>
+	public override void _UnhandledInput(InputEvent @event)
+	{
+		if (@event is not InputEventKey { Pressed: true, Echo: false } key || key.Keycode != Key.Escape) return;
+		BackRequested?.Invoke();
+		GetViewport().SetInputAsHandled();
 	}
 
 	private void OnPerkPicked(PerkId id)
@@ -82,6 +117,7 @@ public partial class HUD : Control
 	{
 		float ui = UiScale;
 		BuildCounters();
+		BuildPauseMenu();
 
 		_perkBar = new PerkBar();
 		_perkBar.SetUiScale(ui);
@@ -110,6 +146,29 @@ public partial class HUD : Control
 		AddChild(_hpLabel);
 		UpdateCounterPositions();
 	}
+
+	/// <summary>
+	/// Выдвижное меню паузы: полукруглый язычок у правого края по центру высоты,
+	/// по нажатию он сменяется выезжающей панелью с круглой кнопкой паузы
+	/// (см. <see cref="PauseMenu"/>).
+	/// </summary>
+	private void BuildPauseMenu()
+	{
+		_pauseMenu = new PauseMenu();
+		_pauseMenu.PausePressed += () => PausePressed?.Invoke();
+		AddChild(_pauseMenu);
+		UpdatePauseMenu();
+	}
+
+	/// <summary>Сворачивает выпадающее меню: вызывается при любом игровом касании и смене экрана.</summary>
+	public void HidePauseMenu() => _pauseMenu?.Collapse();
+
+	/// <summary>
+	/// Стрелка и пункт «Пауза» видны только в идущей партии и не спорят с оверлеями;
+	/// сам пункт появляется лишь при развёрнутом меню.
+	/// </summary>
+	private void UpdatePauseMenu() =>
+		_pauseMenu?.SetAvailable(_gameplayVisible && _perkOverlay?.Visible != true && _pauseOverlay?.Visible != true);
 
 	private static Label MakeCounter(string name, string text)
 	{
@@ -141,10 +200,13 @@ public partial class HUD : Control
 	/// <summary>Скрывает игровые показатели, пока открыт главное меню или мини-игра.</summary>
 	public void SetGameplayVisible(bool visible)
 	{
+		_gameplayVisible = visible;
 		if (_scoreLabel != null) _scoreLabel.Visible = visible;
 		if (_hpLabel != null) _hpLabel.Visible = visible;
 		if (_xpBar != null) _xpBar.Visible = visible;
 		if (_perkBar != null && _perkBar.HasIcons) _perkBar.Visible = visible;
+		if (!visible) _pauseMenu?.Collapse();
+		UpdatePauseMenu();
 		if (!visible)
 		{
 			if (IsInstanceValid(_hint)) _hint!.QueueFree();
@@ -178,12 +240,12 @@ public partial class HUD : Control
 
 		float ui = UiScale;
 
-		Label title = MakeLabel("Лягушка-охотница", (int)Mathf.Round(50f * ui), new Color("ffe066"));
-		Label sub = MakeLabel("Собирай фрукты, не лови мусор!", (int)Mathf.Round(24f * ui), new Color("ffffff"));
-		Label sub2 = MakeLabel("Упустишь фрукт — потеряешь жизнь.", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
-		Button play = MakeButton("Играть", ui, new Color("b4e863"));
-		Button exit = MakeButton("Выйти", ui, new Color("ff8c7a"));
-		_miniGameButton = MakeButton("Мини-игра: Suika", ui, new Color("ffd45e"));
+		Label title = UiStyle.MakeLabel("Лягушка-охотница", (int)Mathf.Round(50f * ui), new Color("ffe066"));
+		Label sub = UiStyle.MakeLabel("Собирай фрукты, не лови мусор!", (int)Mathf.Round(24f * ui), new Color("ffffff"));
+		Label sub2 = UiStyle.MakeLabel("Упустишь фрукт — потеряешь жизнь.", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
+		Button play = UiStyle.MakeButton("Играть", ui, new Color("b4e863"));
+		Button exit = UiStyle.MakeButton("Выйти", ui, new Color("ff8c7a"));
+		_miniGameButton = UiStyle.MakeButton("Мини-игра: Suika", ui, new Color("ffd45e"));
 		play.Pressed += () => PlayPressed?.Invoke();
 		exit.Pressed += () => ExitPressed?.Invoke();
 		_miniGameButton!.Pressed += () => MiniGamePressed?.Invoke();
@@ -197,7 +259,7 @@ public partial class HUD : Control
 		box.AddChild(_miniGameButton!);
 		box.AddChild(exit);
 
-		var madeByText = MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
+		var madeByText = UiStyle.MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
 		// Текст по центру в самом низу стартового экрана (вне центрируемого меню).
 		madeByText.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
 		madeByText.AnchorTop = 1f;
@@ -322,11 +384,11 @@ public partial class HUD : Control
 
 		float ui = UiScale;
 
-		Label title = MakeLabel("Игра окончена!", (int)Mathf.Round(48f * ui), new Color("ffd45e"));
-		_finalScore = MakeLabel("Счёт: 0", (int)Mathf.Round(32f * ui), new Color("ffffff"));
-		_finalHigh = MakeLabel("Рекорд: 0", (int)Mathf.Round(32f * ui), new Color("cfe9c2"));
-		Button restart = MakeButton("Заново", ui, new Color("b4e863"));
-		Button menu = MakeButton("В меню", ui, new Color("ffd45e"));
+		Label title = UiStyle.MakeLabel("Игра окончена!", (int)Mathf.Round(48f * ui), new Color("ffd45e"));
+		_finalScore = UiStyle.MakeLabel("Счёт: 0", (int)Mathf.Round(32f * ui), new Color("ffffff"));
+		_finalHigh = UiStyle.MakeLabel("Рекорд: 0", (int)Mathf.Round(32f * ui), new Color("cfe9c2"));
+		Button restart = UiStyle.MakeButton("Заново", ui, new Color("b4e863"));
+		Button menu = UiStyle.MakeButton("В меню", ui, new Color("ffd45e"));
 		restart.Pressed += () => RestartPressed?.Invoke();
 		menu.Pressed += () => MenuPressed?.Invoke();
 
@@ -335,60 +397,6 @@ public partial class HUD : Control
 		box.AddChild(_finalHigh);
 		box.AddChild(restart);
 		box.AddChild(menu);
-	}
-
-	private static Label MakeLabel(string text, int fontSize, Color color)
-	{
-		var label = new Label
-		{
-			Text = text,
-			MouseFilter = MouseFilterEnum.Ignore,
-			HorizontalAlignment = HorizontalAlignment.Center
-		};
-		label.AddThemeFontSizeOverride("font_size", fontSize);
-		label.AddThemeColorOverride("font_color", color);
-		return label;
-	}
-
-	private Button MakeButton(string text, float ui, Color accent)
-	{
-		var button = new Button
-		{
-			Text = text,
-			CustomMinimumSize = new Vector2(330f * ui, 80f * ui),
-			MouseFilter = MouseFilterEnum.Pass,
-			FocusMode = Control.FocusModeEnum.None,
-			MouseDefaultCursorShape = Control.CursorShape.PointingHand
-		};
-		button.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(24f * ui));
-		button.AddThemeColorOverride("font_color", new Color("173c34"));
-		button.AddThemeColorOverride("font_hover_color", new Color("102c27"));
-		button.AddThemeColorOverride("font_pressed_color", new Color("ffffff"));
-		button.AddThemeColorOverride("font_focus_color", new Color("173c34"));
-		button.AddThemeStyleboxOverride("normal", MakeButtonStyle(new Color(accent, 0.92f), accent, ui, 0.18f));
-		button.AddThemeStyleboxOverride("hover", MakeButtonStyle(new Color(accent, 1f), new Color("ffffff"), ui, 0.32f));
-		button.AddThemeStyleboxOverride("pressed", MakeButtonStyle(new Color(accent, 0.72f), new Color("ffffff"), ui, 0.10f));
-		button.AddThemeStyleboxOverride("focus", MakeButtonStyle(new Color(accent, 0.92f), accent, ui, 0.18f));
-		return button;
-	}
-
-	private static StyleBoxFlat MakeButtonStyle(Color background, Color border, float ui, float shadowAlpha)
-	{
-		var style = new StyleBoxFlat
-		{
-			BgColor = background,
-			BorderColor = new Color(border, 0.72f),
-			CornerRadiusTopLeft = (int)Mathf.Round(14f * ui),
-			CornerRadiusTopRight = (int)Mathf.Round(14f * ui),
-			CornerRadiusBottomLeft = (int)Mathf.Round(14f * ui),
-			CornerRadiusBottomRight = (int)Mathf.Round(14f * ui),
-			ShadowColor = new Color(0f, 0f, 0f, shadowAlpha),
-			ShadowSize = (int)Mathf.Round(5f * ui)
-		};
-		style.SetBorderWidthAll((int)Mathf.Round(2f * ui));
-		style.ContentMarginLeft = 18f * ui;
-		style.ContentMarginRight = 18f * ui;
-		return style;
 	}
 
 	/// <summary>Мимолётная подсказка «держи палец» после старта.</summary>
@@ -454,10 +462,30 @@ public partial class HUD : Control
 	public void ShowPerkSelection(int level, PerkOffer[] cards)
 	{
 		_perkOverlay?.Show(level, cards);
+		UpdatePauseMenu();
 	}
 
 	/// <summary>Скрывает оверлей выбора перка.</summary>
-	public void HidePerkSelection() => _perkOverlay?.Hide();
+	public void HidePerkSelection()
+	{
+		_perkOverlay?.Hide();
+		UpdatePauseMenu();
+	}
+
+	/// <summary>Показывает оверлей паузы с показателями текущей партии.</summary>
+	public void ShowPause(int score, int lives)
+	{
+		_pauseMenu?.Collapse();
+		_pauseOverlay?.Show(score, lives);
+		UpdatePauseMenu();
+	}
+
+	/// <summary>Скрывает оверлей паузы.</summary>
+	public void HidePause()
+	{
+		_pauseOverlay?.Hide();
+		UpdatePauseMenu();
+	}
 
 	public void FlashRed() => _flash?.Start();
 
