@@ -27,7 +27,6 @@ public partial class SuikaGame : Node2D
 	private const float FruitFriction = 0.65f;
 	private const uint SuikaCollisionLayer = ItemPhysics.SuikaLayer;
 	private const float WallThickness = 12f;
-	private const float BowlWallInset = 18f;
 	private const float FloorInset = 4f;
 	/// <summary>Ширина кувшина в долях от ширины экрана.</summary>
 	private const float BowlWidthRatio = 0.80f;
@@ -289,12 +288,12 @@ public partial class SuikaGame : Node2D
 		DrawCircle(new Vector2(size.X * 0.84f, size.Y * 0.19f), 94f, new Color(1f, 1f, 1f, 0.035f));
 		DrawCircle(new Vector2(size.X * 0.15f, size.Y * 0.76f), 120f, new Color(0.2f, 0.9f, 0.67f, 0.035f));
 
-		// Стеклянное тело кувшина и его толстый контур.
+		// Стеклянное тело кувшина и его толстый контур: стенки вертикальны, дно горизонтально.
 		DrawRect(_bowl, new Color(0.03f, 0.14f, 0.16f, 0.72f));
 		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y), new Vector2(_bowl.End.X, _bowl.Position.Y), new Color("9ee4c3"), 3f);
-		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y), new Vector2(_bowl.Position.X + BowlWallInset, _bowl.End.Y), new Color("7acbb2"), 6f);
-		DrawLine(new Vector2(_bowl.End.X, _bowl.Position.Y), new Vector2(_bowl.End.X - BowlWallInset, _bowl.End.Y), new Color("7acbb2"), 6f);
-		DrawLine(new Vector2(_bowl.Position.X + BowlWallInset, _bowl.End.Y), new Vector2(_bowl.End.X - BowlWallInset, _bowl.End.Y), new Color("9ee4c3"), 8f);
+		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y), new Vector2(_bowl.Position.X, _bowl.End.Y), new Color("7acbb2"), 6f);
+		DrawLine(new Vector2(_bowl.End.X, _bowl.Position.Y), new Vector2(_bowl.End.X, _bowl.End.Y), new Color("7acbb2"), 6f);
+		DrawLine(new Vector2(_bowl.Position.X, _bowl.End.Y), new Vector2(_bowl.End.X, _bowl.End.Y), new Color("9ee4c3"), 8f);
 		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y + 30f), new Vector2(_bowl.End.X, _bowl.Position.Y + 30f), new Color(0.62f, 0.93f, 0.8f, 0.18f), 2f);
 
 		// Линия переполнения помогает понять, когда кувшин уже заполнен.
@@ -512,7 +511,7 @@ public partial class SuikaGame : Node2D
 		_bowl = new Rect2((view.X - width) * 0.5f, view.Y - BowlBottom - height, width, height);
 		if (_bowl == previous) return;
 
-		// Внутренние грани повторяют наклон нарисованных стенок. Верх кувшина открыт.
+		// Внутренние грани прямоугольные: боковые стенки вертикальны, дно горизонтально. Верх кувшина открыт.
 		float left = _bowl.Position.X;
 		float right = _bowl.End.X;
 		float top = _bowl.Position.Y;
@@ -520,19 +519,19 @@ public partial class SuikaGame : Node2D
 		_leftWall!.Polygon = new[]
 		{
 			new Vector2(left - WallThickness, top), new Vector2(left, top),
-			new Vector2(left + BowlWallInset, bottom), new Vector2(left + BowlWallInset - WallThickness, bottom)
+			new Vector2(left, bottom), new Vector2(left - WallThickness, bottom)
 		};
 		_rightWall!.Polygon = new[]
 		{
 			new Vector2(right, top), new Vector2(right + WallThickness, top),
-			new Vector2(right - BowlWallInset + WallThickness, bottom), new Vector2(right - BowlWallInset, bottom)
+			new Vector2(right + WallThickness, bottom), new Vector2(right, bottom)
 		};
 		_floor!.Polygon = new[]
 		{
-			new Vector2(left + BowlWallInset - WallThickness, bottom - FloorInset),
-			new Vector2(right - BowlWallInset + WallThickness, bottom - FloorInset),
-			new Vector2(right - BowlWallInset + WallThickness, bottom + WallThickness),
-			new Vector2(left + BowlWallInset - WallThickness, bottom + WallThickness)
+			new Vector2(left - WallThickness, bottom - FloorInset),
+			new Vector2(right + WallThickness, bottom - FloorInset),
+			new Vector2(right + WallThickness, bottom + WallThickness),
+			new Vector2(left - WallThickness, bottom + WallThickness)
 		};
 
 		if (previous.HasArea())
@@ -767,10 +766,8 @@ public partial class SuikaGame : Node2D
 	private Vector2 FitPieceInsideBowl(Piece piece, Vector2 position)
 	{
 		position.Y = Mathf.Min(position.Y, _bowl.End.Y - FloorInset - ShapeExtent(piece, Vector2.Down) - 1f);
-		float slope = BowlWallInset / _bowl.Size.Y;
-		float inset = Mathf.Clamp((position.Y - _bowl.Position.Y) * slope, 0f, BowlWallInset);
-		float left = _bowl.Position.X + inset + ShapeExtent(piece, new Vector2(1f, -slope)) + 1f;
-		float right = _bowl.End.X - inset - ShapeExtent(piece, new Vector2(1f, slope)) - 1f;
+		float left = _bowl.Position.X + ShapeExtent(piece, Vector2.Right) + 1f;
+		float right = _bowl.End.X - ShapeExtent(piece, Vector2.Right) - 1f;
 		position.X = left <= right ? Mathf.Clamp(position.X, left, right) : _bowl.GetCenter().X;
 		return position;
 	}
