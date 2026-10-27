@@ -4,10 +4,11 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Панель выбранных перков внизу экрана: по одному маленькому квадратику на перк.
+/// Панель слотов перков внизу экрана: по одному маленькому квадратику на перк забега.
 /// Квадратик окрашен в акцентный цвет перка из <see cref="PerkCatalog"/>, в центре —
-/// текущий уровень улучшения. Панель центрируется над шкалой опыта и скрывается,
-/// когда выбранных перков нет или игровой HUD неактивен.
+/// текущий уровень улучшения; на максимальном уровне обводка становится золотой.
+/// Пустые слоты показаны приглушённой рамкой. Панель центрируется над шкалой
+/// опыта и скрывается, когда игровой HUD неактивен.
 /// </summary>
 public partial class PerkBar : Control
 {
@@ -17,9 +18,10 @@ public partial class PerkBar : Control
 
 	private readonly List<PerkIcon> _icons = new();
 	private PerkIconInfo[] _perks = { };
+	private int _maxSlots = PerkState.MaxDistinctPerks;
 	private float _uiScale = 1f;
 
-	/// <summary>Есть ли хотя бы один отображаемый перк.</summary>
+	/// <summary>Есть ли хотя бы один отображаемый слот.</summary>
 	public bool HasIcons => _icons.Count > 0;
 
 	public override void _Ready()
@@ -31,10 +33,11 @@ public partial class PerkBar : Control
 		Visible = false;
 	}
 
-	/// <summary>Обновляет набор отображаемых перков.</summary>
-	public void SetPerks(PerkIconInfo[] perks)
+	/// <summary>Обновляет набор отображаемых перков и число слотов забега.</summary>
+	public void SetPerks(PerkIconInfo[] perks, int maxSlots)
 	{
 		_perks = perks ?? new PerkIconInfo[0];
+		_maxSlots = Mathf.Max(_perks.Length, maxSlots);
 		foreach (PerkIcon icon in _icons)
 		{
 			icon.QueueFree();
@@ -44,11 +47,20 @@ public partial class PerkBar : Control
 		foreach (PerkIconInfo info in _perks)
 		{
 			PerkDefinition def = PerkCatalog.Find(info.Id);
-			var icon = new PerkIcon(info.Level, def.Accent, def.MaxLevel, _uiScale);
-			_icons.Add(icon);
-			AddChild(icon);
+			_icons.Add(AddIcon(new PerkIcon(info.Level, def.Accent, def.MaxLevel, _uiScale)));
+		}
+		// Свободные слоты показывают, сколько перков ещё можно взять за забег.
+		for (int i = _perks.Length; i < _maxSlots; i++)
+		{
+			_icons.Add(AddIcon(PerkIcon.Empty(_uiScale)));
 		}
 		UpdateLayout();
+	}
+
+	private PerkIcon AddIcon(PerkIcon icon)
+	{
+		AddChild(icon);
+		return icon;
 	}
 
 	/// <summary>Обновляет масштаб квадратиков (вызывается при ресайзе).</summary>
@@ -89,45 +101,59 @@ public partial class PerkBar : Control
 }
 
 /// <summary>
-/// Квадратик перка в панели <see cref="PerkBar"/>: заливка акцентным цветом,
-/// тонкая обводка и номер уровня по центру. На максимальном уровне обводка золотая.
+/// Квадратик слота в панели <see cref="PerkBar"/>: заливка акцентным цветом,
+/// тонкая обводка и номер уровня по центру. На максимальном уровне обводка золотая,
+/// у пустого слота — только приглушённая рамка без номера.
 /// </summary>
 public partial class PerkIcon : Control
 {
 	private static readonly Color Outline = new Color(1f, 1f, 1f, 0.35f);
+	private static readonly Color EmptyOutline = new Color(1f, 1f, 1f, 0.18f);
+	private static readonly Color EmptyFill = new Color(1f, 1f, 1f, 0.10f);
 	private static readonly Color MaxOutline = new Color("ffd32e");
 
 	private readonly int _level;
 	private readonly int _maxLevel;
+	private readonly bool _empty;
 	private float _uiScale;
 	private Label? _levelLabel;
 	private Color _accent;
 
-	public PerkIcon(int level, Color accent, int maxLevel, float uiScale)
+	public PerkIcon(int level, Color accent, int maxLevel, float uiScale, bool empty = false)
 	{
 		_level = level;
 		_accent = accent;
 		_maxLevel = maxLevel;
 		_uiScale = uiScale;
+		_empty = empty;
 		MouseFilter = MouseFilterEnum.Ignore;
+	}
+
+	/// <summary>Пустой слот забега: перк ещё не выбран.</summary>
+	public static PerkIcon Empty(float uiScale)
+	{
+		return new PerkIcon(0, EmptyFill, 0, uiScale, true);
 	}
 
 	public override void _Ready()
 	{
-		_levelLabel = new Label
+		if (!_empty)
 		{
-			Text = _level.ToString(),
-			HorizontalAlignment = HorizontalAlignment.Center,
-			VerticalAlignment = VerticalAlignment.Center,
-			MouseFilter = MouseFilterEnum.Ignore
-		};
-		_levelLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(16f * _uiScale));
-		_levelLabel.AddThemeColorOverride("font_color", new Color("ffffff"));
-		_levelLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
-		_levelLabel.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(1f * _uiScale));
-		_levelLabel.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(1f * _uiScale));
-		_levelLabel.SetAnchorsPreset(LayoutPreset.FullRect);
-		AddChild(_levelLabel);
+			_levelLabel = new Label
+			{
+				Text = _level.ToString(),
+				HorizontalAlignment = HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center,
+				MouseFilter = MouseFilterEnum.Ignore
+			};
+			_levelLabel.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(16f * _uiScale));
+			_levelLabel.AddThemeColorOverride("font_color", new Color("ffffff"));
+			_levelLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
+			_levelLabel.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(1f * _uiScale));
+			_levelLabel.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(1f * _uiScale));
+			_levelLabel.SetAnchorsPreset(LayoutPreset.FullRect);
+			AddChild(_levelLabel);
+		}
 		QueueRedraw();
 	}
 
@@ -146,10 +172,11 @@ public partial class PerkIcon : Control
 	{
 		float s = Size.X;
 
-		// Скруглённый квадрат: заливка акцентом.
-		DrawRect(new Rect2(1f, 1f, s - 2f, s - 2f), new Color(_accent, 0.88f));
+		// Скруглённый квадрат: заливка акцентом, у пустого слота — едва заметная.
+		DrawRect(new Rect2(1f, 1f, s - 2f, s - 2f), new Color(_accent, _empty ? 0.10f : 0.88f));
 
 		// Обводка, на максимальном уровне — золотая.
-		DrawRect(new Rect2(0.5f, 0.5f, s - 1f, s - 1f), _level >= _maxLevel ? MaxOutline : Outline, false, Mathf.Max(1f, 1.5f * _uiScale));
+		Color outline = _empty ? EmptyOutline : _level >= _maxLevel ? MaxOutline : Outline;
+		DrawRect(new Rect2(0.5f, 0.5f, s - 1f, s - 1f), outline, false, Mathf.Max(1f, 1.5f * _uiScale));
 	}
 }

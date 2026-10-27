@@ -101,7 +101,7 @@ public sealed class PerkPlayer
 			int lvl = _perks.LevelOf(id);
 			cards.Add(new PerkOffer(id, def.Name, def.Tagline, lvl, def.LevelEffects[lvl], def.MaxLevel, def.Accent));
 		}
-		Game.HudNode?.ShowPerkSelection(level, cards.ToArray());
+		Game.HudNode?.ShowPerkSelection(level, cards.ToArray(), _perks.SelectedCount, PerkState.MaxDistinctPerks);
 	}
 
 	/// <summary>Игрок выбрал перк: прокачиваем, применяем мгновенные эффекты и снимаем паузу.</summary>
@@ -111,7 +111,13 @@ public sealed class PerkPlayer
 		{
 			return;
 		}
-		_perks.Increment(id);
+		// Карточка могла устареть (перк уже максимален или место занято) — просто закрываем выбор.
+		if (!_perks.Increment(id))
+		{
+			Game.HudNode?.HidePerkSelection();
+			Game.EndPerkPause();
+			return;
+		}
 
 		// Панель выбранных перков обновляется сразу после выбора.
 		Game.HudNode?.SetPickedPerks(_perks.PickedSnapshot());

@@ -448,7 +448,7 @@ public partial class HUD : Control
 	}
 
 	/// <summary>Обновляет панель выбранных перков внизу экрана.</summary>
-	public void SetPickedPerks(PerkIconInfo[] perks) => _perkBar?.SetPerks(perks);
+	public void SetPickedPerks(PerkIconInfo[] perks) => _perkBar?.SetPerks(perks, PerkState.MaxDistinctPerks);
 
 	/// <summary>Обновляет максимум жизней с учётом перка «Панцирь».</summary>
 	public void SetMaxLives(int max)
@@ -459,9 +459,9 @@ public partial class HUD : Control
 	}
 
 	/// <summary>Показывает оверлей выбора перка с карточками.</summary>
-	public void ShowPerkSelection(int level, PerkOffer[] cards)
+	public void ShowPerkSelection(int level, PerkOffer[] cards, int selectedCount, int maxPerks)
 	{
-		_perkOverlay?.Show(level, cards);
+		_perkOverlay?.Show(level, cards, selectedCount, maxPerks);
 		UpdatePauseMenu();
 	}
 

@@ -22,6 +22,8 @@ public partial class PerkSelectionOverlay : Control
 	private VBoxContainer? _box;
 	private PerkOffer[]? _cards;
 	private int _level;
+	private int _selectedCount;
+	private int _maxPerks = PerkState.MaxDistinctPerks;
 	private bool _fitQueued;
 
 	public override void _Ready()
@@ -55,10 +57,12 @@ public partial class PerkSelectionOverlay : Control
 	}
 
 	/// <summary>Показывает оверлей с карточками перков.</summary>
-	public void Show(int level, PerkOffer[] cards)
+	public void Show(int level, PerkOffer[] cards, int selectedCount, int maxPerks)
 	{
 		_level = level;
 		_cards = cards;
+		_selectedCount = selectedCount;
+		_maxPerks = maxPerks;
 		RebuildCards();
 		Visible = true;
 		Recenter();
@@ -139,7 +143,7 @@ public partial class PerkSelectionOverlay : Control
 		_box.CustomMinimumSize = new Vector2(contentWidth, 0f);
 
 		_box.AddChild(MakeLabel($"Новый перк!  Уровень {_level}", (int)Mathf.Round(44f * ui), new Color("ffd45e")));
-		_box.AddChild(MakeLabel("Выбери одно улучшение — удерживай карточку 1 сек", (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.92f)));
+		_box.AddChild(MakeLabel($"Перки: {_selectedCount}/{_maxPerks} — выбери одно улучшение, удерживай карточку 1 сек", (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.92f)));
 
 		foreach (PerkOffer card in _cards)
 		{
@@ -150,7 +154,7 @@ public partial class PerkSelectionOverlay : Control
 			_box.AddChild(button);
 		}
 
-		_box.AddChild(MakeLabel("Слоты перков ограничены — выбирай с умом!", (int)Mathf.Round(24f * ui), new Color(1f, 1f, 1f, 0.75f)));
+		_box.AddChild(MakeLabel($"За забег можно взять {_maxPerks} перков — потом их можно докачать до максимума", (int)Mathf.Round(24f * ui), new Color(1f, 1f, 1f, 0.75f)));
 	}
 
 	private HoldCardButton MakeCardButton(string text, Color accent, float ui)
