@@ -211,9 +211,6 @@ public partial class Main : Node2D
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
 	public Rect2 ViewBounds => new(Vector2.Zero, ViewSize);
 
-	/// <summary>Мировая координата Y верхней кромки экрана с учётом HUD и безопасных отступов. Задаётся GameScreen.</summary>
-	public Func<float>? ScreenTopWorldY { get; set; }
-
 	public override void _EnterTree()
 	{
 		_hud = GetNode<HUD>("HUD");
@@ -335,7 +332,7 @@ public partial class Main : Node2D
 	public float ScreenScale => 1f;
 	public Vector2 ViewSize => _viewSize;
 
-	/// <summary>Настраивает вертикальный размер мира под безопасную область экрана.</summary>
+	/// <summary>Настраивает вертикальный размер мира по высоте экрана.</summary>
 	public void ConfigureViewSize(Vector2 size)
 	{
 		if (size.X <= 0f || size.Y <= 0f)
@@ -559,8 +556,9 @@ public partial class Main : Node2D
 		item.ItemType = type;
 		item.IsGolden = golden;
 		item.FallSpeed = speed;
-		// Спавн за верхней кромкой экрана с учётом отступов HUD и безопасной области.
-		float spawnY = (ScreenTopWorldY?.Invoke() ?? 0f) - SpawnAboveScreen;
+		// Спавн за верхней кромкой экрана: поле начинается у самого верха,
+		// поэтому предмет входит в кадр падением из-за края.
+		float spawnY = -SpawnAboveScreen;
 		item.Position = new Vector2(_rng.RandfRange(46f, Mathf.Max(60f, size.X - 46f)), spawnY);
 		// Случайный разброс и золото применяет FallingItem._Ready; экран не влияет на размер.
 		_items!.AddChild(item);

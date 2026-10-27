@@ -2,22 +2,20 @@ using Godot;
 
 namespace SwampFrog;
 
-/// <summary>Отображение мира в безопасной области. Масштабируется изображение, не физические тела.</summary>
+/// <summary>Отображение мира в игровой колонке экрана. Масштабируется изображение, не физические тела.</summary>
 public partial class GameScreen : Control
 {
 	private SubViewport _world = null!;
 	private TextureRect _image = null!;
 	private Control _ui = null!;
-	private Rect2 _lastSafeArea;
+	private Rect2 _lastScreen;
 	private Vector2 _lastPixelScale;
 	private Vector2 _worldSize = Playfield.Size;
 	public Main Game { get; private set; } = null!;
-	/// <summary>Общая безопасная колонка HUD и игрового поля.</summary>
+	/// <summary>Общая колонка HUD и игрового поля: вся высота экрана.</summary>
 	public Rect2 ArenaRect { get; private set; }
 	public Rect2 FieldRect { get; private set; }
 	public Control UiRoot => _ui;
-	// Используется проверками разных вырезов экрана без изменения физических устройств.
-	public Rect2? SafeAreaOverride { get; set; }
 
 	public override void _Ready()
 	{
@@ -46,11 +44,6 @@ public partial class GameScreen : Control
 		Game.ConfigureViewSize(_worldSize);
 		Game.UiHost = _ui;
 		Game.WorldToUi = WorldToUi;
-		// Мировая координата верхней кромки экрана: отрицательная, если поле начинается
-		// ниже верхнего края безопасной области. Используется для спавна за краем поля.
-		Game.ScreenTopWorldY = () => !FieldRect.HasArea()
-			? 0f
-			: -FieldRect.Position.Y / FieldRect.Size.Y * _worldSize.Y;
 		Game.ProcessMode = ProcessModeEnum.Pausable;
 		_world.AddChild(Game);
 	}
@@ -59,33 +52,21 @@ public partial class GameScreen : Control
 	public Vector2 WorldToScreen(Vector2 point) => FieldRect.Position + point * FieldRect.Size / _worldSize;
 	public Vector2 WorldToUi(Vector2 point) => (WorldToScreen(point) - _ui.Position) / _ui.Scale;
 
-	private Rect2 ReadSafeArea()
-	{
-		Rect2 full = new(Vector2.Zero, Size);
-		if (SafeAreaOverride is Rect2 forced) return full.Intersection(forced);
-		if (!OS.HasFeature("android") && !OS.HasFeature("ios")) return full;
-		Rect2 pixels = DisplayServer.GetDisplaySafeArea();
-		if (!pixels.HasArea()) return full;
-		Rect2 safe = full.Intersection(GetScreenTransform().AffineInverse() * pixels);
-		return safe.HasArea() ? safe : full;
-	}
-
 	public override void _Process(double delta) => RefreshLayout();
 
 	public void RefreshLayout()
 	{
-		Rect2 safe = ReadSafeArea();
-		if (!safe.HasArea() || _world == null) return;
-		Transform2D screen = GetScreenTransform();
-		Vector2 pixelScale = new(screen.X.Length(), screen.Y.Length());
-		if (safe == _lastSafeArea && pixelScale == _lastPixelScale) return;
-		_lastSafeArea = safe;
+		Rect2 screen = new(Vector2.Zero, Size);
+		if (!screen.HasArea() || _world == null) return;
+		Transform2D transform = GetScreenTransform();
+		Vector2 pixelScale = new(transform.X.Length(), transform.Y.Length());
+		if (screen == _lastScreen && pixelScale == _lastPixelScale) return;
+		_lastScreen = screen;
 		_lastPixelScale = pixelScale;
-		// Поле и HUD занимают одну колонку: на высоких телефонах растёт её высота,
-		// на широких экранах по бокам остаётся декоративный фон.
-		ArenaRect = Playfield.ArenaFor(safe);
+		// Поле и HUD занимают одну колонку во всю высоту экрана: сверху и снизу
+		// неигровых полос нет, на широких экранах по бокам остаётся декоративный фон.
+		ArenaRect = Playfield.ColumnFor(screen);
 		float uiScale = Mathf.Max(0.01f, ArenaRect.Size.X / Playfield.Size.X);
-		// Интерфейс обоих режимов лежит поверх поля, без отдельной верхней полосы.
 		_worldSize = Playfield.SizeFor(ArenaRect);
 		FieldRect = Playfield.Fit(ArenaRect, _worldSize);
 		_image.Position = FieldRect.Position;
@@ -94,6 +75,7 @@ public partial class GameScreen : Control
 		// Нативный размер текстуры соответствует фактическому размеру поля.
 		_world.Size = new Vector2I(Mathf.Max(2, Mathf.RoundToInt(FieldRect.Size.X * pixelScale.X)),
 			Mathf.Max(2, Mathf.RoundToInt(FieldRect.Size.Y * pixelScale.Y)));
+		// Интерфейс лежит на той же колонке, поэтому затемнения меню закрывают весь экран.
 		_ui.Position = ArenaRect.Position;
 		_ui.Scale = Vector2.One * uiScale;
 		_ui.Size = ArenaRect.Size / uiScale;
@@ -166,7 +148,7 @@ public partial class GameScreen : Control
 	private void DrawSideDividers(Rect2 full)
 	{
 		// Вырезы телефона сами по себе не включают боковые панели.
-		if (_lastSafeArea.Size.X - ArenaRect.Size.X <= 1f) return;
+		if (Size.X - ArenaRect.Size.X <= 1f) return;
 		float left = ArenaRect.Position.X;
 		float right = ArenaRect.End.X;
 		Color shade = new(0.01f, 0.05f, 0.05f, 0.68f);

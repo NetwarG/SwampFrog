@@ -13,20 +13,20 @@ public static class Playfield
 	public static readonly Color PondBottom = new("0a352f");
 
 	/// <summary>
-	/// Колонка поля с наложенным HUD: на телефоне занимает всю ширину и высоту,
-	/// на широком экране сохраняет портретную ширину и свободное место по бокам.
+	/// Колонка поля с наложенным HUD: высота всегда равна высоте экрана, поэтому
+	/// вертикальных неигровых полос нет. На широком экране ширина остаётся портретной.
 	/// </summary>
-	public static Rect2 ArenaFor(Rect2 safeArea)
+	public static Rect2 ColumnFor(Rect2 screen)
 	{
-		if (!safeArea.HasArea()) return new Rect2(safeArea.Position, Vector2.Zero);
-		float width = Mathf.Min(safeArea.Size.X, safeArea.Size.Y * Size.X / Size.Y);
-		return new Rect2(safeArea.GetCenter().X - width * 0.5f, safeArea.Position.Y, width, safeArea.Size.Y);
+		if (!screen.HasArea()) return new Rect2(screen.Position, Vector2.Zero);
+		float width = Mathf.Min(screen.Size.X, screen.Size.Y * Size.X / Size.Y);
+		return new Rect2(screen.GetCenter().X - width * 0.5f, screen.Position.Y, width, screen.Size.Y);
 	}
 
 	/// <summary>
-	/// Возвращает размер мира для доступной области. Ширина остаётся эталонной,
-	/// а высота следует за доступной игровой областью без фиксированного предела по Y.
-	/// Пропорции общей колонки ограничивает ArenaFor, а не минимальная высота поля.
+	/// Возвращает размер мира для игровой колонки. Ширина остаётся эталонной,
+	/// а высота равна высоте колонки: по вертикали поле ничем не ограничено.
+	/// Пропорции колонки ограничивает ColumnFor, а не минимальная высота поля.
 	/// </summary>
 	public static Vector2 SizeFor(Rect2 available)
 	{
