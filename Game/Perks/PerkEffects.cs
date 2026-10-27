@@ -15,6 +15,9 @@ public sealed class PerkEffects
 	/// <summary>Неуязвимость «Панциря» (ур. 5) после урона, секунды.</summary>
 	public const float ShellInvulnDuration = 2f;
 
+	/// <summary>Задержка между паузами «Зоны замедления» (ур. 5) после поимки золотого фрукта, секунды.</summary>
+	public const float GoldFreezeCooldown = 5f;
+
 	// ---------- Липкие ладони ----------
 
 	/// <summary>Множитель радиуса ловли: 1.3 / 1.6 / 1.9, дальше — магнит.</summary>
@@ -126,7 +129,8 @@ public sealed class PerkEffects
 	/// <summary>true — замедление на нижней половине экрана, false — на нижней трети.</summary>
 	public static bool SlowZoneCoversHalf(PerkState s) => s.LevelOf(PerkId.SlowZone) >= 3;
 
-	/// <summary>Пауза всех предметов при появлении золотого (0 — выключено).</summary>
+	/// <summary>Пауза всех предметов при поимке золотого фрукта (0 — выключено).
+	/// Перезарядка между паузами — <see cref="GoldFreezeCooldown"/>.</summary>
 	public static float GoldFreezeDuration(PerkState s) => s.LevelOf(PerkId.SlowZone) >= 5 ? 1f : 0f;
 
 	// ---------- Золотая лихорадка ----------
@@ -269,15 +273,15 @@ public sealed class PerkEffects
 		int lvl = s.LevelOf(PerkId.LightningTongue);
 		if (lvl >= 4)
 		{
-			return 5f;
+			return 10f;
 		}
 		if (lvl == 3)
 		{
-			return 10f;
+			return 20f;
 		}
 		if (lvl == 2)
 		{
-			return 20f;
+			return 25f;
 		}
 		if (lvl == 1)
 		{

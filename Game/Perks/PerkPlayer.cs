@@ -16,8 +16,10 @@ public sealed class PerkPlayer
 	private float _autoCatchTimer;
 	/// <summary>Отсчёт до заморозки «Взгляда василиска».</summary>
 	private float _gazeTimer;
-	/// <summary>Заморозка всего поля («Зона замедления» ур. 5 при золотом).</summary>
+	/// <summary>Заморозка всего поля («Зона замедления» ур. 5 при поимке золотого).</summary>
 	private float _worldFreezeTimer;
+	/// <summary>Перезарядка паузы «Зоны замедления» ур. 5.</summary>
+	private float _goldFreezeCooldown;
 	/// <summary>Текущая заморозка «Взгляда василиска».</summary>
 	private float _gazeFreezeTimer;
 	/// <summary>Неуязвимость («Панцирь» ур. 5, возрождение).</summary>
@@ -44,6 +46,7 @@ public sealed class PerkPlayer
 		_gazeTimer = PerkEffects.GazeInterval(_perks);
 		_gazeFreezeTimer = 0f;
 		_worldFreezeTimer = 0f;
+		_goldFreezeCooldown = 0f;
 		_invulnTimer = 0f;
 
 		// Панель перков очищается вместе с состоянием.
@@ -160,6 +163,10 @@ public sealed class PerkPlayer
 		{
 			_worldFreezeTimer = Mathf.Max(0f, _worldFreezeTimer - dt);
 		}
+		if (_goldFreezeCooldown > 0f)
+		{
+			_goldFreezeCooldown = Mathf.Max(0f, _goldFreezeCooldown - dt);
+		}
 		if (_gazeFreezeTimer > 0f)
 		{
 			_gazeFreezeTimer = Mathf.Max(0f, _gazeFreezeTimer - dt);
@@ -223,7 +230,7 @@ public sealed class PerkPlayer
 		return PerkEffects.GoldenFallsSlower(_perks) ? 0.75f : 1f;
 	}
 
-	/// <summary>Учёт спавна фрукта: счётчик до гарантированного золотого и заморозка «Зоны замедления» ур. 5.</summary>
+	/// <summary>Учёт спавна фрукта: счётчик до гарантированного золотого («Золотая лихорадка» ур. 5).</summary>
 	public void OnFruitSpawned(bool golden)
 	{
 		if (!golden)
@@ -232,11 +239,6 @@ public sealed class PerkPlayer
 			return;
 		}
 		_fruitsSinceLastGolden = 0;
-		float freeze = PerkEffects.GoldFreezeDuration(_perks);
-		if (freeze > 0f)
-		{
-			_worldFreezeTimer = Mathf.Max(_worldFreezeTimer, freeze);
-		}
 	}
 
 	// ---------- Урон, мусор, возрождение ----------
@@ -349,7 +351,20 @@ public sealed class PerkPlayer
 		{
 			return;
 		}
+		TryGoldFreeze(item);
 		AwardCaught(item, false);
+	}
+
+	/// <summary>Пауза поля после поимки золотого фрукта («Зона замедления» ур. 5) с перезарядкой.</summary>
+	private void TryGoldFreeze(FallingItem item)
+	{
+		if (_goldFreezeCooldown > 0f || item.ItemType != ItemType.Fruit || !item.IsGolden)
+			return;
+		float freeze = PerkEffects.GoldFreezeDuration(_perks);
+		if (freeze <= 0f)
+			return;
+		_worldFreezeTimer = Mathf.Max(_worldFreezeTimer, freeze);
+		_goldFreezeCooldown = freeze + PerkEffects.GoldFreezeCooldown;
 	}
 
 	/// <summary>
