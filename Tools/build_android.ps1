@@ -12,6 +12,10 @@
 	Поднять эмулятор, если устройств нет, и показать лог игры после запуска.
 
 .EXAMPLE
+	Tools\build_android.ps1 -Preset "Android Emulator" -AvdName Pixel_10
+	Собрать x86_64-APK пресетом для эмулятора и запустить его на эмуляторе.
+
+.EXAMPLE
 	Tools\build_android.ps1 -DryRun
 	Только проверить окружение, пресет и устройство, ничего не собирая.
 
@@ -298,6 +302,9 @@ $script:AbiToKey = @{
 	"x86"         = "architectures/x86"
 }
 
+# Пресет для x86_64-эмулятора: подсказываем его, когда архитектура не совпала с устройством.
+$script:EmulatorPresetName = "Android Emulator"
+
 
 # ---------- Устройство и эмулятор ----------
 
@@ -448,7 +455,12 @@ if ($targetAbi) {
 		}
 		else {
 			Write-Notice $message
-			Write-Notice "Варианты: запустить с -FixArch (скрипт включит архитектуру) или использовать arm64-устройство/эмулятор."
+			if ($targetAbi -eq "x86_64" -and $Preset -ne $script:EmulatorPresetName) {
+				Write-Notice "Для x86_64-эмулятора в проекте есть отдельный пресет: -Preset '$script:EmulatorPresetName'."
+			}
+			else {
+				Write-Notice "Варианты: запустить с -FixArch (скрипт включит архитектуру) или использовать устройство с ABI $targetAbi."
+			}
 			if (!$DryRun) { exit 1 }
 		}
 	}
@@ -460,6 +472,9 @@ if ($targetAbi) {
 
 
 # ---------- Сборка APK ----------
+
+# Состав APK разбирает отдельный файл, чтобы этот скрипт не разрастался.
+. (Join-Path $PSScriptRoot "apk_report.ps1")
 
 $apkDir = Split-Path -Parent $apkPath
 if (!(Test-Path -LiteralPath $apkDir)) {
@@ -483,6 +498,7 @@ if ($NoBuild) {
 	$apkInfo = Get-Item -LiteralPath $apkPath
 	Write-Info "APK: $($apkInfo.FullName)"
 	Write-Info "Размер: $([math]::Round($apkInfo.Length / 1MB, 2)) МБ, изменён $($apkInfo.LastWriteTime.ToString('dd.MM HH:mm:ss'))"
+	Show-ApkSizeReport -ApkPath $apkInfo.FullName
 }
 else {
 	Write-Step "Сборка $Mode-APK пресетом '$Preset'"
@@ -510,11 +526,19 @@ else {
 			if ($build.Code) { Fail "Сборка APK не удалась (код возврата $($build.Code))." }
 			Fail "Сборка APK не удалась - файл $apkPath не обновлён, смотрите вывод выше."
 		}
+		# Godot пишет APK до подписи: при ошибке подписи файл уже обновлён, но экспорт провален.
+		if ($build.Output -match 'Project export for preset .* failed') {
+			if ($Mode -eq "release") {
+				Write-Notice "Release-сборка подписывается release-keystore: Project -> Export -> Android -> Keystore (Release Keystore, User, Password)."
+			}
+			Fail "Экспорт пресета '$Preset' не удался - смотрите вывод выше."
+		}
 		if ($build.Output -match 'Could not find version of build tools') {
 			Write-Notice "Godot не нашёл свежие build-tools и подписал APK старой версией. Обновите Android SDK Build-Tools в SDK Manager."
 		}
 		Write-Info "APK: $($apkInfo.FullName)"
 		Write-Info "Размер: $([math]::Round($apkInfo.Length / 1MB, 2)) МБ, изменён $($apkInfo.LastWriteTime.ToString('HH:mm:ss'))"
+		Show-ApkSizeReport -ApkPath $apkInfo.FullName
 	}
 }
 
@@ -540,7 +564,7 @@ if (!$NoInstall) {
 		Write-Info $installOutput.Trim()
 		if ($installOutput -match '(?i)Failure') {
 			if ($installOutput -match 'INSTALL_FAILED_NO_MATCHING_ABIS') {
-				Write-Notice "Устройство не поддерживает архитектуры APK: пересоберите с -FixArch или используйте arm64-устройство."
+				Write-Notice "Устройство не поддерживает архитектуры APK: пересоберите с -FixArch или пресетом '$script:EmulatorPresetName' для x86_64-эмулятора."
 			}
 			elseif ($installOutput -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE|signatures do not match') {
 				Write-Notice "Ранее установленное приложение подписано другим ключом, удалите его:"

@@ -4,4 +4,13 @@
     <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
+
+  <!-- Godot 4.7 копирует в Android-APK статические архивы Mono (.a) из каталога публикации:
+       в рантайме они не нужны. Официальный фикс появится в 4.8 (godotengine/godot#122774),
+       поэтому исключаем их из публикации здесь. -->
+  <Target Name="StripMonoStaticLibraries" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(GodotTargetPlatform)' == 'android'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.a'" />
+    </ItemGroup>
+  </Target>
 </Project>

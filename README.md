@@ -417,6 +417,7 @@ Game/
 
 Tools/
 ├── build_android.ps1    — сборка Android-APK, установка на эмулятор/телефон и запуск
+├── apk_report.ps1       — разбор состава APK: что занимает место в сборке
 └── build_android.bat    — обёртка для двойного клика
 ```
 
@@ -465,13 +466,17 @@ godot --path .
 
 ### Сборка и запуск на Android
 
-Пресет **Android** уже настроен в `export_presets.cfg` (APK: `build/SwampFrog.apk`,
-архитектура `arm64-v8a`). Сборку, установку на эмулятор/телефон и запуск делает скрипт
+В `export_presets.cfg` настроены два пресета: **Android** (`build/SwampFrog.apk`,
+`arm64-v8a` — телефоны и планшеты) и **Android Emulator** (`build/SwampFrog-emulator.apk`,
+`x86_64` — эмуляторы). Сборку, установку на эмулятор/телефон и запуск делает скрипт
 в `Tools/`:
 
 ```powershell
 Tools\build_android.ps1                     # собрать, установить и запустить
 Tools\build_android.ps1 -AvdName Pixel_10 -Logs   # поднять эмулятор и показать лог игры
+Tools\build_android.ps1 -Preset "Android Emulator" -AvdName Pixel_10   # x86_64-APK для эмулятора
+Tools\build_android.ps1 -Mode release             # release-APK для телефона
+Tools\build_android.ps1 -Mode release -NoInstall -NoLaunch   # только собрать release-APK
 Tools\build_android.ps1 -NoInstall -NoLaunch      # только собрать APK
 Tools\build_android.ps1 -NoBuild                  # поставить и запустить уже собранный APK
 Tools\build_android.ps1 -DryRun                   # проверить окружение и показать команды
@@ -480,7 +485,8 @@ Tools\build_android.ps1 -DryRun                   # проверить окру�
 `Tools\build_android.bat` — та же команда для двойного клика. Скрипт находит Godot и `adb`
 (или берёт пути из `-Godot`/`-Adb`), читает путь экспорта из пресета, при необходимости
 поднимает эмулятор (`-AvdName` или единственный найденный AVD), собирает APK
-(`--export-debug`, релиз — `-Mode release`), ставит его через `adb install -r` и запускает.
+(`--export-debug`, релиз — `-Mode release`), печатает состав APK (`Tools/apk_report.ps1`),
+ставит его через `adb install -r` и запускает.
 Ключи: `-NoInstall`, `-NoLaunch`, `-NoBuild`, `-Logs`, `-DryRun`, `-FixArch`,
 `-BuildTimeout` (предел времени сборки, по умолчанию 900 с), `-ConsoleWrapper`.
 
@@ -494,10 +500,40 @@ Job Object и ждёт завершения всего дерева процес
 записи APK, скрипт снимет его дерево процессов и продолжит установку. Ключ `-ConsoleWrapper`
 возвращает прежнее поведение с console-обёрткой.
 
-**Архитектура.** Пресет собирает `arm64-v8a`. Скрипт сверяет её с ABI устройства
-(`adb shell getprop ro.product.cpu.abi`): если не совпадает (например, эмулятор x86_64),
-он предупредит про `INSTALL_FAILED_NO_MATCHING_ABIS` и предложит либо arm64-устройство,
-либо ключ `-FixArch` (включит нужную архитектуру в `export_presets.cfg`).
+**Архитектура.** Пресет **Android** собирает только `arm64-v8a`, пресет
+**Android Emulator** — только `x86_64`. Скрипт сверяет архитектуру с ABI устройства
+(`adb shell getprop ro.product.cpu.abi`): при несовпадении он предупредит про
+`INSTALL_FAILED_NO_MATCHING_ABIS` и предложит пресет для эмулятора или ключ `-FixArch`
+(включит нужную архитектуру в текущем пресете).
+
+### Размер APK
+
+APK на C# тяжёлый из-за рантайма Mono и шаблона движка, поэтому в сборку попадает
+только нужное:
+
+| Что настроено | Почему |
+|---|---|
+| Одна архитектура на пресет | `lib/<abi>/*.so` и `assets/.godot/mono/publish/<abi>` стоят ~40 МБ на каждую ABI |
+| Без статических архивов `.a` | Godot 4.7 копирует их из `dotnet publish`, хотя в рантайме они не нужны ([godot#115679](https://github.com/godotengine/godot/issues/115679), исправлено в 4.8); исключает цель `StripMonoStaticLibraries` в `SwampFrog.csproj` |
+| `dotnet/include_debug_symbols=false` | `.pdb` не уезжают в APK |
+| `dotnet/include_scripts_content=false` | исходники `.cs` не уезжают в APK |
+| `exclude_filter="Tests/*"` | тестовые сцены не попадают в сборку |
+
+Итог по пресету **Android**: было ~200 МиБ (две архитектуры, с `.a`), стало ~45 МБ.
+`Tools/build_android.ps1` печатает такой разбор после каждой сборки и предупреждает,
+если `.a` вернулись в APK.
+
+**Release.** Ключ `-Mode release` собирает релизный шаблон движка (ещё на несколько МБ
+меньше), но требует release-keystore: Project → Export → Android → Keystore
+(Release Keystore, User, Password). Без него Godot завершает экспорт ошибкой подписи,
+поэтому по умолчанию скрипт собирает debug-APK. Сборка под телефон (пресет **Android**,
+`arm64-v8a`):
+
+```powershell
+Tools\build_android.ps1 -Mode release                       # собрать release-APK, установить и запустить
+Tools\build_android.ps1 -Mode release -NoInstall -NoLaunch   # только собрать build\SwampFrog.apk
+Tools\build_android.ps1 -Mode release -Logs                  # собрать и показать лог игры
+```
 
 **Что нужно установить** (Editor Settings → Export → Android: Android SDK Path и Java SDK Path):
 
@@ -505,7 +541,8 @@ Job Object и ждёт завершения всего дерева процес
 - Android SDK: `platform-tools`, свежие `build-tools` и `platform` — иначе Godot подпишет
   APK старой версией и предупредит об этом;
 - .NET SDK 9 для Android (в `SwampFrog.csproj` для Android указан `net9.0`);
-- шаблоны экспорта: Editor → Manage Export Templates.
+- шаблоны экспорта: Editor → Manage Export Templates;
+- release-keystore для `-Mode release` (debug-подпись берётся из Editor Settings → Export → Android).
 
 **Rapier2D.** Каталог `addons/godot-rapier2d` исключён из Git и в текущей рабочей копии
 пуст (нет ни `.gdextension`, ни библиотек), поэтому расширение не подключается и физика
