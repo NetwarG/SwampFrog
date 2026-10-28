@@ -415,7 +415,7 @@ public partial class Main : Node2D
 				continue;
 			}
 
-			EllipseHitbox itemHitbox = item.GetHitbox();
+			ItemHitbox itemHitbox = item.GetHitbox();
 			for (int i = 0; i < handHitboxes.Length; i++)
 			{
 				// Рука может держать один предмет (или два — перк «Липкие ладони»); занятую пропускаем.

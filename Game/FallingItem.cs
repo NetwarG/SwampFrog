@@ -80,15 +80,42 @@ public partial class FallingItem : Node2D
 	/// <summary>Только изображение, когда физическое тело создаёт Suika.</summary>
 	public bool ManualPhysics { get; set; }
 
-	/// <summary>Полуоси эллипса коллизии в мировых единицах (учитывают масштаб и форму спрайта).</summary>
+	/// <summary>Полуоси габарита формы в мировых единицах (учитывают масштаб и силуэт спрайта).</summary>
 	public float HitRadiusX { get; set; }
 	public float HitRadiusY { get; set; }
 
 	/// <summary>
-	/// Хитбокс предмета: эллипс по форме тела фрукта в мировых координатах.
-	/// Ловля срабатывает только при пересечении эллипса с хитбоксом ладони.
+	/// Хитбокс предмета: силуэт иконки в мировых координатах. Ловля срабатывает
+	/// только при пересечении силуэта с хитбоксом ладони.
 	/// </summary>
-	public EllipseHitbox GetHitbox() => new(GlobalPosition, HitRadiusX, HitRadiusY, GlobalRotation);
+	public ItemHitbox GetHitbox()
+	{
+		FruitShape? shape = Shape;
+		if (shape == null)
+		{
+			return new EllipseHitbox(GlobalPosition, HitRadiusX, HitRadiusY, GlobalRotation);
+		}
+		return new PolygonHitbox(GlobalPosition, GlobalRotation, BaseRadius * Mathf.Max(Scale.X, 0.01f), shape.Local);
+	}
+
+	/// <summary>Форма иконки: у фруктов и мусора силуэт спрайта, у хилки спрайта нет.</summary>
+	private FruitShape? Shape => ItemType switch
+	{
+		ItemType.Trash => FruitShape.Trash,
+		ItemType.Healing => null,
+		_ => FruitShape.Of(Kind),
+	};
+
+	/// <summary>Форма тела: силуэт иконки, а у хилки без спрайта — эллипс.</summary>
+	private Shape2D ItemShape()
+	{
+		FruitShape? shape = Shape;
+		if (shape == null)
+		{
+			return ItemPhysics.Ellipse(HitRadiusX, HitRadiusY);
+		}
+		return shape.Shape(BaseRadius * Mathf.Max(Scale.X, 0.01f));
+	}
 
 	/// <summary>Насколько золотой фрукт крупнее обычного (умножение масштаба).</summary>
 	private const float GoldenSizeFactor = 1.35f;
@@ -118,9 +145,9 @@ public partial class FallingItem : Node2D
 		_rotationSpeed = _rng.RandfRange(-1.3f, 1.3f);
 
 		float baseScale = Mathf.Max(Scale.X, 0.01f);
-		// Масштаб в координатах мира умножается на случайный
-		// разброс, чтобы одинаковые предметы отличались размером; золотой — крупнее.
-		float scale = baseScale * _rng.RandfRange(0.85f, 1.08f);
+		// В классическом режиме случайный разброс делает одинаковые предметы разными;
+		// в Suika картинка должна ровно совпадать со своим физическим телом.
+		float scale = ManualPhysics ? baseScale : baseScale * _rng.RandfRange(0.85f, 1.08f);
 		if (IsGolden)
 		{
 			scale *= GoldenSizeFactor;
@@ -131,10 +158,11 @@ public partial class FallingItem : Node2D
 		// чтобы предметы сами «гуляли» по экрану и сталкивались друг с другом.
 		Velocity = new Vector2(_rng.RandfRange(-60f, 60f), FallSpeed);
 
-		// Полуоси эллипса коллизии — форма тела из спрайта (доли от BaseRadius) в мировых единицах.
-		FruitBody body = BaseBody();
-		HitRadiusX = BaseRadius * body.HitX * scale;
-		HitRadiusY = BaseRadius * body.HitY * scale;
+		// Полуоси силуэта иконки (доли от BaseRadius) в мировых единицах.
+		FruitShape? shape = Shape;
+		Vector2 fractions = shape == null ? Vector2.One : new Vector2(shape.HitX, shape.HitY);
+		HitRadiusX = BaseRadius * fractions.X * scale;
+		HitRadiusY = BaseRadius * fractions.Y * scale;
 
 		_sprite = new Sprite2D { Centered = true };
 		AddChild(_sprite);
@@ -171,7 +199,7 @@ public partial class FallingItem : Node2D
 			LinearVelocity = _velocity,
 			AngularVelocity = _rotationSpeed
 		};
-		_physicsBody.AddChild(new CollisionShape2D { Shape = ItemPhysics.Ellipse(HitRadiusX, HitRadiusY) });
+		_physicsBody.AddChild(new CollisionShape2D { Shape = ItemShape() });
 		AddChild(_physicsBody);
 		_physicsBody.GlobalPosition = GlobalPosition;
 		_physicsBody.GlobalRotation = GlobalRotation;
@@ -245,17 +273,9 @@ public partial class FallingItem : Node2D
 		_ => FruitCatalog.Get(Kind).BaseRadius,
 	};
 
-	/// <summary>Форма тела для хитбокса: у фруктов из FruitCatalog, у остальных — свои доли.</summary>
-	private FruitBody BaseBody() => ItemType switch
-	{
-		ItemType.Trash => new FruitBody(0.677f, 0.799f),
-		ItemType.Healing => new FruitBody(1f, 1f),
-		_ => FruitCatalog.Get(Kind).Body,
-	};
-
 	/// <summary>
-	/// Обновляет текстуру и масштаб спрайта под текущие ItemType/Kind. Вызывается
-	/// из сеттеров и после создания спрайта, поэтому в Suika вид меняется сразу.
+	/// Обновляет текстуру, масштаб и смещение спрайта под текущие ItemType/Kind.
+	/// Вызывается из сеттеров и после создания спрайта, поэтому в Suika вид меняется сразу.
 	/// </summary>
 	private void RefreshSprite()
 	{
@@ -275,6 +295,8 @@ public partial class FallingItem : Node2D
 		// Высота спрайта в локальных единицах — диаметр хитбокса (2 × BaseRadius):
 		// видимый размер и радиус коллизии всегда совпадают.
 		_sprite.Scale = Vector2.One * (2f * BaseRadius / texture.GetHeight());
+		// Центр непрозрачной области ставится в центр тела: иначе иконка съезжает с него.
+		_sprite.Offset = Shape?.SpriteOffset(texture.GetHeight()) ?? Vector2.Zero;
 	}
 
 	/// <summary>Текстура предмета из Game/assets или null для хилки (нет ассета).</summary>

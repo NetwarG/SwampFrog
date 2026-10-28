@@ -8,28 +8,25 @@ namespace SwampFrog;
 /// Мини-игра Suika: лягушка двигается по верхней границе и бросает фрукты в кувшин.
 /// Фрукты используют тот же FallingItem, что и основной режим, поэтому их внешний вид
 /// и последовательность развития всегда остаются синхронизированы с FruitCatalog.
-/// Движение и столкновения считает Rapier2D через стандартные физические тела Godot.
+/// Движение и столкновения считает физический движок проекта через стандартные тела Godot.
+/// Часть класса SuikaGame: см. SuikaPile.cs (фрукты в кувшине) и SuikaUi.cs (интерфейс).
 /// </summary>
 public partial class SuikaGame : Node2D
 {
-	private sealed class Piece
-	{
-		public required RigidBody2D Body;
-		public FruitKind Kind;
-		/// <summary>Локальные полуоси формы фрукта; поворот задаёт физическое тело.</summary>
-		public float RadiusX;
-		public float RadiusY;
-		public float Age;
-		public bool Removed;
-	}
-
-	private const float Restitution = 0.12f;
-	private const float FruitFriction = 0.65f;
+	private const float Restitution = 0.25f;
+	private const float FruitFriction = 0.4f;
+	/// <summary>Трение дна и стенок: горка должна сдвигаться от удара, а не упираться в дно.</summary>
+	private const float BowlFriction = 0.1f;
+	/// <summary>Затухание движения: удар брошенного фрукта не должен тонуть в вязкости.</summary>
+	private const float FruitLinearDamp = 0f;
+	private const float FruitAngularDamp = 0.3f;
+	/// <summary>Показатель роста массы: крупный фрукт тяжелее, но не «давит» мелкие намертво.</summary>
+	private const float MassExponent = 1f;
 	private const uint SuikaCollisionLayer = ItemPhysics.SuikaLayer;
 	private const float WallThickness = 12f;
 	private const float FloorInset = 4f;
 	/// <summary>Ширина кувшина в долях от ширины экрана.</summary>
-	private const float BowlWidthRatio = 0.80f;
+	private const float BowlWidthRatio = 0.8f;
 	/// <summary>Высота кувшина в долях от высоты экрана.</summary>
 	private const float BowlHeightRatio = 0.70f;
 	/// <summary>Отступ кувшина от нижнего края экрана.</summary>
@@ -55,7 +52,13 @@ public partial class SuikaGame : Node2D
 	private const float SettleSpeed = 40f;
 
 	/// <summary>Случайный боковой импульс брошенного фрукта, чтобы броски в одну точку не ложились столбцом.</summary>
-	private const float DropScatter = 52f;
+	private const float DropScatter = 70f;
+
+	/// <summary>Скорость броска вниз: у самой кромки кувшина свободного падения почти нет.</summary>
+	private const float ThrowSpeed = 520f;
+
+	/// <summary>Выпуск фрукта выше кромки кувшина — на уровне лап лягушки.</summary>
+	private const float ReleaseAboveRim = 28f;
 
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly List<Piece> _pieces = new();
@@ -301,188 +304,6 @@ public partial class SuikaGame : Node2D
 		DrawLine(new Vector2(_bowl.Position.X + 5f, dangerY), new Vector2(_bowl.End.X - 5f, dangerY), new Color(1f, 0.55f, 0.38f, 0.33f), 2f);
 	}
 
-	private void BuildUi()
-	{
-		var root = new Control { Name = "SuikaUI", MouseFilter = Control.MouseFilterEnum.Ignore };
-		_uiRoot = root;
-		if (Game?.UiHost != null) Game.UiHost.AddChild(root);
-		else
-		{
-			var layer = new CanvasLayer { Layer = 20 };
-			AddChild(layer);
-			layer.AddChild(root);
-		}
-		root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-		root.Resized += UpdateVisuals;
-
-		_scoreLabel = MakeLabel("Счёт  0", 26, new Color("ffffff"));
-		_scoreLabel.Position = new Vector2(18f, 16f);
-		root.AddChild(_scoreLabel);
-		_bestLabel = MakeLabel($"Рекорд  {_bestScore}", 20, new Color(1f, 1f, 1f, 0.62f));
-		_bestLabel.Position = new Vector2(20f, 50f);
-		root.AddChild(_bestLabel);
-
-		_stockLabel = MakeLabel("Фрукты: 0", 20, new Color("ffd45e"));
-		_stockLabel.Position = new Vector2(20f, 78f);
-		root.AddChild(_stockLabel);
-
-		_nextLabel = MakeLabel("Следующий", 22, new Color("b4e863"));
-		_nextLabel.Position = new Vector2(0f, 15f);
-		_nextLabel.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-		_nextLabel.AnchorLeft = 1f;
-		_nextLabel.AnchorRight = 1f;
-		_nextLabel.OffsetLeft = -162f;
-		_nextLabel.OffsetRight = -18f;
-		_nextLabel.HorizontalAlignment = HorizontalAlignment.Center;
-		root.AddChild(_nextLabel);
-
-		Button back = MakeButton("В меню", 24, new Color("ffd45e"), new Vector2(138f, 80f));
-		back.Position = new Vector2(16f, 112f);
-		back.Pressed += () => ExitRequested?.Invoke();
-		root.AddChild(back);
-
-		_hintLabel = MakeLabel("Отпусти, чтобы бросить", 18, new Color(1f, 1f, 1f, 0.78f));
-		_hintLabel.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
-		_hintLabel.AnchorTop = 1f;
-		_hintLabel.AnchorBottom = 1f;
-		_hintLabel.OffsetTop = -50f;
-		_hintLabel.OffsetBottom = -18f;
-		_hintLabel.HorizontalAlignment = HorizontalAlignment.Center;
-		root.AddChild(_hintLabel);
-
-		BuildStockDialog(root);
-		BuildGameOver(root);
-	}
-
-	private void BuildGameOver(Control parent)
-	{
-		_gameOverRoot = new Control { Visible = false, MouseFilter = Control.MouseFilterEnum.Stop };
-		_gameOverRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-		parent.AddChild(_gameOverRoot);
-		var shade = new ColorRect { Color = new Color(0.02f, 0.08f, 0.1f, 0.82f), MouseFilter = Control.MouseFilterEnum.Ignore };
-		shade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-		_gameOverRoot.AddChild(shade);
-
-		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-		box.AddThemeConstantOverride("separation", 14);
-		ModalContent.Mount(_gameOverRoot, box);
-		_gameOverTitle = MakeLabel("Кувшин полон", 42, new Color("ffd45e"));
-		box.AddChild(_gameOverTitle);
-		_gameOverScore = MakeLabel("Счёт: 0", 28, new Color("ffffff"));
-		box.AddChild(_gameOverScore);
-		_retryButton = MakeButton("Играть ещё", 22, new Color("b4e863"), new Vector2(300f, 54f));
-		_retryButton!.Pressed += Restart;
-		box.AddChild(_retryButton!);
-		Button menu = MakeButton("В меню", 22, new Color("ffd45e"), new Vector2(300f, 54f));
-		menu.Pressed += () => ExitRequested?.Invoke();
-		box.AddChild(menu);
-	}
-
-	/// <summary>Строит окно со списком собранных фруктов и кнопкой старта раунда.</summary>
-	private void BuildStockDialog(Control parent)
-	{
-		_stockRoot = new Control { Visible = false, MouseFilter = Control.MouseFilterEnum.Stop };
-		_stockRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-		parent.AddChild(_stockRoot);
-
-		var shade = new ColorRect { Color = new Color(0.02f, 0.08f, 0.1f, 0.82f), MouseFilter = Control.MouseFilterEnum.Ignore };
-		shade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-		_stockRoot.AddChild(shade);
-
-		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-		box.AddThemeConstantOverride("separation", 12);
-		ModalContent.Mount(_stockRoot, box);
-
-		Label title = MakeLabel("Собранные фрукты", 34, new Color("ffd45e"));
-		box.AddChild(title);
-
-		_stockListBox = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-		_stockListBox.AddThemeConstantOverride("separation", 6);
-		box.AddChild(_stockListBox);
-
-		foreach (FruitSpec spec in FruitCatalog.All)
-		{
-			Label row = MakeLabel($"{spec.Name} — 0", 24, new Color("ffffff"));
-			row.Visible = false;
-			_stockListBox!.AddChild(row);
-			_stockRows.Add(row);
-		}
-
-		_stockTotal = MakeLabel("Всего: 0", 20, new Color("b4e863"));
-		box.AddChild(_stockTotal);
-
-		Button start = MakeButton("Начать игру", 22, new Color("b4e863"), new Vector2(300f, 54f));
-		start.Pressed += StartFromStockDialog;
-		box.AddChild(start);
-	}
-
-	/// <summary>Обновляет и показывает окно со списком фруктов перед началом раунда.</summary>
-	private void ShowStockDialog()
-	{
-		if (_stockRoot == null) return;
-		int total = 0;
-		int rowIndex = 0;
-		foreach (FruitSpec spec in FruitCatalog.All)
-		{
-			Label row = _stockRows[rowIndex++];
-			int count = Game?.FruitStock(spec.Kind) ?? 0;
-			row.Text = $"{spec.Name} — {count}";
-			row.Visible = count > 0;
-			total += count;
-		}
-		if (_stockTotal != null) _stockTotal.Text = $"Всего: {total}";
-		_stockRoot.Visible = true;
-	}
-
-	/// <summary>Игрок подтвердил список — скрываем окно и начинаем раунд.</summary>
-	private void StartFromStockDialog()
-	{
-		if (_stockRoot != null) _stockRoot.Visible = false;
-		_active = true;
-		// Небольшая пауза, чтобы клик по кнопке случайно не бросил фрукт.
-		_dropCooldown = Mathf.Max(_dropCooldown, 0.35f);
-	}
-
-	private Label MakeLabel(string text, int size, Color color)
-	{
-		var label = new Label { Text = text, MouseFilter = Control.MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center };
-		label.AddThemeFontSizeOverride("font_size", size);
-		label.AddThemeColorOverride("font_color", color);
-		label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.6f));
-		label.AddThemeConstantOverride("shadow_offset_x", 2);
-		label.AddThemeConstantOverride("shadow_offset_y", 2);
-		return label;
-	}
-
-	private Button MakeButton(string text, int size, Color accent, Vector2 minSize)
-	{
-		var button = new Button
-		{
-			Text = text,
-			CustomMinimumSize = new Vector2(minSize.X, Mathf.Max(80f, minSize.Y)),
-			MouseFilter = Control.MouseFilterEnum.Pass,
-			FocusMode = Control.FocusModeEnum.None,
-			MouseDefaultCursorShape = Control.CursorShape.PointingHand
-		};
-		button.AddThemeFontSizeOverride("font_size", size);
-		button.AddThemeColorOverride("font_color", new Color("173c34"));
-		button.AddThemeColorOverride("font_pressed_color", new Color("ffffff"));
-		button.AddThemeStyleboxOverride("normal", ButtonStyle(new Color(accent, 0.9f), accent));
-		button.AddThemeStyleboxOverride("hover", ButtonStyle(accent, new Color("ffffff")));
-		button.AddThemeStyleboxOverride("pressed", ButtonStyle(new Color(accent, 0.72f), new Color("ffffff")));
-		button.AddThemeStyleboxOverride("focus", ButtonStyle(new Color(accent, 0.9f), accent));
-		return button;
-	}
-
-	private static StyleBoxFlat ButtonStyle(Color background, Color border)
-	{
-		var style = new StyleBoxFlat { BgColor = background, BorderColor = new Color(border, 0.72f) };
-		style.SetBorderWidthAll(2);
-		style.SetCornerRadiusAll(12);
-		style.ShadowColor = new Color(0f, 0f, 0f, 0.18f);
-		style.ShadowSize = 4;
-		return style;
-	}
 
 	private void BuildBowlPhysics()
 	{
@@ -491,7 +312,7 @@ public partial class SuikaGame : Node2D
 			Name = "BowlBody",
 			CollisionLayer = SuikaCollisionLayer,
 			CollisionMask = SuikaCollisionLayer,
-			PhysicsMaterialOverride = new PhysicsMaterial { Friction = FruitFriction, Bounce = 0f }
+			PhysicsMaterialOverride = new PhysicsMaterial { Friction = BowlFriction, Bounce = 0f }
 		};
 		AddChild(_bowlBody);
 		_leftWall = new CollisionPolygon2D { Name = "LeftWall" };
@@ -615,12 +436,14 @@ public partial class SuikaGame : Node2D
 		}
 		UpdateStockLabel();
 
-		FruitBody body = FruitCatalog.Get(_currentKind).Body;
+		FruitShape shape = FruitShape.Of(_currentKind);
 		float radius = FruitRadius(_currentKind);
-		float x = ClampDropX(_aimX, radius * body.HitX);
-		// Случайный боковой импульс: даже бросая в одну точку, фрукт на лету смещается
-		// вбок и при падении на горку отскакивает, а не ложится ровным столбцом.
-		CreatePiece(_currentKind, new Vector2(x, _bowl.Position.Y + radius * body.HitY + 4f), new Vector2(_rng.RandfRange(-DropScatter, DropScatter), 80f));
+		float x = ClampDropX(_aimX, radius * shape.HitX);
+		// Фрукт вылетает из лап лягушки с заметной скоростью: у самой кромки кувшина
+		// свободного падения почти нет, и слабый бросок не двигал горку.
+		CreatePiece(_currentKind,
+			new Vector2(x, _bowl.Position.Y - ReleaseAboveRim),
+			new Vector2(_rng.RandfRange(-DropScatter, DropScatter), ThrowSpeed));
 		_throwTimer = 0.24f;
 		_currentKind = _nextKind;
 		_nextKind = PickStartFruit();
@@ -689,7 +512,7 @@ public partial class SuikaGame : Node2D
 		{
 			if (piece.Body.Sleeping) continue;
 			float speed = piece.Body.LinearVelocity.Length()
-				+ Mathf.Abs(piece.Body.AngularVelocity) * Mathf.Max(piece.RadiusX, piece.RadiusY);
+				+ Mathf.Abs(piece.Body.AngularVelocity) * piece.Radius;
 			maxSpeed = Mathf.Max(maxSpeed, speed);
 		}
 		if (maxSpeed < SettleSpeed)
@@ -706,127 +529,6 @@ public partial class SuikaGame : Node2D
 		}
 	}
 
-	private Piece CreatePiece(FruitKind kind, Vector2 position, Vector2 velocity)
-	{
-		float radius = FruitRadius(kind);
-		FruitBody shape = FruitCatalog.Get(kind).Body;
-		var body = new RigidBody2D
-		{
-			Name = $"Fruit_{kind}",
-			CollisionLayer = SuikaCollisionLayer,
-			CollisionMask = SuikaCollisionLayer,
-			Mass = Mathf.Pow(radius / FruitRadius(FruitKind.Cherry), 2f),
-			PhysicsMaterialOverride = _fruitMaterial,
-			LinearDampMode = RigidBody2D.DampMode.Replace,
-			LinearDamp = 0.2f,
-			AngularDampMode = RigidBody2D.DampMode.Replace,
-			AngularDamp = 1.5f,
-			ContinuousCd = RigidBody2D.CcdMode.CastShape,
-			ContactMonitor = true,
-			MaxContactsReported = 16,
-			CanSleep = true,
-			LinearVelocity = velocity
-		};
-		var piece = new Piece { Body = body, Kind = kind, RadiusX = radius * shape.HitX, RadiusY = radius * shape.HitY };
-		body.AddChild(new CollisionShape2D { Shape = ItemPhysics.Ellipse(piece.RadiusX, piece.RadiusY) });
-		body.Position = FitPieceInsideBowl(piece, position);
-		body.BodyEntered += other => QueueMerge(piece, other);
-		_pieces.Add(piece);
-		_piecesByBody.Add(body.GetInstanceId(), piece);
-		AddChild(body);
-		CreateVisualFruit(kind, radius, body);
-		return piece;
-	}
-
-	private FallingItem CreateVisualFruit(FruitKind kind, float radius, Node2D? parent = null)
-	{
-		var item = new FallingItem { ItemType = ItemType.Fruit, Kind = kind, ManualPhysics = true };
-		(parent ?? this).AddChild(item);
-		float baseRadius = FruitCatalog.Get(kind).BaseRadius;
-		item.Scale = Vector2.One * (radius / baseRadius);
-		return item;
-	}
-
-	private float FruitRadius(FruitKind kind)
-	{
-		int order = (int)kind;
-		// Базовый радиус куска (вишня) вдвое больше прежнего (16): фрукты в Suika
-		// крупные, поэтому корзина вмещает заметно меньше плодов.
-		return 32f * Mathf.Pow(1.18f, order);
-	}
-
-	/// <summary>Проекция повёрнутой формы на ось: для линии переполнения и размещения новых тел.</summary>
-	private static float ShapeExtent(Piece piece, Vector2 axis)
-	{
-		Vector2 local = axis.Rotated(-piece.Body.Rotation);
-		return new Vector2(local.X * piece.RadiusX, local.Y * piece.RadiusY).Length();
-	}
-
-	/// <summary>Размещение при создании/ресайзе; текущие столкновения решает только физический сервер.</summary>
-	private Vector2 FitPieceInsideBowl(Piece piece, Vector2 position)
-	{
-		position.Y = Mathf.Min(position.Y, _bowl.End.Y - FloorInset - ShapeExtent(piece, Vector2.Down) - 1f);
-		float left = _bowl.Position.X + ShapeExtent(piece, Vector2.Right) + 1f;
-		float right = _bowl.End.X - ShapeExtent(piece, Vector2.Right) - 1f;
-		position.X = left <= right ? Mathf.Clamp(position.X, left, right) : _bowl.GetCenter().X;
-		return position;
-	}
-
-	/// <summary>
-	/// Ограничивает горизонтальную точку броска стенами кувшина с учётом
-	/// горизонтальной полуоси фрукта. Если фрукт шире кувшина, цель — в середине.
-	/// </summary>
-	private float ClampDropX(float x, float radius)
-	{
-		float left = _bowl.Position.X + radius + 4f;
-		float right = _bowl.End.X - radius - 4f;
-		if (left > right)
-			return _bowl.Position.X + _bowl.Size.X * 0.5f;
-		return Mathf.Clamp(x, left, right);
-	}
-
-	private void QueueMerge(Piece piece, Node other)
-	{
-		if (!_active || _gameOver || piece.Removed || piece.Kind == FruitKind.Watermelon) return;
-		if (!_piecesByBody.TryGetValue(other.GetInstanceId(), out Piece? partner)
-			|| partner.Removed || partner.Kind != piece.Kind) return;
-
-		// Достаточно сигнала от любого тела. Повторные записи отсекаются флагом Removed.
-		_pendingMerges.Enqueue((piece, partner));
-	}
-
-	private void MergeContactingPieces()
-	{
-		while (_pendingMerges.TryDequeue(out var pair))
-		{
-			Piece a = pair.A;
-			Piece b = pair.B;
-			// Одновременное касание трёх фруктов не должно использовать один фрукт дважды.
-			if (a.Removed || b.Removed) continue;
-			FruitKind mergedKind = (FruitKind)((int)a.Kind + 1);
-			Vector2 position = (a.Body.Position + b.Body.Position) * 0.5f;
-			Vector2 velocity = (a.Body.LinearVelocity + b.Body.LinearVelocity) * 0.5f;
-			RemovePiece(a);
-			RemovePiece(b);
-			CreatePiece(mergedKind, position, velocity * 0.45f);
-			_settleTime = 0f;
-			_score += 10 * ((int)mergedKind + 1);
-			_scoreLabel!.Text = $"Счёт  {_score}";
-		}
-	}
-
-	private void RemovePiece(Piece piece)
-	{
-		piece.Removed = true;
-		_pieces.Remove(piece);
-		_piecesByBody.Remove(piece.Body.GetInstanceId());
-		// QueueFree отложен до конца кадра: сразу исключаем старые тела из столкновений.
-		piece.Body.CollisionLayer = 0;
-		piece.Body.CollisionMask = 0;
-		piece.Body.Freeze = true;
-		piece.Body.Hide();
-		piece.Body.QueueFree();
-	}
 
 	private void CheckOverflow(float dt)
 	{
@@ -887,20 +589,7 @@ public partial class SuikaGame : Node2D
 		Open();
 	}
 
-	/// <summary>Обновляет индикатор остатка фруктов в запасе.</summary>
-	private void UpdateStockLabel()
-	{
-		if (_stockLabel == null) return;
-		int total = Game?.TotalFruitStock() ?? 0;
-		_stockLabel.Text = $"Фрукты: {total}";
-	}
 
-	private void ClearPieces()
-	{
-		for (int i = _pieces.Count - 1; i >= 0; i--) RemovePiece(_pieces[i]);
-		_pendingMerges.Clear();
-		_piecesByBody.Clear();
-	}
 
 	private static int LoadBestScore()
 	{

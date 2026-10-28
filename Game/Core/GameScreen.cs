@@ -151,7 +151,7 @@ public partial class GameScreen : Control
 		if (Size.X - ArenaRect.Size.X <= 1f) return;
 		float left = ArenaRect.Position.X;
 		float right = ArenaRect.End.X;
-		Color shade = new(0.01f, 0.05f, 0.05f, 0.68f);
+		Color shade = new(0.01f, 0.05f, 0.05f, 0.8f);
 		DrawRect(new Rect2(full.Position.X, full.Position.Y, left - full.Position.X, full.Size.Y), shade);
 		DrawRect(new Rect2(right, full.Position.Y, full.End.X - right, full.Size.Y), shade);
 
