@@ -7,3 +7,7 @@
 /addons/
 /Tests/
 build
+
+# Локальные параметры release-ключа: в репозиторий не попадают
+Tools/release_keystore.local.json
+Tools/*.keystore

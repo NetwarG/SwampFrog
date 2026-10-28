@@ -442,6 +442,7 @@ Game/
 Tools/
 ├── build_android.ps1    — сборка Android-APK, установка на эмулятор/телефон и запуск
 ├── apk_report.ps1       — разбор состава APK: что занимает место в сборке
+├── keystore.ps1         — поиск и создание release-keystore для подписи APK
 ├── ShapeDump.tscn       — снятие силуэтов иконок для FruitShape.cs
 └── build_android.bat    — обёртка для двойного клика
 ```
@@ -520,7 +521,8 @@ Tools\build_android.ps1 -DryRun                   # проверить окру�
 (`--export-debug`, релиз — `-Mode release`), печатает состав APK (`Tools/apk_report.ps1`),
 ставит его через `adb install -r` и запускает.
 Ключи: `-NoInstall`, `-NoLaunch`, `-NoBuild`, `-Logs`, `-DryRun`, `-FixArch`,
-`-BuildTimeout` (предел времени сборки, по умолчанию 900 с), `-ConsoleWrapper`.
+`-BuildTimeout` (предел времени сборки, по умолчанию 900 с), `-ConsoleWrapper`,
+`-ReleaseKeystore`/`-ReleaseUser`/`-ReleasePassword` (ключ для `-Mode release`).
 
 **Почему сборка может выглядеть зависшей.** Скрипт экспортирует основным исполняемым файлом
 Godot (`Godot_vX_win64.exe`), а не `*_console.exe`. Console-обёртка запускает движок внутри
@@ -556,9 +558,17 @@ APK на C# тяжёлый из-за рантайма Mono и шаблона д�
 если `.a` вернулись в APK.
 
 **Release.** Ключ `-Mode release` собирает релизный шаблон движка (ещё на несколько МБ
-меньше), но требует release-keystore: Project → Export → Android → Keystore
-(Release Keystore, User, Password). Без него Godot завершает экспорт ошибкой подписи,
-поэтому по умолчанию скрипт собирает debug-APK. Сборка под телефон (пресет **Android**,
+меньше) и подписывает APK отдельным release-ключом: debug-ключ из Editor Settings для
+релиза не подходит, а без ключа Godot падает на шаге подписи («Не удалось найти
+хранилище ключей релиза»). Ключ скрипт ищет в `-ReleaseKeystore`, переменных окружения
+`GODOT_ANDROID_KEYSTORE_RELEASE_PATH`/`_USER`/`_PASSWORD`, ключах `keystore/release*`
+пресета и в локальном файле `Tools/release_keystore.local.json`, а если ключа нет
+совсем — создаёт `%APPDATA%\Godot\keystores\release.keystore` через `keytool` (JDK берётся
+из Editor Settings → Export → Android) и сохраняет пароль в тот же локальный файл.
+Проверка идёт до сборки, поэтому о проблеме с ключом видно сразу, а не после нескольких
+минут экспорта. Пароль в `export_presets.cfg` не пишется: скрипт передаёт его Godot
+переменной окружения, а локальный файл с кредами исключён из Git — храните его отдельно,
+подпись нельзя менять между обновлениями APK. Сборка под телефон (пресет **Android**,
 `arm64-v8a`):
 
 ```powershell
@@ -574,7 +584,8 @@ Tools\build_android.ps1 -Mode release -Logs                  # собрать и
   APK старой версией и предупредит об этом;
 - .NET SDK 9 для Android (в `SwampFrog.csproj` для Android указан `net9.0`);
 - шаблоны экспорта: Editor → Manage Export Templates;
-- release-keystore для `-Mode release` (debug-подпись берётся из Editor Settings → Export → Android).
+- `keytool` из JDK для `-Mode release`: ключ скрипт создаёт сам, а debug-подпись берётся
+  из Editor Settings → Export → Android.
 
 **Rapier2D.** Каталог `addons/godot-rapier2d` исключён из Git и в текущей рабочей копии
 пуст (нет ни `.gdextension`, ни библиотек), поэтому расширение не подключается и физика

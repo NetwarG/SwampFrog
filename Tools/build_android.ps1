@@ -26,6 +26,10 @@
 .EXAMPLE
 	Tools\build_android.ps1 -BuildTimeout 300
 	Ограничить сборку пятью минутами: дольше процесс будет снят принудительно.
+
+.EXAMPLE
+	Tools\build_android.ps1 -Mode release
+	Собрать release-APK: ключ для подписи скрипт найдёт сам, а при отсутствии создаст.
 #>
 [CmdletBinding()]
 param(
@@ -41,7 +45,10 @@ param(
 	[switch]$ConsoleWrapper,
 	[int]$BuildTimeout = 900,
 	[string]$Godot = "",
-	[string]$Adb = ""
+	[string]$Adb = "",
+	[string]$ReleaseKeystore = "",
+	[string]$ReleaseUser = "",
+	[string]$ReleasePassword = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -471,10 +478,27 @@ if ($targetAbi) {
 
 
 
-# ---------- Сборка APK ----------
+# ---------- Вспомогательные файлы ----------
 
-# Состав APK разбирает отдельный файл, чтобы этот скрипт не разрастался.
+# Состав APK и release-keystore разбирают отдельные файлы, чтобы этот скрипт не разрастался.
 . (Join-Path $PSScriptRoot "apk_report.ps1")
+. (Join-Path $PSScriptRoot "keystore.ps1")
+
+# ---------- Release-keystore ----------
+
+# Release-APK подписывается только отдельным ключом: debug-ключ из Editor Settings не подходит.
+# Переменная называется $releaseKey, а не $releaseKeystore: PowerShell не различает регистр,
+# и объект ключа молча превратился бы в строку параметра -ReleaseKeystore.
+$releaseKey = $null
+if ($Mode -eq "release") {
+	$releaseKey = Get-ReleaseKeystore -Path $ReleaseKeystore -User $ReleaseUser -Password $ReleasePassword `
+		-PresetPath (Get-PresetValue -Text $presetText -Key "keystore/release") `
+		-PresetUser (Get-PresetValue -Text $presetText -Key "keystore/release_user") `
+		-PresetPassword (Get-PresetValue -Text $presetText -Key "keystore/release_password")
+	Write-Info "Release-keystore: $($releaseKey.Path) (алиас $($releaseKey.User), источник: $($releaseKey.Source))"
+}
+
+# ---------- Сборка APK ----------
 
 $apkDir = Split-Path -Parent $apkPath
 if (!(Test-Path -LiteralPath $apkDir)) {
@@ -489,6 +513,12 @@ $buildEnv = @{
 	"DOTNET_CLI_USE_MSBUILD_SERVER" = "0"
 	"DOTNET_CLI_TELEMETRY_OPTOUT" = "1"
 	"UseSharedCompilation" = "false"
+}
+# Release-ключ Godot читает из этих переменных: пароль не попадает в export_presets.cfg.
+if ($releaseKey) {
+	$buildEnv["GODOT_ANDROID_KEYSTORE_RELEASE_PATH"] = $releaseKey.Path
+	$buildEnv["GODOT_ANDROID_KEYSTORE_RELEASE_USER"] = $releaseKey.User
+	$buildEnv["GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD"] = $releaseKey.Password
 }
 $buildArguments = @("--headless", "--path", "`"$root`"", $exportArg, "`"$Preset`"", "`"$apkPath`"")
 
@@ -507,7 +537,11 @@ else {
 
 	if ($DryRun) {
 		Write-Info "& `"$godotPath`" --headless --path `"$root`" $exportArg `"$Preset`" `"$apkPath`""
-		foreach ($key in $buildEnv.Keys) { Write-Info "env: $key=$($buildEnv[$key])" }
+		foreach ($key in $buildEnv.Keys) {
+			# Пароль ключа в консоль не печатаем.
+			$value = if ($key -match 'PASSWORD') { '***' } else { $buildEnv[$key] }
+			Write-Info "env: $key=$value"
+		}
 	}
 	else {
 		$build = Invoke-BuildStreaming -FilePath $godotPath -Arguments $buildArguments -Environment $buildEnv `
@@ -528,8 +562,8 @@ else {
 		}
 		# Godot пишет APK до подписи: при ошибке подписи файл уже обновлён, но экспорт провален.
 		if ($build.Output -match 'Project export for preset .* failed') {
-			if ($Mode -eq "release") {
-				Write-Notice "Release-сборка подписывается release-keystore: Project -> Export -> Android -> Keystore (Release Keystore, User, Password)."
+			if ($releaseKey) {
+				Write-Notice "Release-APK подписывается ключом $($releaseKey.Path) (источник: $($releaseKey.Source)): проверьте пароль в $($script:KeystoreCredsPath)."
 			}
 			Fail "Экспорт пресета '$Preset' не удался - смотрите вывод выше."
 		}
