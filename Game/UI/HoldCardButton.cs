@@ -6,18 +6,19 @@ namespace SwampFrog;
 /// <summary>
 /// Карточка перка с выбором по удержанию: чтобы выбрать, нужно зажать карточку
 /// и не отпускать в течение <see cref="HoldFor"/> секунд. Случайный короткий клик
-/// выбор не срабатывает. Прогресс удержания показывается кольцом вокруг указателя.
+/// выбор не срабатывает. Прогресс удержания заполняет карточку слева направо
+/// (см. <see cref="HoldProgressFill"/>), поэтому заливка видна и под пальцем.
 /// </summary>
 public partial class HoldCardButton : Button
 {
 	/// <summary>Сколько секунд нужно удерживать карточку, чтобы выбрать перк.</summary>
 	public float HoldFor = 1f;
 
-	/// <summary>Коэффициент масштаба UI, от которого зависит размер кольца прогресса.</summary>
+	/// <summary>Коэффициент масштаба UI, от которого зависит размер заливки.</summary>
 	public float UiScale { get; set; } = 1f;
 
-	/// <summary>Цвет кольца прогресса удержания.</summary>
-	public Color BarColor { get; set; } = new Color("ffd45e");
+	/// <summary>Цвет заливки карточки при удержании.</summary>
+	public Color FillColor { get; set; } = new Color("ffd45e");
 
 	/// <summary>Прогресс удержания от 0 до 1.</summary>
 	public float HoldProgress => HoldFor <= 0f ? 1f : Mathf.Clamp(_holdTime / HoldFor, 0f, 1f);
@@ -25,7 +26,7 @@ public partial class HoldCardButton : Button
 	/// <summary>Удержание завершено, карточка выбрана.</summary>
 	public event Action? Held;
 
-	private HoldProgressRing? _holdRing;
+	private HoldProgressFill? _holdFill;
 	private float _holdTime;
 	private bool _holding;
 	private Vector2 _holdPointerPosition;
@@ -35,12 +36,9 @@ public partial class HoldCardButton : Button
 	{
 		ProcessMode = ProcessModeEnum.Always;
 
-		_holdRing = new HoldProgressRing
-		{
-			MouseFilter = MouseFilterEnum.Ignore,
-			Visible = false
-		};
-		AddChild(_holdRing);
+		_holdFill = new HoldProgressFill { UiScale = UiScale, FillColor = FillColor };
+		AddChild(_holdFill);
+		_holdFill.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 	}
 
 	public override void _GuiInput(InputEvent @event)
@@ -104,7 +102,7 @@ public partial class HoldCardButton : Button
 		}
 
 		_holdTime += (float)delta;
-		UpdateHoldRing(HoldProgress);
+		UpdateHoldFill(HoldProgress);
 		if (_holdTime >= HoldFor)
 		{
 			CancelHold();
@@ -123,7 +121,7 @@ public partial class HoldCardButton : Button
 		_holdTime = 0f;
 		_holdPointerPosition = pointerPosition;
 		_holdPointerIndex = pointerIndex;
-		UpdateHoldRing(0f);
+		UpdateHoldFill(0f);
 	}
 
 	private void UpdateHoldPointer(Vector2 pointerPosition, int pointerIndex)
@@ -134,7 +132,7 @@ public partial class HoldCardButton : Button
 		}
 
 		_holdPointerPosition = pointerPosition;
-		UpdateHoldRing(HoldProgress);
+		UpdateHoldFill(HoldProgress);
 	}
 
 	private void CancelHold()
@@ -142,44 +140,20 @@ public partial class HoldCardButton : Button
 		_holding = false;
 		_holdTime = 0f;
 		_holdPointerIndex = -1;
-		UpdateHoldRing(0f);
+		UpdateHoldFill(0f);
 	}
 
-	private void UpdateHoldRing(float progress)
+	private void UpdateHoldFill(float progress)
 	{
-		if (_holdRing == null)
+		if (_holdFill == null)
 		{
 			return;
 		}
 
-		float ui = Mathf.Max(0.85f, UiScale);
-		float diameter = 64f * ui;
-		_holdRing.Size = new Vector2(diameter, diameter);
-		_holdRing.Position = _holdPointerPosition - new Vector2(diameter, diameter) * 0.5f;
-		_holdRing.Progress = progress;
-		_holdRing.RingColor = BarColor;
-		_holdRing.Visible = _holding;
-		_holdRing.QueueRedraw();
-	}
-
-	private partial class HoldProgressRing : Control
-	{
-		public float Progress { get; set; }
-		public Color RingColor { get; set; } = new Color("ffd45e");
-
-		public override void _Draw()
-		{
-			float width = 4f;
-			Vector2 center = Size * 0.5f;
-			float radius = Mathf.Max(1f, Size.X * 0.5f - width);
-			float startAngle = -Mathf.Pi * 0.5f;
-			float endAngle = startAngle + Mathf.Tau * Mathf.Clamp(Progress, 0f, 1f);
-
-			DrawArc(center, radius, startAngle, startAngle + Mathf.Tau, 64, new Color(RingColor, 0.28f), width, true);
-			if (Progress > 0f)
-			{
-				DrawArc(center, radius, startAngle, endAngle, 64, RingColor, width, true);
-			}
-		}
+		_holdFill.Progress = progress;
+		_holdFill.FillColor = FillColor;
+		_holdFill.UiScale = UiScale;
+		_holdFill.Visible = _holding;
+		_holdFill.QueueRedraw();
 	}
 }

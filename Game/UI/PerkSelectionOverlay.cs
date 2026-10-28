@@ -148,7 +148,7 @@ public partial class PerkSelectionOverlay : Control
 		foreach (PerkOffer card in _cards)
 		{
 			PerkId id = card.Id;
-			string text = $"{card.Name}\n“{card.Tagline}”\nУр. {card.CurrentLevel}/{card.MaxLevel} → {card.CurrentLevel + 1}\n{card.NextLevelEffect}";
+			string text = $"{card.Name}\nУр. {card.CurrentLevel}/{card.MaxLevel} → {card.CurrentLevel + 1}\n{card.NextLevelEffect}";
 			HoldCardButton button = MakeCardButton(text, card.Accent, ui);
 			button.Held += () => PerkPicked?.Invoke(id);
 			_box.AddChild(button);
@@ -168,7 +168,7 @@ public partial class PerkSelectionOverlay : Control
 			MouseFilter = MouseFilterEnum.Pass,
 			MouseDefaultCursorShape = Control.CursorShape.PointingHand,
 			UiScale = ui,
-			BarColor = new Color(accent, 0.9f)
+			FillColor = new Color(accent.Lightened(0.72f), 0.95f)
 		};
 		button.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(24f * ui));
 		button.AddThemeColorOverride("font_color", new Color("173c34"));
@@ -187,10 +187,10 @@ public partial class PerkSelectionOverlay : Control
 		{
 			BgColor = background,
 			BorderColor = new Color(border, 0.72f),
-			CornerRadiusTopLeft = (int)Mathf.Round(14f * ui),
-			CornerRadiusTopRight = (int)Mathf.Round(14f * ui),
-			CornerRadiusBottomLeft = (int)Mathf.Round(14f * ui),
-			CornerRadiusBottomRight = (int)Mathf.Round(14f * ui),
+			CornerRadiusTopLeft = (int)Mathf.Round(UiStyle.CornerRadius * ui),
+			CornerRadiusTopRight = (int)Mathf.Round(UiStyle.CornerRadius * ui),
+			CornerRadiusBottomLeft = (int)Mathf.Round(UiStyle.CornerRadius * ui),
+			CornerRadiusBottomRight = (int)Mathf.Round(UiStyle.CornerRadius * ui),
 			ShadowColor = new Color(0f, 0f, 0f, shadowAlpha),
 			ShadowSize = (int)Mathf.Round(5f * ui)
 		};

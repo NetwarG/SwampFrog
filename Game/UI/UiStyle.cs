@@ -9,6 +9,9 @@ public static class UiStyle
 	public const float ButtonWidth = 330f;
 	public const float ButtonHeight = 80f;
 
+	/// <summary>Радиус скругления кнопок, карточек перков и заливки карточек.</summary>
+	public const float CornerRadius = 14f;
+
 	public static Label MakeLabel(string text, int fontSize, Color color)
 	{
 		var label = new Label
@@ -54,10 +57,10 @@ public static class UiStyle
 		{
 			BgColor = background,
 			BorderColor = new Color(border, 0.72f),
-			CornerRadiusTopLeft = (int)Mathf.Round(14f * ui),
-			CornerRadiusTopRight = (int)Mathf.Round(14f * ui),
-			CornerRadiusBottomLeft = (int)Mathf.Round(14f * ui),
-			CornerRadiusBottomRight = (int)Mathf.Round(14f * ui),
+			CornerRadiusTopLeft = (int)Mathf.Round(CornerRadius * ui),
+			CornerRadiusTopRight = (int)Mathf.Round(CornerRadius * ui),
+			CornerRadiusBottomLeft = (int)Mathf.Round(CornerRadius * ui),
+			CornerRadiusBottomRight = (int)Mathf.Round(CornerRadius * ui),
 			ShadowColor = new Color(0f, 0f, 0f, shadowAlpha),
 			ShadowSize = (int)Mathf.Round(5f * ui)
 		};
