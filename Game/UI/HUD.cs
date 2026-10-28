@@ -10,6 +10,14 @@ namespace SwampFrog;
 public partial class HUD : Control
 {
 	private const float HintDuration = 3.4f;
+
+	/// <summary>Отступ строки счёта и жизней от верхнего левого угла поля.</summary>
+	private const float CounterMarginX = 20f;
+	private const float CounterMarginY = 16f;
+
+	/// <summary>Зазор между счётом и жизнями в одной строке.</summary>
+	private const float CounterGap = 24f;
+
 	private Label? _scoreLabel;
 	private Label? _hpLabel;
 	private int _lives = 3;
@@ -139,7 +147,7 @@ public partial class HUD : Control
 
 	private void BuildCounters()
 	{
-		// Две самостоятельные надписи поверх поля, без панели и контейнеров.
+		// Две самостоятельные надписи в одной строке слева, без панели и контейнеров.
 		_scoreLabel = MakeCounter("Score", "Score: 0");
 		_hpLabel = MakeCounter("HP", $"HP: {_lives}/{_maxLives}");
 		AddChild(_scoreLabel);
@@ -148,8 +156,8 @@ public partial class HUD : Control
 	}
 
 	/// <summary>
-	/// Выдвижное меню паузы: полукруглый язычок у правого края по центру высоты,
-	/// по нажатию он сменяется выезжающей панелью с круглой кнопкой паузы
+	/// Меню паузы: кнопка с тремя точками в правом верхнем углу поля, по нажатию
+	/// она сменяется выезжающей панелью с круглой кнопкой паузы
 	/// (см. <see cref="PauseMenu"/>).
 	/// </summary>
 	private void BuildPauseMenu()
@@ -164,8 +172,7 @@ public partial class HUD : Control
 	public void HidePauseMenu() => _pauseMenu?.Collapse();
 
 	/// <summary>
-	/// Стрелка и пункт «Пауза» видны только в идущей партии и не спорят с оверлеями;
-	/// сам пункт появляется лишь при развёрнутом меню.
+	/// Кнопка паузы видна только в идущей партии и не спорит с оверлеями.
 	/// </summary>
 	private void UpdatePauseMenu() =>
 		_pauseMenu?.SetAvailable(_gameplayVisible && _perkOverlay?.Visible != true && _pauseOverlay?.Visible != true);
@@ -187,8 +194,9 @@ public partial class HUD : Control
 		if (_scoreLabel == null || _hpLabel == null) return;
 		_scoreLabel.ResetSize();
 		_hpLabel.ResetSize();
-		_scoreLabel.Position = new Vector2(20f, 16f);
-		_hpLabel.Position = new Vector2(Size.X - 20f - _hpLabel.Size.X, 16f);
+		// Счёт и жизни держатся в одной строке слева: HP встаёт сразу за счётом.
+		_scoreLabel.Position = new Vector2(CounterMarginX, CounterMarginY);
+		_hpLabel.Position = new Vector2(_scoreLabel.Position.X + _scoreLabel.Size.X + CounterGap, CounterMarginY);
 	}
 
 	private void UpdateHp()

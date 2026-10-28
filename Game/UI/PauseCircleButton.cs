@@ -7,7 +7,7 @@ namespace SwampFrog;
 /// </summary>
 public partial class PauseCircleButton : TouchArea
 {
-	private static readonly Vector2 ButtonSize = new(56f, 56f);
+	private static readonly Vector2 ButtonSize = new(64f, 64f);
 	private static readonly Color Fill = new("ffd45e");
 	private static readonly Color Outline = new(0.09f, 0.24f, 0.20f, 0.9f);
 	private static readonly Color Bars = new("173c34");
@@ -26,9 +26,9 @@ public partial class PauseCircleButton : TouchArea
 		DrawCircle(center, radius, Outline, false, 2f);
 
 		// Иконка паузы: две вертикальные полосы.
-		const float barWidth = 6f;
-		const float barHeight = 22f;
-		const float gap = 6f;
+		const float barWidth = 7f;
+		const float barHeight = 26f;
+		const float gap = 7f;
 		float top = center.Y - barHeight * 0.5f;
 		DrawRect(new Rect2(center.X - gap * 0.5f - barWidth, top, barWidth, barHeight), Bars);
 		DrawRect(new Rect2(center.X + gap * 0.5f, top, barWidth, barHeight), Bars);

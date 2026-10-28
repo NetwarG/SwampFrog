@@ -9,7 +9,7 @@ namespace SwampFrog;
 /// </summary>
 public partial class PausePanel : TouchArea
 {
-	private static readonly Vector2 PanelSize = new(104f, 88f);
+	private static readonly Vector2 PanelSize = new(112f, 96f);
 	private const float SlideDuration = 0.16f;
 	private const float CornerRadius = 16f;
 
@@ -26,7 +26,7 @@ public partial class PausePanel : TouchArea
 	/// <summary>Игрок нажал фон панели: панель нужно свернуть.</summary>
 	public event Action? BackgroundPressed;
 
-	/// <summary>Панель открыта: язычок в это время скрыт.</summary>
+	/// <summary>Панель открыта: кнопка с точками в это время скрыта.</summary>
 	public bool IsOpen => _open;
 
 	public override void _Ready()
