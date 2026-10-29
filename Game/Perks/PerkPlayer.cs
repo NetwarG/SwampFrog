@@ -30,6 +30,8 @@ public sealed class PerkPlayer
 	private int _revivesLeft;
 	/// <summary>Фрукты с момента последнего золотого (гарантия «Золотой лихорадки»).</summary>
 	private int _fruitsSinceLastGolden;
+	/// <summary>Уровень, на котором перк не предложился из-за другого оверлея.</summary>
+	private int _pendingLevel;
 
 	/// <summary>Состояние перков (уровни и занятые слоты).</summary>
 	public PerkState State => _perks;
@@ -42,6 +44,7 @@ public sealed class PerkPlayer
 		_revivesLeft = PerkEffects.ReviveCount(_perks);
 		_combo = 0;
 		_fruitsSinceLastGolden = 0;
+		_pendingLevel = 0;
 		_autoCatchTimer = PerkEffects.LightningInterval(_perks);
 		_gazeTimer = PerkEffects.GazeInterval(_perks);
 		_gazeFreezeTimer = 0f;
@@ -58,16 +61,40 @@ public sealed class PerkPlayer
 	/// <summary>Обработка уровня жабы: предложить перк или показать уведомление.</summary>
 	public void OnLevelUp(int newLevel)
 	{
-		if (Game == null || !Game.IsPlaying)
+		if (Game == null)
 		{
 			return;
 		}
-		if (_perks.WantsOffer(newLevel))
+		if (!Game.IsPlaying)
+		{
+			// Игра занята другим оверлеем (например, выбором субперка) — предложим позже.
+			if (_perks.WantsOffer(newLevel))
+				_pendingLevel = newLevel;
+			return;
+		}
+		OfferOrNotify(newLevel);
+	}
+
+	/// <summary>Повторная проверка отложенного предложения после закрытия другого оверлея.</summary>
+	public void TryOfferPending()
+	{
+		if (Game == null || !Game.IsPlaying || _pendingLevel <= 0)
+		{
+			return;
+		}
+		int level = _pendingLevel;
+		_pendingLevel = 0;
+		OfferOrNotify(level);
+	}
+
+	private void OfferOrNotify(int level)
+	{
+		if (_perks.WantsOffer(level))
 		{
 			OpenSelection();
 			return;
 		}
-		Game.HudNode?.ShowLevelUp(newLevel);
+		Game?.HudNode?.ShowLevelUp(level);
 	}
 
 	/// <summary>
@@ -426,13 +453,18 @@ public sealed class PerkPlayer
 		if (basePoints > 0)
 		{
 			int points = basePoints * PerkEffects.ComboMultiplier(_combo, _perks);
+			// Субперки «Азарт» и «Голод» дают утешительный процент к очкам.
+			points = Mathf.Max(1, Mathf.RoundToInt(points * SubPerkEffects.ScoreMultiplier(Game.SubPerks)));
 			Game.AddScore(points);
 			Game.HudNode?.SpawnPopup(Game.FrogNode?.GlobalPosition ?? item.GlobalPosition, "+" + points);
 		}
 
 		if (!fromExplosion)
 		{
-			Game.Xp.AddXp(XpSystem.XpForFruit(item.ItemType == ItemType.Fruit && item.IsGolden));
+			// Субперки «Мудрость»/«Бессонница» меняют получаемый опыт.
+			int xp = XpSystem.XpForFruit(item.ItemType == ItemType.Fruit && item.IsGolden);
+			xp = Mathf.Max(1, Mathf.RoundToInt(xp * SubPerkEffects.XpMultiplier(Game.SubPerks)));
+			Game.Xp.AddXp(xp);
 			Game.HudNode?.SetXp(Game.Xp.Level, Game.Xp.LevelProgress);
 		}
 

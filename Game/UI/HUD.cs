@@ -38,6 +38,9 @@ public partial class HUD : Control
 	/// <summary>Оверлей выбора перка (работает и на паузе игры).</summary>
 	private PerkSelectionOverlay? _perkOverlay;
 
+	/// <summary>Оверлей выбора субперка (работает и на паузе игры).</summary>
+	private SubPerkSelectionOverlay? _subPerkOverlay;
+
 	/// <summary>Оверлей паузы (работает и на паузе игры).</summary>
 	private PauseOverlay? _pauseOverlay;
 
@@ -66,6 +69,9 @@ public partial class HUD : Control
 	/// <summary>Игрок выбрал перк в оверлее выбора.</summary>
 	public event Action<PerkId>? PerkPicked;
 
+	/// <summary>Игрок выбрал субперк в оверлее выбора.</summary>
+	public event Action<SubPerkId>? SubPerkPicked;
+
 	/// <summary>Масштаб интерфейса задаётся один раз родителем GameScreen.</summary>
 	public float UiScale => 1f;
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
@@ -80,6 +86,10 @@ public partial class HUD : Control
 		_perkOverlay = new PerkSelectionOverlay { ZIndex = 80 };
 		AddChild(_perkOverlay);
 		_perkOverlay.PerkPicked += OnPerkPicked;
+
+		_subPerkOverlay = new SubPerkSelectionOverlay { ZIndex = 85 };
+		AddChild(_subPerkOverlay);
+		_subPerkOverlay.SubPerkPicked += OnSubPerkPicked;
 
 		_pauseOverlay = new PauseOverlay { ZIndex = 70 };
 		AddChild(_pauseOverlay);
@@ -101,6 +111,11 @@ public partial class HUD : Control
 	private void OnPerkPicked(PerkId id)
 	{
 		PerkPicked?.Invoke(id);
+	}
+
+	private void OnSubPerkPicked(SubPerkId id)
+	{
+		SubPerkPicked?.Invoke(id);
 	}
 
 	private void OnViewportResized()
@@ -175,7 +190,7 @@ public partial class HUD : Control
 	/// Кнопка паузы видна только в идущей партии и не спорит с оверлеями.
 	/// </summary>
 	private void UpdatePauseMenu() =>
-		_pauseMenu?.SetAvailable(_gameplayVisible && _perkOverlay?.Visible != true && _pauseOverlay?.Visible != true);
+		_pauseMenu?.SetAvailable(_gameplayVisible && _perkOverlay?.Visible != true && _subPerkOverlay?.Visible != true && _pauseOverlay?.Visible != true);
 
 	private static Label MakeCounter(string name, string text)
 	{
@@ -480,11 +495,25 @@ public partial class HUD : Control
 		UpdatePauseMenu();
 	}
 
-	/// <summary>Показывает оверлей паузы с показателями текущей партии.</summary>
-	public void ShowPause(int score, int lives)
+	/// <summary>Показывает оверлей выбора субперка с карточками одной полярности.</summary>
+	public void ShowSubPerkSelection(int level, SubPerkOffer[] cards, SubPerkPolarity polarity)
+	{
+		_subPerkOverlay?.Show(level, cards, polarity);
+		UpdatePauseMenu();
+	}
+
+	/// <summary>Скрывает оверлей выбора субперка.</summary>
+	public void HideSubPerkSelection()
+	{
+		_subPerkOverlay?.Hide();
+		UpdatePauseMenu();
+	}
+
+	/// <summary>Показывает оверлей паузы с показателями партии и списком субперков.</summary>
+	public void ShowPause(int score, int lives, SubPerkSummary[] subPerks)
 	{
 		_pauseMenu?.Collapse();
-		_pauseOverlay?.Show(score, lives);
+		_pauseOverlay?.Show(score, lives, subPerks);
 		UpdatePauseMenu();
 	}
 

@@ -14,6 +14,9 @@ public enum GameState
 	/// <summary>Игра на паузе с оверлеем выбора перка.</summary>
 	PerkSelect,
 
+	/// <summary>Игра на паузе с оверлеем выбора субперка.</summary>
+	SubPerkSelect,
+
 	/// <summary>Партия на паузе: поле замерло, открыт оверлей паузы.</summary>
 	Paused,
 }
@@ -42,6 +45,7 @@ public partial class Main : Node2D
 	private CollisionShape2D? _rightWall;
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly PerkPlayer _perkPlayer = new();
+	private readonly SubPerkPlayer _subPerkPlayer = new();
 
 	private int _score;
 	/// <summary>Секунды текущей партии — источник роста сложности.</summary>
@@ -79,6 +83,12 @@ public partial class Main : Node2D
 	public bool IsChoosingPerk => _state == GameState.PerkSelect;
 	public bool IsPaused => _state == GameState.Paused;
 
+	/// <summary>Игра на паузе с оверлеем выбора субперка.</summary>
+	public bool IsChoosingSubPerk => _state == GameState.SubPerkSelect;
+
+	/// <summary>Состояние субперков забега (для PerkPlayer и окна паузы).</summary>
+	public SubPerkState SubPerks => _subPerkPlayer.State;
+
 	/// <summary>Ставит игру на паузу выбора перка.</summary>
 	public void StartPerkPause()
 	{
@@ -94,6 +104,27 @@ public partial class Main : Node2D
 		GetTree().Paused = false;
 		_state = GameState.Playing;
 		_spawnTimer?.Start();
+		// Опыт мог поднять сразу два уровня: субперк тогда не предлагался — проверяем очередь.
+		_subPerkPlayer.TryOfferPending();
+	}
+
+	/// <summary>Ставит игру на паузу выбора субперка.</summary>
+	public void StartSubPerkPause()
+	{
+		CancelGameInput();
+		_state = GameState.SubPerkSelect;
+		_spawnTimer?.Stop();
+		GetTree().Paused = true;
+	}
+
+	/// <summary>Снимает паузу выбора субперка и возобновляет игру.</summary>
+	public void EndSubPerkPause()
+	{
+		GetTree().Paused = false;
+		_state = GameState.Playing;
+		_spawnTimer?.Start();
+		// Если на этом же уровне ждал основной перк — предлагаем его теперь.
+		_perkPlayer.TryOfferPending();
 	}
 
 	/// <summary>
@@ -112,7 +143,7 @@ public partial class Main : Node2D
 		_spawnTimerLeft = (float)(_spawnTimer?.TimeLeft ?? 0.0);
 		_spawnTimer?.Stop();
 		GetTree().Paused = true;
-		_hud?.ShowPause(_score, _lives);
+		_hud?.ShowPause(_score, _lives, _subPerkPlayer.State.PickedSnapshot());
 	}
 
 	/// <summary>Снимает паузу и возвращает партию.</summary>
@@ -149,6 +180,11 @@ public partial class Main : Node2D
 				break;
 			case GameState.Paused:
 				ResumeGame();
+				break;
+			case GameState.PerkSelect:
+				break;
+			case GameState.SubPerkSelect:
+				// Субперк пропустить нельзя — «Назад» здесь ничего не меняет.
 				break;
 			case GameState.Suika:
 				CloseSuika();
@@ -247,6 +283,7 @@ public partial class Main : Node2D
 	{
 		_rng.Randomize();
 		_perkPlayer.Game = this;
+		_subPerkPlayer.Game = this;
 
 		_frog = GetNode<Frog>("Frog");
 		_frog.Game = this;
@@ -265,6 +302,7 @@ public partial class Main : Node2D
 		_hud.RestartPressed += Restart;
 		_hud.MenuPressed += GoToMenu;
 		_hud.PerkPicked += OnPerkPicked;
+		_hud.SubPerkPicked += OnSubPerkPicked;
 		_hud.PausePressed += PauseGame;
 		_hud.BackRequested += HandleBackRequest;
 		_hud.ResumePressed += ResumeGame;
@@ -443,12 +481,19 @@ public partial class Main : Node2D
 	private void OnLevelUp(int newLevel)
 	{
 		_perkPlayer.OnLevelUp(newLevel);
+		_subPerkPlayer.OnLevelUp(newLevel);
 	}
 
 	/// <summary>Игрок выбрал перк в оверлее (HUD → PerkPlayer).</summary>
 	private void OnPerkPicked(PerkId id)
 	{
 		_perkPlayer.OnPicked(id);
+	}
+
+	/// <summary>Игрок выбрал субперк в оверлее (HUD → SubPerkPlayer).</summary>
+	private void OnSubPerkPicked(SubPerkId id)
+	{
+		_subPerkPlayer.OnPicked(id);
 	}
 
 	private void CatchItem(FallingItem item, int handIndex)
@@ -510,14 +555,15 @@ public partial class Main : Node2D
 		var item = new FallingItem();
 		Vector2 size = ViewSize;
 
-		float trashWeight = Difficulty.TrashChance(_runTime);
+		float trashWeight = Difficulty.TrashChance(_runTime) * SubPerkEffects.TrashChanceMultiplier(_subPerkPlayer.State);
 		float goldenChance = Mathf.Min(0.34f, _perkPlayer.GoldenSpawnChance());
 		bool guaranteedGolden = _perkPlayer.IsGoldenGuaranteed();
 
 		ItemType type;
 		bool golden = false;
 		// Хилка выпадает только при неполных жизнях и с очень маленьким шансом.
-		if (!guaranteedGolden && _lives < MaxLives && _rng.Randf() < HealSpawnChance)
+		float healChance = HealSpawnChance * SubPerkEffects.HealChanceMultiplier(_subPerkPlayer.State);
+		if (!guaranteedGolden && _lives < MaxLives && _rng.Randf() < healChance)
 		{
 			type = ItemType.Healing;
 		}
@@ -547,6 +593,8 @@ public partial class Main : Node2D
 		}
 
 		float speed = Difficulty.FallSpeed(_runTime) + _rng.RandfRange(-25f, 25f);
+		// «Голод»: субперк ускоряет падение всех предметов.
+		speed *= SubPerkEffects.FallSpeedMultiplier(_subPerkPlayer.State);
 		if (golden)
 		{
 			// «Золотая лихорадка» ур. 4: золотой падает медленнее обычного.
@@ -577,7 +625,7 @@ public partial class Main : Node2D
 		{
 			return;
 		}
-		_spawnTimer.WaitTime = Difficulty.SpawnInterval(_runTime, _rng);
+		_spawnTimer.WaitTime = Difficulty.SpawnInterval(_runTime, _rng) / SubPerkEffects.SpawnRateMultiplier(_subPerkPlayer.State);
 	}
 
 	// ---------- Игровой цикл ----------
@@ -592,6 +640,7 @@ public partial class Main : Node2D
 		_suika?.Close();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		if (_frog != null) _frog.Visible = true;
 		_state = GameState.Playing;
@@ -622,6 +671,8 @@ public partial class Main : Node2D
 		_frog!.Visible = false;
 		_hud?.HideStart();
 		_hud?.HideGameOver();
+		_hud?.HidePerkSelection();
+		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		_hud?.SetGameplayVisible(false);
 		_suika?.Open();
@@ -632,6 +683,7 @@ public partial class Main : Node2D
 		_suika?.Close();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		UpdateSuikaButton();
 		ResetMainRoundData();
@@ -648,6 +700,7 @@ public partial class Main : Node2D
 		_spawnTimer?.Stop();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		ClearMainRound();
 		ResetMainRoundData();
@@ -680,6 +733,7 @@ public partial class Main : Node2D
 		_frog?.ResetForRound();
 		PositionFrog();
 		_perkPlayer.Reset();
+		_subPerkPlayer.Reset();
 		_lives = MaxLives;
 		ResetXp();
 		_hud?.SetMaxLives(MaxLives);
@@ -700,6 +754,7 @@ public partial class Main : Node2D
 		// На случай завершения во время паузы выбора перка (теоретически невозможно).
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		if (_score > _highScore)
 		{
@@ -715,6 +770,7 @@ public partial class Main : Node2D
 		ClearMainRound();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
+		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		_frog!.Visible = true;
 
@@ -761,6 +817,9 @@ public partial class Main : Node2D
 	private void RegisterCollectedFruit(FruitKind kind)
 	{
 		_fruitStock[kind] = StockOf(kind) + 1;
+		// «Запасливость»: с накопленным шансом фрукт попадает в запас дважды.
+		if (_rng.Randf() < SubPerkEffects.StockDoubleChance(_subPerkPlayer.State))
+			_fruitStock[kind] = StockOf(kind) + 1;
 		SaveCollectedFruits();
 		UpdateSuikaButton();
 	}
