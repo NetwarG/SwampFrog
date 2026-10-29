@@ -429,7 +429,7 @@ public partial class HUD : Control
 		float ui = UiScale;
 		var hint = new Label
 		{
-			Text = "Держи палец на экране — руки растут",
+			Text = "Держи палец на экране — руки тянутся к нему",
 			MouseFilter = MouseFilterEnum.Ignore,
 			AnchorLeft = 0.5f,
 			AnchorRight = 0.5f,

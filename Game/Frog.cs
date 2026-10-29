@@ -5,12 +5,13 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Лягушка с вытягивающимися руками. Пока палец зажат — руки растут в направлении
-/// точки касания (направление можно менять, двигая палец). Отпустил — руки втягиваются.
+/// Лягушка с вытягивающимися руками. Пока палец зажат — руки растут к точке касания:
+/// палец задаёт и направление, и длину вылета (расстояние от лягушки до пальца).
+/// Отпустил — руки втягиваются и доставляют пойманное.
 /// Тело — спрайт из Game/assets/frogs (позы idle/catching/eating/angry), а руки и ладони
 /// рисуются процедурно: они динамически следуют за пальцем и задают хитбоксы ловли.
 /// Вся геометрия рук хранится в «мировых» единицах (как и границы экрана), поэтому руки
-/// всегда дотягиваются до любого угла экрана на любом разрешении.
+/// дотягиваются до любого угла экрана на любом разрешении.
 /// </summary>
 public partial class Frog : Node2D
 {
@@ -341,17 +342,22 @@ public partial class Frog : Node2D
 		QueueRedraw();
 	}
 
-	/// <summary>Обе руки обновляются на физическом такте до проверки ловли в Main.</summary>
+	/// <summary>
+	/// Обе руки обновляются на физическом такте до проверки ловли в Main.
+	/// Вылет задаёт палец: длина руки стремится к расстоянию от лягушки до точки удержания,
+	/// поэтому рука останавливается на пальце, а не тянется сразу до краёв поля.
+	/// </summary>
 	public void UpdateArms(float dt)
 	{
 		if (!CanAct || Game == null) return;
 		_sag = new ArmSag.Profile(ComputeMaxArmLength(Game.ViewSize), _currentUiScale);
 		UpdateArmLengths(_sag.MaxArmLength);
+		float reach = _holding ? GlobalPosition.DistanceTo(_aimTarget) : 0f;
 		for (int i = 0; i < _armLengthsWorld.Length; i++)
 		{
-			_armLengthsWorld[i] = _holding
-				? _armLengthsWorld[i] + _armGrowSpeedWorld * dt
-				: Mathf.Max(0f, _armLengthsWorld[i] - _armRetractSpeedWorld * dt);
+			// Палец ближе — рука втягивается быстрее, чем растёт.
+			float speed = _armLengthsWorld[i] < reach ? _armGrowSpeedWorld : _armRetractSpeedWorld;
+			_armLengthsWorld[i] = Mathf.MoveToward(_armLengthsWorld[i], reach, speed * dt);
 		}
 		ConstrainHands();
 		UpdateCaughtItems();
@@ -446,6 +452,10 @@ public partial class Frog : Node2D
 		}
 		return float.PositiveInfinity;
 	}
+
+	/// <summary>Текущий вылет руки в мировых единицах (0 — верхняя рука, 1 — нижняя).</summary>
+	public float ArmLengthWorld(int handIndex) =>
+		handIndex >= 0 && handIndex < _armLengthsWorld.Length ? _armLengthsWorld[handIndex] : 0f;
 
 	/// <summary>Мировые позиции обеих ладоней (в координатах сцены).</summary>
 	public Vector2[] GetHandPositions()
@@ -543,7 +553,9 @@ public partial class Frog : Node2D
 
 	/// <summary>
 	/// Пока руки не вернулись полностью — пойманный предмет следует за своей ладонью.
-	/// Как только длина рук стала нулевой — фрукт «сдан» лягушке (событие начисляет очки и удаляет предмет).
+	/// Как только после отпускания длина руки стала нулевой — фрукт «сдан» лягушке
+	/// (событие начисляет очки и удаляет предмет). Палец, прижатый к лягушке, руку
+	/// возвращает, но доставку не запускает: она идёт только по отпусканию.
 	/// </summary>
 	private void UpdateCaughtItems()
 	{
@@ -556,7 +568,7 @@ public partial class Frog : Node2D
 				_caughtItems.RemoveAt(i);
 				continue;
 			}
-			if (_armLengthsWorld[entry.HandIndex] <= 0f)
+			if (!_holding && _armLengthsWorld[entry.HandIndex] <= 0f)
 			{
 				_caughtItems.RemoveAt(i);
 				(returned ??= new List<FallingItem>()).Add(entry.Item);
