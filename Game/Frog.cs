@@ -24,7 +24,10 @@ public partial class Frog : Node2D
 	/// <summary>Время полного вытягивания рук от нуля до максимума, секунды.</summary>
 	private const float FullExtendTime = 0.8f;
 	private const float RetractScale = 1.55f;
-	private const float HandSpreadDeg = 13f;
+
+	/// <summary>Разворот ладоней от направления прицела: верхняя рука на +13°, нижняя на −13°.</summary>
+	public const float HandSpreadDeg = 13f;
+
 	private const float MinCatchLengthPx = 50f;
 
 	/// <summary>Отступ ладони от края экрана (в базовых единицах, затем умножается на UiScale).</summary>
@@ -74,6 +77,8 @@ public partial class Frog : Node2D
 	private readonly float[] _armLengthsWorld = new float[2];
 	private float _armGrowSpeedWorld;
 	private float _armRetractSpeedWorld;
+	/// <summary>Профиль провиса рук: предел длины и масштаб поля (см. Game/Core/ArmSag.cs).</summary>
+	private ArmSag.Profile _sag = new(MinReach, 1f);
 	private bool _holding;
 	private int _pointerIndex = -1;
 	private float _flash;
@@ -126,6 +131,7 @@ public partial class Frog : Node2D
 	{
 		_currentUiScale = uiScale;
 		if (!_pulsing) Scale = Vector2.One * uiScale;
+		_sag = new ArmSag.Profile(Game != null ? ComputeMaxArmLength(Game.ViewSize) : _sag.MaxArmLength, uiScale);
 		ConstrainHands();
 		UpdateBodyState();
 	}
@@ -339,7 +345,8 @@ public partial class Frog : Node2D
 	public void UpdateArms(float dt)
 	{
 		if (!CanAct || Game == null) return;
-		UpdateArmLengths(ComputeMaxArmLength(Game.ViewSize));
+		_sag = new ArmSag.Profile(ComputeMaxArmLength(Game.ViewSize), _currentUiScale);
+		UpdateArmLengths(_sag.MaxArmLength);
 		for (int i = 0; i < _armLengthsWorld.Length; i++)
 		{
 			_armLengthsWorld[i] = _holding
@@ -414,33 +421,30 @@ public partial class Frog : Node2D
 
 	/// <summary>
 	/// Максимальная длина одной руки до края с запасом под пальцы и увеличенный хитбокс перка.
+	/// Провис опускает ладонь тем сильнее, чем длиннее рука, поэтому предел по высоте
+	/// считается вместе с ним.
 	/// </summary>
 	private float ComputeMaxArmLengthInDirection(Vector2 viewSize, int handIndex)
 	{
 		float margin = Mathf.Max(HandScreenMargin * _currentUiScale, HandHitRadiusWorld);
-		Vector2 o = GlobalPosition;
 		Vector2 dir = HandDirection(handIndex);
-		float maxLen = float.PositiveInfinity;
+		// Провис вертикальный: на предел по горизонтали он не влияет.
+		float cap = Mathf.Min(MaxArmLengthAlongX(viewSize, dir, margin), _sag.MaxArmLength);
+		return _sag.FitLengthInsideHeight(GlobalPosition, dir, DownWorld, margin, viewSize.Y - margin, cap);
+	}
 
+	/// <summary>Предел длины руки по горизонтали: дальше ладонь вышла бы за боковую кромку.</summary>
+	private float MaxArmLengthAlongX(Vector2 viewSize, Vector2 dir, float margin)
+	{
 		if (dir.X > 0.0001f)
 		{
-			maxLen = Mathf.Min(maxLen, (viewSize.X - margin - o.X) / dir.X);
+			return (viewSize.X - margin - GlobalPosition.X) / dir.X;
 		}
-		else if (dir.X < -0.0001f)
+		if (dir.X < -0.0001f)
 		{
-			maxLen = Mathf.Min(maxLen, (margin - o.X) / dir.X);
+			return (margin - GlobalPosition.X) / dir.X;
 		}
-
-		if (dir.Y > 0.0001f)
-		{
-			maxLen = Mathf.Min(maxLen, (viewSize.Y - margin - o.Y) / dir.Y);
-		}
-		else if (dir.Y < -0.0001f)
-		{
-			maxLen = Mathf.Min(maxLen, (margin - o.Y) / dir.Y);
-		}
-
-		return Mathf.Max(0f, maxLen);
+		return float.PositiveInfinity;
 	}
 
 	/// <summary>Мировые позиции обеих ладоней (в координатах сцены).</summary>
@@ -476,11 +480,18 @@ public partial class Frog : Node2D
 		};
 	}
 
-	/// <summary>Мировая позиция ладони (0 — верхняя, 1 — нижняя). Общая для ловли и для «прилипших» фруктов.</summary>
-	private Vector2 HandPositionWorld(int handIndex)
-	{
-		return GlobalPosition + HandDirection(handIndex) * _armLengthsWorld[handIndex];
-	}
+	/// <summary>
+	/// Мировая позиция ладони (0 — верхняя, 1 — нижняя): направление руки плюс её провис.
+	/// Общая для ловли, «прилипших» фруктов и магнита перка.
+	/// </summary>
+	private Vector2 HandPositionWorld(int handIndex) => HandPositionWorld(handIndex, _armLengthsWorld[handIndex]);
+
+	/// <summary>Мировая позиция ладони при заданной длине руки — нужна для поиска предела у кромок.</summary>
+	private Vector2 HandPositionWorld(int handIndex, float armLength) =>
+		_sag.HandPosition(GlobalPosition, HandDirection(handIndex), DownWorld, armLength);
+
+	/// <summary>Направление, в которое провисают ладони (вниз по экрану).</summary>
+	private Vector2 DownWorld => Vector2.Down.Rotated(GlobalRotation);
 
 	private Vector2 HandDirection(int handIndex) => _direction.Rotated(Mathf.DegToRad(handIndex == 0 ? HandSpreadDeg : -HandSpreadDeg));
 
@@ -587,19 +598,39 @@ public partial class Frog : Node2D
 		for (int i = 0; i < _armLengthsWorld.Length; i++)
 		{
 			if (!(DecorativeOnly && ThrowPose) && _armLengthsWorld[i] <= 2f) continue;
-			Vector2 dir = HandDirection(i).Rotated(-GlobalRotation);
-			Vector2 handLocal = DecorativeOnly ? dir * 54f : ToLocal(HandPositionWorld(i));
-			DrawLine(Vector2.Zero, handLocal, SkinDark, 10f * unit);
-			DrawLine(Vector2.Zero, handLocal, Skin, 5f * unit);
-			DrawCircle(handLocal, 15f * unit, HandDark);
-			DrawCircle(handLocal, 12f * unit, Hand);
+			DrawArm(i, unit);
+		}
+	}
 
-			float angle = dir.Angle();
-			for (int fingerIndex = -1; fingerIndex <= 1; fingerIndex++)
-			{
-				Vector2 finger = Vector2.FromAngle(angle + fingerIndex * 0.75f);
-				DrawCircle(handLocal + finger * (14f * unit), 4.5f * unit, Hand);
-			}
+	/// <summary>
+	/// Рука рисуется изогнутой ломаной: чем дальше вытянута, тем сильнее провисает.
+	/// Концом кривой остаётся ладонь, поэтому рисунок и хитбокс ловли совпадают.
+	/// </summary>
+	private void DrawArm(int handIndex, float unit)
+	{
+		Vector2 dirLocal = HandDirection(handIndex).Rotated(-GlobalRotation);
+		Vector2 handLocal = DecorativeOnly ? dirLocal * 54f : ToLocal(HandPositionWorld(handIndex));
+		float dropLocal = _sag.Drop(_armLengthsWorld[handIndex]) * unit;
+		Vector2 control = ArmSag.ControlPoint(Vector2.Zero, handLocal, Vector2.Down, dropLocal);
+
+		Vector2 previous = Vector2.Zero;
+		for (int segment = 1; segment <= ArmSag.Segments; segment++)
+		{
+			Vector2 point = ArmSag.Point(Vector2.Zero, control, handLocal, segment / (float)ArmSag.Segments);
+			DrawLine(previous, point, SkinDark, 10f * unit);
+			DrawLine(previous, point, Skin, 5f * unit);
+			previous = point;
+		}
+		DrawCircle(handLocal, 15f * unit, HandDark);
+		DrawCircle(handLocal, 12f * unit, Hand);
+
+		// Кисть свисает: чем сильнее провис, тем больше ладонь смотрит вниз.
+		float tilt = DecorativeOnly ? 0f : ArmSag.PalmTilt(_sag.Amount(_armLengthsWorld[handIndex]));
+		float angle = dirLocal.Angle() + tilt;
+		for (int fingerIndex = -1; fingerIndex <= 1; fingerIndex++)
+		{
+			Vector2 finger = Vector2.FromAngle(angle + fingerIndex * 0.75f);
+			DrawCircle(handLocal + finger * (14f * unit), 4.5f * unit, Hand);
 		}
 	}
 }
