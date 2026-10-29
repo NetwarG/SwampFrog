@@ -60,6 +60,7 @@ public partial class SuikaGame
 
 		BuildStockDialog(root);
 		BuildGameOver(root);
+		BuildHelp(root);
 	}
 
 	private void BuildGameOver(Control parent)
@@ -149,6 +150,7 @@ public partial class SuikaGame
 		_active = true;
 		// Небольшая пауза, чтобы клик по кнопке случайно не бросил фрукт.
 		_dropCooldown = Mathf.Max(_dropCooldown, 0.35f);
+		UpdateHelpButton();
 	}
 
 	private Label MakeLabel(string text, int size, Color color)

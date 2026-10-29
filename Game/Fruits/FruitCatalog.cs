@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -16,6 +17,18 @@ public record FruitSpec(FruitKind Kind, string Name, float BaseRadius, bool Acti
 public sealed class FruitCatalog
 {
 	public static FruitSpec Get(FruitKind kind) => All.Where(f => f.Kind == kind).First();
+
+	/// <summary>Кэш текстур иконок: предметы и подсказка используют один и тот же файл.</summary>
+	private static readonly Dictionary<FruitKind, Texture2D?> Icons = new();
+
+	/// <summary>Текстура иконки фрукта из Game/assets/fruits или null, если ассета нет.</summary>
+	public static Texture2D? Icon(FruitKind kind)
+	{
+		if (Icons.TryGetValue(kind, out Texture2D? cached)) return cached;
+		Texture2D? loaded = GD.Load<Texture2D>($"res://Game/assets/fruits/{kind.ToString().ToLower()}.png");
+		Icons[kind] = loaded;
+		return loaded;
+	}
 
 	/// <summary>Все виды фруктов (включая те, что для других режимов).</summary>
 	public static FruitSpec[] All =

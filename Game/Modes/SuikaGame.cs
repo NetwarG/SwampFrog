@@ -60,6 +60,9 @@ public partial class SuikaGame : Node2D
 	/// <summary>Выпуск фрукта выше кромки кувшина — на уровне лап лягушки.</summary>
 	private const float ReleaseAboveRim = 28f;
 
+	/// <summary>Зазор между низом тела лягушки и верхом фрукта в лапе.</summary>
+	private const float FrogFruitGap = 8f;
+
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly List<Piece> _pieces = new();
 	private readonly Dictionary<ulong, Piece> _piecesByBody = new();
@@ -112,6 +115,11 @@ public partial class SuikaGame : Node2D
 	private readonly List<Label> _stockRows = new();
 	private bool _stockEmpty;
 
+	/// <summary>Окно подсказки «Как играть» и круглая кнопка «?».</summary>
+	private HelpShade? _helpRoot;
+	private HelpCircleButton? _helpButton;
+	private bool _helpOpen;
+
 	public Main? Game { get; set; }
 	public event Action? ExitRequested;
 
@@ -123,6 +131,7 @@ public partial class SuikaGame : Node2D
 		UpdateBowl();
 		UpdateFrog(0f);
 		UpdateVisuals();
+		UpdateHelpButtonPosition();
 	}
 
 	public override void _Ready()
@@ -181,6 +190,7 @@ public partial class SuikaGame : Node2D
 		// Окно со списком собранных фруктов: раунд начнётся после нажатия «Начать игру».
 		_active = false;
 		ShowStockDialog();
+		UpdateHelpButton();
 	}
 
 	public void Close()
@@ -194,6 +204,7 @@ public partial class SuikaGame : Node2D
 		ClearPieces();
 		if (_gameOverRoot != null) _gameOverRoot.Visible = false;
 		if (_stockRoot != null) _stockRoot.Visible = false;
+		CloseHelp();
 		if (_uiRoot != null) _uiRoot.Visible = false;
 		Visible = false;
 	}
@@ -224,7 +235,7 @@ public partial class SuikaGame : Node2D
 
 	public void HandleGameInput(InputEvent input)
 	{
-		if (!_active || _gameOver) return;
+		if (!_active || _gameOver || _helpOpen) return;
 		if (input is InputEventScreenTouch touch)
 		{
 			if (touch.Canceled)
@@ -376,14 +387,15 @@ public partial class SuikaGame : Node2D
 		if (_frog == null) return;
 		float x = Mathf.Clamp(_aimX, _bowl.Position.X + 45f, _bowl.End.X - 45f);
 		_aimX = x;
-		_frog.Position = new Vector2(x, 103f);
 		_frog.SyncUiScale(0.56f);
+		// Лягушка висит прямо над фруктом в лапе: он вылетает из-под её лап, а высота
+		// считается от кромки кувшина, поэтому высокий экран не увеличивает разрыв.
+		float heldTop = _bowl.Position.Y - ReleaseAboveRim - (_heldFruit?.VisualRadius ?? 0f);
+		_frog.Position = new Vector2(x, heldTop - FrogFruitGap - _frog.VisualHeight * 0.5f);
 		_frog.ThrowPose = _throwTimer > 0f;
 		_frog.SetLookTarget(new Vector2(x, _bowl.Position.Y));
 		if (_heldFruit != null)
-		{
-			_heldFruit.Position = new Vector2(x, _bowl.Position.Y - 28f);
-		}
+			_heldFruit.Position = new Vector2(x, _bowl.Position.Y - ReleaseAboveRim);
 	}
 
 	private void UpdateVisuals()
@@ -555,6 +567,9 @@ public partial class SuikaGame : Node2D
 	{
 		_gameOver = true;
 		_active = true;
+		// Окно подсказки уступает место итогам раунда.
+		CloseHelp();
+		UpdateHelpButton();
 		_pendingMerges.Clear();
 		foreach (Piece piece in _pieces)
 		{

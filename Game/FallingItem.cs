@@ -265,6 +265,9 @@ public partial class FallingItem : Node2D
 		SyncFromPhysics();
 	}
 
+	/// <summary>Радиус видимой иконки в мировых единицах: спрайт нормирован по BaseRadius текущего вида.</summary>
+	public float VisualRadius => BaseRadius * Mathf.Max(Scale.X, 0.01f);
+
 	/// <summary>Базовый радиус предмета без учёта масштаба.</summary>
 	private float BaseRadius => ItemType switch
 	{
@@ -302,13 +305,9 @@ public partial class FallingItem : Node2D
 	/// <summary>Текстура предмета из Game/assets или null для хилки (нет ассета).</summary>
 	private Texture2D? LoadItemTexture()
 	{
-		string path = ItemType switch
-		{
-			ItemType.Trash => "res://Game/assets/fruits/trash.png",
-			ItemType.Healing => string.Empty,
-			_ => "res://Game/assets/fruits/" + Kind.ToString().ToLower() + ".png",
-		};
-		return path.Length == 0 ? null : LoadTextureAt(path);
+		if (ItemType == ItemType.Trash) return LoadTextureAt("res://Game/assets/fruits/trash.png");
+		// У хилки ассета нет, а фрукты рисует та же иконка, что и цепочка слияния в подсказке.
+		return ItemType == ItemType.Healing ? null : FruitCatalog.Icon(Kind);
 	}
 
 	private static Texture2D LoadTextureAt(string path)

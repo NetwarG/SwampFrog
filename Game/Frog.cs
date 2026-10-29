@@ -100,6 +100,9 @@ public partial class Frog : Node2D
 	/// <summary>Текущий коэффициент масштаба UI/мира, чтобы лягушка не «худела» на больших экранах.</summary>
 	public float UiScale => _currentUiScale;
 
+	/// <summary>Высота видимой части тела в мировых единицах: спрайт центрирован по Position.</summary>
+	public float VisualHeight => BodyVisualHeight * _currentUiScale;
+
 	/// <summary>Радиус хитбокса ладони в мировых единицах (учитывает масштаб ноды и множитель перка «Липкие ладони»).</summary>
 	public float HandHitRadiusWorld => HandHitRadiusLocal * _currentUiScale * CatchRadiusMultiplier;
 
