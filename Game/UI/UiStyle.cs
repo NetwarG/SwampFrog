@@ -69,4 +69,36 @@ public static class UiStyle
 		style.ContentMarginRight = 18f * ui;
 		return style;
 	}
+
+	/// <summary>
+	/// Рисует скруглённую панель с обводкой в заданном прямоугольнике.
+	/// Используется кнопками и ползунком звука вместо готовых стилей.
+	/// </summary>
+	public static void DrawRoundedPanel(CanvasItem target, Rect2 rect, float radius, Color fill, Color outline, float width)
+	{
+		float x = rect.Position.X;
+		float y = rect.Position.Y;
+		float w = rect.Size.X;
+		float h = rect.Size.Y;
+
+		target.DrawRect(new Rect2(x + radius, y, w - radius * 2f, h), fill);
+		target.DrawRect(new Rect2(x, y + radius, w, h - radius * 2f), fill);
+		target.DrawCircle(new Vector2(x + radius, y + radius), radius, fill);
+		target.DrawCircle(new Vector2(x + w - radius, y + radius), radius, fill);
+		target.DrawCircle(new Vector2(x + radius, y + h - radius), radius, fill);
+		target.DrawCircle(new Vector2(x + w - radius, y + h - radius), radius, fill);
+
+		if (width <= 0f || outline.A <= 0f)
+			return;
+
+		float inner = Mathf.Max(1f, radius - width * 0.5f);
+		target.DrawLine(new Vector2(x + radius, y + width * 0.5f), new Vector2(x + w - radius, y + width * 0.5f), outline, width);
+		target.DrawLine(new Vector2(x + radius, y + h - width * 0.5f), new Vector2(x + w - radius, y + h - width * 0.5f), outline, width);
+		target.DrawLine(new Vector2(x + width * 0.5f, y + radius), new Vector2(x + width * 0.5f, y + h - radius), outline, width);
+		target.DrawLine(new Vector2(x + w - width * 0.5f, y + radius), new Vector2(x + w - width * 0.5f, y + h - radius), outline, width);
+		target.DrawArc(new Vector2(x + radius, y + radius), inner, Mathf.Pi, Mathf.Pi * 1.5f, 8, outline, width);
+		target.DrawArc(new Vector2(x + w - radius, y + radius), inner, Mathf.Pi * 1.5f, Mathf.Pi * 2f, 8, outline, width);
+		target.DrawArc(new Vector2(x + w - radius, y + h - radius), inner, 0f, Mathf.Pi * 0.5f, 8, outline, width);
+		target.DrawArc(new Vector2(x + radius, y + h - radius), inner, Mathf.Pi * 0.5f, Mathf.Pi, 8, outline, width);
+	}
 }

@@ -291,6 +291,10 @@ public partial class HUD : Control
 		madeByText.OffsetBottom = -(int)Mathf.Round(10f * ui);
 		madeByText.HorizontalAlignment = HorizontalAlignment.Center;
 		_startRoot.AddChild(madeByText);
+
+		// Управление звуком показывается вместе с меню и скрывается вместе с ним:
+		// в партии, Suika и оверлеях его нет (см. SoundControls).
+		_startRoot.AddChild(new SoundControls { ZIndex = 20 });
 	}
 
 	/// <summary>Показывает главное меню с запуском режимов и выходом.</summary>

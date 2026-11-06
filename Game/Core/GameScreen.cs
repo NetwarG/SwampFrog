@@ -39,6 +39,9 @@ public partial class GameScreen : Control
 		AddChild(_image);
 		_ui = new Control { Name = "SafeUI", MouseFilter = MouseFilterEnum.Ignore };
 		AddChild(_ui);
+		// Сохранённые громкость и mute применяются до запуска музыки.
+		SoundSettings.Load();
+		AddChild(new BackgroundMusic { Name = "BackgroundMusic" });
 		RefreshLayout();
 		Game = GD.Load<PackedScene>("res://Scenes/Main.tscn").Instantiate<Main>();
 		Game.ConfigureViewSize(_worldSize);
