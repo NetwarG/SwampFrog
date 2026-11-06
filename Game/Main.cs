@@ -14,9 +14,6 @@ public enum GameState
 	/// <summary>Игра на паузе с оверлеем выбора перка.</summary>
 	PerkSelect,
 
-	/// <summary>Игра на паузе с оверлеем выбора субперка.</summary>
-	SubPerkSelect,
-
 	/// <summary>Партия на паузе: поле замерло, открыт оверлей паузы.</summary>
 	Paused,
 }
@@ -83,9 +80,6 @@ public partial class Main : Node2D
 	public bool IsChoosingPerk => _state == GameState.PerkSelect;
 	public bool IsPaused => _state == GameState.Paused;
 
-	/// <summary>Игра на паузе с оверлеем выбора субперка.</summary>
-	public bool IsChoosingSubPerk => _state == GameState.SubPerkSelect;
-
 	/// <summary>Состояние субперков забега (для PerkPlayer и окна паузы).</summary>
 	public SubPerkState SubPerks => _subPerkPlayer.State;
 
@@ -104,27 +98,6 @@ public partial class Main : Node2D
 		GetTree().Paused = false;
 		_state = GameState.Playing;
 		_spawnTimer?.Start();
-		// Опыт мог поднять сразу два уровня: субперк тогда не предлагался — проверяем очередь.
-		_subPerkPlayer.TryOfferPending();
-	}
-
-	/// <summary>Ставит игру на паузу выбора субперка.</summary>
-	public void StartSubPerkPause()
-	{
-		CancelGameInput();
-		_state = GameState.SubPerkSelect;
-		_spawnTimer?.Stop();
-		GetTree().Paused = true;
-	}
-
-	/// <summary>Снимает паузу выбора субперка и возобновляет игру.</summary>
-	public void EndSubPerkPause()
-	{
-		GetTree().Paused = false;
-		_state = GameState.Playing;
-		_spawnTimer?.Start();
-		// Если на этом же уровне ждал основной перк — предлагаем его теперь.
-		_perkPlayer.TryOfferPending();
 	}
 
 	/// <summary>
@@ -182,9 +155,6 @@ public partial class Main : Node2D
 				ResumeGame();
 				break;
 			case GameState.PerkSelect:
-				break;
-			case GameState.SubPerkSelect:
-				// Субперк пропустить нельзя — «Назад» здесь ничего не меняет.
 				break;
 			case GameState.Suika:
 				CloseSuika();
@@ -302,7 +272,6 @@ public partial class Main : Node2D
 		_hud.RestartPressed += Restart;
 		_hud.MenuPressed += GoToMenu;
 		_hud.PerkPicked += OnPerkPicked;
-		_hud.SubPerkPicked += OnSubPerkPicked;
 		_hud.PausePressed += PauseGame;
 		_hud.BackRequested += HandleBackRequest;
 		_hud.ResumePressed += ResumeGame;
@@ -490,12 +459,6 @@ public partial class Main : Node2D
 		_perkPlayer.OnPicked(id);
 	}
 
-	/// <summary>Игрок выбрал субперк в оверлее (HUD → SubPerkPlayer).</summary>
-	private void OnSubPerkPicked(SubPerkId id)
-	{
-		_subPerkPlayer.OnPicked(id);
-	}
-
 	private void CatchItem(FallingItem item, int handIndex)
 	{
 		// Мусор нельзя нести в руках: отскок/камень либо урон и исчезновение.
@@ -640,7 +603,6 @@ public partial class Main : Node2D
 		_suika?.Close();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
-		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		if (_frog != null) _frog.Visible = true;
 		_state = GameState.Playing;
@@ -672,7 +634,6 @@ public partial class Main : Node2D
 		_hud?.HideStart();
 		_hud?.HideGameOver();
 		_hud?.HidePerkSelection();
-		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		_hud?.SetGameplayVisible(false);
 		_suika?.Open();
@@ -683,7 +644,6 @@ public partial class Main : Node2D
 		_suika?.Close();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
-		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		UpdateSuikaButton();
 		ResetMainRoundData();
@@ -700,7 +660,6 @@ public partial class Main : Node2D
 		_spawnTimer?.Stop();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
-		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		ClearMainRound();
 		ResetMainRoundData();
@@ -754,7 +713,6 @@ public partial class Main : Node2D
 		// На случай завершения во время паузы выбора перка (теоретически невозможно).
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
-		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		if (_score > _highScore)
 		{
@@ -770,7 +728,6 @@ public partial class Main : Node2D
 		ClearMainRound();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
-		_hud?.HideSubPerkSelection();
 		_hud?.HidePause();
 		_frog!.Visible = true;
 
