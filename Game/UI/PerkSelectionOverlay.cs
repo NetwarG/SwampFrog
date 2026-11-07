@@ -149,7 +149,7 @@ public partial class PerkSelectionOverlay : Control
 		{
 			PerkId id = card.Id;
 			string text = $"{card.Name}\nУр. {card.CurrentLevel}/{card.MaxLevel} → {card.CurrentLevel + 1}\n{card.NextLevelEffect}";
-			HoldCardButton button = MakeCardButton(text, card.Accent, ui);
+			HoldCardButton button = MakeCardButton(text, card.Accent, PerkCatalog.Icon(card.Id), ui);
 			button.Held += () => PerkPicked?.Invoke(id);
 			_box.AddChild(button);
 		}
@@ -157,11 +157,16 @@ public partial class PerkSelectionOverlay : Control
 		_box.AddChild(MakeLabel($"За забег можно взять {_maxPerks} перков — потом их можно докачать до максимума", (int)Mathf.Round(24f * ui), new Color(1f, 1f, 1f, 0.75f)));
 	}
 
-	private HoldCardButton MakeCardButton(string text, Color accent, float ui)
+	private HoldCardButton MakeCardButton(string text, Color accent, Texture2D? icon, float ui)
 	{
 		var button = new HoldCardButton
 		{
 			Text = text,
+			Icon = icon,
+			ExpandIcon = true,
+			IconAlignment = HorizontalAlignment.Left,
+			VerticalIconAlignment = VerticalAlignment.Center,
+			Alignment = HorizontalAlignment.Left,
 			AutowrapMode = TextServer.AutowrapMode.WordSmart,
 			CustomMinimumSize = new Vector2(GetContentWidth(ui), CardHeight * ui),
 			FocusMode = Control.FocusModeEnum.None,
@@ -171,6 +176,8 @@ public partial class PerkSelectionOverlay : Control
 			FillColor = new Color(accent.Lightened(0.72f), 0.95f)
 		};
 		button.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(24f * ui));
+		button.AddThemeConstantOverride("icon_max_width", (int)Mathf.Round(112f * ui));
+		button.AddThemeConstantOverride("h_separation", (int)Mathf.Round(18f * ui));
 		button.AddThemeColorOverride("font_color", new Color("173c34"));
 		button.AddThemeColorOverride("font_hover_color", new Color("102c27"));
 		button.AddThemeColorOverride("font_pressed_color", new Color("173c34"));

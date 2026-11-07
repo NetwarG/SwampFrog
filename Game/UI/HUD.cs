@@ -19,7 +19,7 @@ public partial class HUD : Control
 	private const float CounterGap = 24f;
 
 	private Label? _scoreLabel;
-	private Label? _hpLabel;
+	private HealthDisplay? _healthDisplay;
 	private int _lives = 3;
 	private int _maxLives = 3;
 	private FlashOverlay? _flash;
@@ -147,11 +147,16 @@ public partial class HUD : Control
 
 	private void BuildCounters()
 	{
-		// Две самостоятельные надписи в одной строке слева, без панели и контейнеров.
+		// Счёт и жизни располагаются в одной строке слева, без панели и контейнеров.
 		_scoreLabel = MakeCounter("Score", "Score: 0");
-		_hpLabel = MakeCounter("HP", $"HP: {_lives}/{_maxLives}");
+		_healthDisplay = new HealthDisplay
+		{
+			Name = "HP",
+			ZIndex = 10
+		};
 		AddChild(_scoreLabel);
-		AddChild(_hpLabel);
+		AddChild(_healthDisplay);
+		_healthDisplay.SetLives(_lives, _maxLives);
 		UpdateCounterPositions();
 	}
 
@@ -191,17 +196,17 @@ public partial class HUD : Control
 
 	private void UpdateCounterPositions()
 	{
-		if (_scoreLabel == null || _hpLabel == null) return;
+		if (_scoreLabel == null || _healthDisplay == null) return;
 		_scoreLabel.ResetSize();
-		_hpLabel.ResetSize();
+		_healthDisplay.SetLives(_lives, _maxLives);
 		// Счёт и жизни держатся в одной строке слева: HP встаёт сразу за счётом.
 		_scoreLabel.Position = new Vector2(CounterMarginX, CounterMarginY);
-		_hpLabel.Position = new Vector2(_scoreLabel.Position.X + _scoreLabel.Size.X + CounterGap, CounterMarginY);
+		_healthDisplay.Position = new Vector2(_scoreLabel.Position.X + _scoreLabel.Size.X + CounterGap, CounterMarginY);
 	}
 
 	private void UpdateHp()
 	{
-		if (_hpLabel != null) _hpLabel.Text = $"HP: {_lives}/{_maxLives}";
+		_healthDisplay?.SetLives(_lives, _maxLives);
 		UpdateCounterPositions();
 	}
 
@@ -210,7 +215,7 @@ public partial class HUD : Control
 	{
 		_gameplayVisible = visible;
 		if (_scoreLabel != null) _scoreLabel.Visible = visible;
-		if (_hpLabel != null) _hpLabel.Visible = visible;
+		if (_healthDisplay != null) _healthDisplay.Visible = visible;
 		if (_xpBar != null) _xpBar.Visible = visible;
 		if (_perkBar != null && _perkBar.HasIcons) _perkBar.Visible = visible;
 		if (!visible) _pauseMenu?.Collapse();

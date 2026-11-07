@@ -6,8 +6,7 @@ namespace SwampFrog;
 /// <summary>
 /// Падающий сверху объект: фрукт (ловить), мусор (не ловить) или хилка (+1 жизнь).
 /// Любой фрукт может быть золотым (IsGolden): он крупнее и даёт больше очков и опыта.
-/// Фрукты и мусор отображаются спрайтами из Game/assets; хилка пока рисуется
-/// процедурно — у неё ещё нет ассета.
+/// Все предметы отображаются спрайтами из Game/assets.
 /// </summary>
 public partial class FallingItem : Node2D
 {
@@ -98,7 +97,7 @@ public partial class FallingItem : Node2D
 		return new PolygonHitbox(GlobalPosition, GlobalRotation, BaseRadius * Mathf.Max(Scale.X, 0.01f), shape.Local);
 	}
 
-	/// <summary>Форма иконки: у фруктов и мусора силуэт спрайта, у хилки спрайта нет.</summary>
+	/// <summary>Форма иконки: у фруктов и мусора силуэт спрайта, у хилки эллипс.</summary>
 	private FruitShape? Shape => ItemType switch
 	{
 		ItemType.Trash => FruitShape.Trash,
@@ -106,7 +105,7 @@ public partial class FallingItem : Node2D
 		_ => FruitShape.Of(Kind),
 	};
 
-	/// <summary>Форма тела: силуэт иконки, а у хилки без спрайта — эллипс.</summary>
+	/// <summary>Форма тела: силуэт иконки, а у хилки — эллипс.</summary>
 	private Shape2D ItemShape()
 	{
 		FruitShape? shape = Shape;
@@ -128,7 +127,7 @@ public partial class FallingItem : Node2D
 	private bool _despawning;
 	private RigidBody2D? _physicsBody;
 
-	/// <summary>Спрайт предмета (фрукт или мусор).</summary>
+	/// <summary>Спрайт предмета.</summary>
 	private Sprite2D? _sprite;
 
 	/// <summary>Золотое кольцо поверх спрайта золотого фрукта.</summary>
@@ -164,7 +163,7 @@ public partial class FallingItem : Node2D
 		HitRadiusX = BaseRadius * fractions.X * scale;
 		HitRadiusY = BaseRadius * fractions.Y * scale;
 
-		_sprite = new Sprite2D { Centered = true };
+		_sprite = new Sprite2D { Name = "Icon", Centered = true };
 		AddChild(_sprite);
 		RefreshSprite();
 
@@ -302,12 +301,12 @@ public partial class FallingItem : Node2D
 		_sprite.Offset = Shape?.SpriteOffset(texture.GetHeight()) ?? Vector2.Zero;
 	}
 
-	/// <summary>Текстура предмета из Game/assets или null для хилки (нет ассета).</summary>
+	/// <summary>Текстура предмета из Game/assets.</summary>
 	private Texture2D? LoadItemTexture()
 	{
+		if (ItemType == ItemType.Healing) return LoadTextureAt("res://Game/assets/fruits/healing.png");
 		if (ItemType == ItemType.Trash) return LoadTextureAt("res://Game/assets/fruits/trash.png");
-		// У хилки ассета нет, а фрукты рисует та же иконка, что и цепочка слияния в подсказке.
-		return ItemType == ItemType.Healing ? null : FruitCatalog.Icon(Kind);
+		return FruitCatalog.Icon(Kind);
 	}
 
 	private static Texture2D LoadTextureAt(string path)
@@ -326,15 +325,6 @@ public partial class FallingItem : Node2D
 		SyncFromPhysics();
 	}
 
-	public override void _Draw()
-	{
-		// Хилка пока процедурная — для неё нет ассета. Остальное рисуют спрайты.
-		if (ItemType == ItemType.Healing)
-		{
-			DrawHealing();
-		}
-	}
-
 	/// <summary>Золотое кольцо поверх спрайта золотого фрукта.</summary>
 	private sealed partial class GoldenGlow : Node2D
 	{
@@ -349,33 +339,4 @@ public partial class FallingItem : Node2D
 		}
 	}
 
-	// --- Хилка: сердечко с медицинским крестом (+1 жизнь) ---
-	private void DrawHealing()
-	{
-		Color heart = new("ff6b81");
-
-		// Сердечко: два верхних круга + треугольник снизу.
-		DrawCircle(new Vector2(-6f, -4f), 7f, heart);
-		DrawCircle(new Vector2(6f, -4f), 7f, heart);
-		Vector2[] body =
-		{
-			new(-12f, -2f),
-			new(12f, -2f),
-			new(0f, 12f),
-		};
-		DrawColoredPolygon(body, heart);
-
-		// Белая кайма.
-		DrawCircle(new Vector2(-6f, -4f), 8f, new Color(1f, 1f, 1f, 0.85f), false, 2f);
-		DrawCircle(new Vector2(6f, -4f), 8f, new Color(1f, 1f, 1f, 0.85f), false, 2f);
-		DrawLine(new Vector2(-12f, -2f), new Vector2(0f, 14f), new Color(1f, 1f, 1f, 0.85f), 2f);
-		DrawLine(new Vector2(12f, -2f), new Vector2(0f, 14f), new Color(1f, 1f, 1f, 0.85f), 2f);
-
-		// Медицинский крест.
-		DrawRect(new Rect2(-2.5f, -3f, 5f, 9f), new Color("ffffff"));
-		DrawRect(new Rect2(-4.5f, -1f, 9f, 5f), new Color("ffffff"));
-
-		// Блик.
-		DrawCircle(new Vector2(-8f, -8f), 2.5f, new Color(1f, 1f, 1f, 0.55f));
-	}
 }

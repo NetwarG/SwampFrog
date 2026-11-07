@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace SwampFrog;
@@ -10,6 +11,37 @@ namespace SwampFrog;
 /// </summary>
 public sealed class PerkCatalog
 {
+	private static readonly Dictionary<PerkId, Texture2D?> Icons = new();
+
+	public static Texture2D? Icon(PerkId id)
+	{
+		if (Icons.TryGetValue(id, out Texture2D? cached))
+			return cached;
+		Texture2D? loaded = GD.Load<Texture2D>($"res://Game/assets/perks/{IconName(id)}.png");
+		Icons[id] = loaded;
+		return loaded;
+	}
+
+	private static string IconName(PerkId id)
+	{
+		return id switch
+		{
+			PerkId.StickyPaws => "sticky_paws",
+			PerkId.RubberGrip => "rubber_grip",
+			PerkId.RapidFire => "rapid_fire",
+			PerkId.SlowZone => "slow_zone",
+			PerkId.GoldRush => "gold_rush",
+			PerkId.FruitExplosion => "fruit_explosion",
+			PerkId.ComboMaster => "combo_master",
+			PerkId.Shell => "shell",
+			PerkId.TrashBounce => "trash_bounce",
+			PerkId.SecondLife => "second_life",
+			PerkId.LightningTongue => "lightning_tongue",
+			PerkId.BasiliskGaze => "basilisk_gaze",
+			_ => "sticky_paws",
+		};
+	}
+
 	public static PerkDefinition Find(PerkId id)
 	{
 		foreach (PerkDefinition def in All)
