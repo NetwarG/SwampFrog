@@ -3,9 +3,9 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Квадратная полупрозрачная кнопка с тремя точками сверху вниз в правом верхнем углу поля.
+/// Квадратная кнопка-стикер с тремя точками сверху вниз в правом верхнем углу поля.
 /// Четверть кнопки уходит за правый край: видимая часть прижата к кромке.
-/// Собственный Control, а не Button: фон и точки рисуются кодом и не зависят от шрифта.
+/// Собственный Control, а не Button: фон и точки рисуются кодом в стиле иконок игры.
 /// </summary>
 public partial class PauseDotsButton : TouchArea
 {
@@ -17,9 +17,11 @@ public partial class PauseDotsButton : TouchArea
 
 	private const float CornerRadius = 18f;
 
-	private static readonly Color Background = new(0.02f, 0.12f, 0.09f, 0.38f);
-	private static readonly Color Outline = new("9ee4c3", 0.5f);
-	private static readonly Color DotColor = new(0.93f, 1f, 0.97f, 0.8f);
+	/// <summary>Цвет кнопки: жёлтый, как у кнопок «В меню».</summary>
+	private static readonly Color Accent = new("ffd45e");
+
+	/// <summary>Цвет точек: тёмный, как контур иконок.</summary>
+	private static readonly Color DotColor = new("2b170f");
 
 	private const float DotRadius = 6f;
 	/// <summary>Шаг между точками: три точки идут сверху вниз.</summary>
@@ -31,24 +33,11 @@ public partial class PauseDotsButton : TouchArea
 		Size = ButtonSize;
 	}
 
+	/// <summary>Фон рисуется общим стилем кнопок: градиент, коричневый контур и блик.</summary>
 	public override void _Draw()
 	{
-		// Скруглённый квадрат: кнопка стоит в углу поля и не прижата к самой кромке.
-		DrawRect(new Rect2(CornerRadius, 0f, Size.X - CornerRadius * 2f, Size.Y), Background);
-		DrawRect(new Rect2(0f, CornerRadius, Size.X, Size.Y - CornerRadius * 2f), Background);
-		DrawCircle(new Vector2(CornerRadius, CornerRadius), CornerRadius, Background);
-		DrawCircle(new Vector2(Size.X - CornerRadius, CornerRadius), CornerRadius, Background);
-		DrawCircle(new Vector2(CornerRadius, Size.Y - CornerRadius), CornerRadius, Background);
-		DrawCircle(new Vector2(Size.X - CornerRadius, Size.Y - CornerRadius), CornerRadius, Background);
-
-		DrawLine(new Vector2(CornerRadius, 1f), new Vector2(Size.X - CornerRadius, 1f), Outline, 2f);
-		DrawLine(new Vector2(CornerRadius, Size.Y - 1f), new Vector2(Size.X - CornerRadius, Size.Y - 1f), Outline, 2f);
-		DrawLine(new Vector2(1f, CornerRadius), new Vector2(1f, Size.Y - CornerRadius), Outline, 2f);
-		DrawLine(new Vector2(Size.X - 1f, CornerRadius), new Vector2(Size.X - 1f, Size.Y - CornerRadius), Outline, 2f);
-		DrawArc(new Vector2(CornerRadius, CornerRadius), CornerRadius, Mathf.Pi, Mathf.Pi * 1.5f, 8, Outline, 2f);
-		DrawArc(new Vector2(Size.X - CornerRadius, CornerRadius), CornerRadius, Mathf.Pi * 1.5f, Mathf.Pi * 2f, 8, Outline, 2f);
-		DrawArc(new Vector2(Size.X - CornerRadius, Size.Y - CornerRadius), CornerRadius, 0f, Mathf.Pi * 0.5f, 8, Outline, 2f);
-		DrawArc(new Vector2(CornerRadius, Size.Y - CornerRadius), CornerRadius, Mathf.Pi * 0.5f, Mathf.Pi, 8, Outline, 2f);
+		StickerStyle.DrawPanel(this, new Rect2(Vector2.Zero, Size), CornerRadius,
+			StickerStyle.Light(Accent), StickerStyle.Dark(Accent), StickerStyle.OutlineWidth, true);
 
 		// Три точки сверху вниз по центру видимой части: четверть кнопки скрыта за кромкой.
 		Vector2 center = new((Size.X - EdgeSink) * 0.5f, Size.Y * 0.5f);

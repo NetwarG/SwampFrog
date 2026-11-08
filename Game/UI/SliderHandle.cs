@@ -13,9 +13,11 @@ public partial class SliderHandle : TouchArea
 
 	private const float CornerRadius = 14f;
 
-	private static readonly Color Background = new(0.02f, 0.12f, 0.09f, 0.4f);
-	private static readonly Color Outline = new("9ee4c3", 0.5f);
-	private static readonly Color Glyph = new(0.93f, 1f, 0.97f, 0.9f);
+	/// <summary>Цвет рычажка: жёлтый, как у кнопок «В меню».</summary>
+	private static readonly Color Accent = new("ffd45e");
+
+	/// <summary>Цвет шеврона: тёмный, как контур иконок.</summary>
+	private static readonly Color Glyph = new("2b170f");
 
 	private bool _expanded;
 
@@ -36,7 +38,8 @@ public partial class SliderHandle : TouchArea
 
 	public override void _Draw()
 	{
-		UiStyle.DrawRoundedPanel(this, new Rect2(Vector2.Zero, Size), CornerRadius, Background, Outline, 2f);
+		StickerStyle.DrawPanel(this, new Rect2(Vector2.Zero, Size), CornerRadius,
+			StickerStyle.Light(Accent), StickerStyle.Dark(Accent), StickerStyle.OutlineWidth, true);
 
 		Vector2 c = Size * 0.5f;
 		float sign = _expanded ? 1f : -1f;

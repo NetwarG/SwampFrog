@@ -164,34 +164,12 @@ public partial class SuikaGame
 		return label;
 	}
 
+	/// <summary>Кнопки мини-игры — общий стиль игры (см. <see cref="UiStyle.MakeButton"/>).</summary>
 	private Button MakeButton(string text, int size, Color accent, Vector2 minSize)
 	{
-		var button = new Button
-		{
-			Text = text,
-			CustomMinimumSize = new Vector2(minSize.X, Mathf.Max(80f, minSize.Y)),
-			MouseFilter = Control.MouseFilterEnum.Pass,
-			FocusMode = Control.FocusModeEnum.None,
-			MouseDefaultCursorShape = Control.CursorShape.PointingHand
-		};
-		button.AddThemeFontSizeOverride("font_size", size);
-		button.AddThemeColorOverride("font_color", new Color("173c34"));
-		button.AddThemeColorOverride("font_pressed_color", new Color("ffffff"));
-		button.AddThemeStyleboxOverride("normal", ButtonStyle(new Color(accent, 0.9f), accent));
-		button.AddThemeStyleboxOverride("hover", ButtonStyle(accent, new Color("ffffff")));
-		button.AddThemeStyleboxOverride("pressed", ButtonStyle(new Color(accent, 0.72f), new Color("ffffff")));
-		button.AddThemeStyleboxOverride("focus", ButtonStyle(new Color(accent, 0.9f), accent));
-		return button;
-	}
-
-	private static StyleBoxFlat ButtonStyle(Color background, Color border)
-	{
-		var style = new StyleBoxFlat { BgColor = background, BorderColor = new Color(border, 0.72f) };
-		style.SetBorderWidthAll(2);
-		style.SetCornerRadiusAll(12);
-		style.ShadowColor = new Color(0f, 0f, 0f, 0.18f);
-		style.ShadowSize = 4;
-		return style;
+		// Размер шрифта задаёт масштаб стиля: 24 — базовая подпись кнопки.
+		float ui = size / 24f;
+		return UiStyle.MakeButton(text, ui, accent, new Vector2(minSize.X, Mathf.Max(80f, minSize.Y)));
 	}
 
 	/// <summary>Обновляет индикатор остатка фруктов в запасе.</summary>

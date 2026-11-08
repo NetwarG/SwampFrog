@@ -15,12 +15,13 @@ public partial class VolumeSlider : TouchArea
 	private const float KnobRadius = 15f;
 	private const float TrackHeight = 10f;
 
-	private static readonly Color Track = new(0.02f, 0.12f, 0.09f, 0.6f);
-	private static readonly Color TrackOutline = new("9ee4c3", 0.35f);
+	/// <summary>Толщина коричневого контура трека и бегунка.</summary>
+	private const float OutlineWidth = 2.5f;
+
+	private static readonly Color TrackLight = new(0.08f, 0.24f, 0.19f, 0.72f);
+	private static readonly Color TrackDark = new(0.02f, 0.1f, 0.08f, 0.72f);
 	private static readonly Color Fill = new("b4e863");
-	private static readonly Color Knob = new(0.93f, 1f, 0.97f);
-	private static readonly Color KnobOutline = new("173c34");
-	private static readonly Color NoOutline = new(0f, 0f, 0f, 0f);
+	private static readonly Color Knob = new("f4fff0");
 
 	private float _value = 1f;
 	private bool _dragging;
@@ -99,25 +100,26 @@ public partial class VolumeSlider : TouchArea
 		ValueChanged?.Invoke(value);
 	}
 
+	/// <summary>Трек и бегунок в общем стиле кнопок: градиент и коричневый контур.</summary>
 	public override void _Draw()
 	{
 		float cy = Size.Y * 0.5f;
 		float trackLeft = KnobRadius;
 		float trackRight = Size.X - KnobRadius;
-		UiStyle.DrawRoundedPanel(this, new Rect2(trackLeft, cy - TrackHeight * 0.5f, trackRight - trackLeft, TrackHeight),
-			TrackHeight * 0.5f, Track, TrackOutline, 1.5f);
+		var track = new Rect2(trackLeft, cy - TrackHeight * 0.5f, trackRight - trackLeft, TrackHeight);
+		StickerStyle.DrawPanel(this, track, TrackHeight * 0.5f, TrackLight, TrackDark, OutlineWidth, false);
 
 		float knobX = trackLeft + _value * (trackRight - trackLeft);
 		float fillWidth = knobX - trackLeft;
 		if (fillWidth > 1f)
 		{
 			Color fill = _muted ? new Color(Fill, 0.35f) : Fill;
-			UiStyle.DrawRoundedPanel(this, new Rect2(trackLeft, cy - TrackHeight * 0.5f, fillWidth, TrackHeight),
-				TrackHeight * 0.5f, fill, NoOutline, 0f);
+			StickerStyle.DrawPanel(this, new Rect2(track.Position, new Vector2(fillWidth, TrackHeight)),
+				TrackHeight * 0.5f, StickerStyle.Light(fill), StickerStyle.Dark(fill), 0f, false);
 		}
 
 		Color knob = _muted ? new Color(Knob, 0.5f) : Knob;
-		DrawCircle(new Vector2(knobX, cy), KnobRadius, knob);
-		DrawCircle(new Vector2(knobX, cy), KnobRadius, KnobOutline, false, 2f);
+		StickerStyle.DrawCirclePanel(this, new Vector2(knobX, cy), KnobRadius,
+			StickerStyle.Light(knob), StickerStyle.Dark(knob), OutlineWidth, true);
 	}
 }

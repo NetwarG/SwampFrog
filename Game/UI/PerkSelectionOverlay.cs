@@ -173,6 +173,9 @@ public partial class PerkSelectionOverlay : Control
 			MouseFilter = MouseFilterEnum.Pass,
 			MouseDefaultCursorShape = Control.CursorShape.PointingHand,
 			UiScale = ui,
+			CornerRadius = UiStyle.CornerRadius * ui,
+			OutlineWidth = StickerStyle.OutlineWidth * ui,
+			MarginX = 16f * ui,
 			FillColor = new Color(accent.Lightened(0.72f), 0.95f)
 		};
 		button.AddThemeFontSizeOverride("font_size", (int)Mathf.Round(24f * ui));
@@ -181,30 +184,8 @@ public partial class PerkSelectionOverlay : Control
 		button.AddThemeColorOverride("font_color", new Color("173c34"));
 		button.AddThemeColorOverride("font_hover_color", new Color("102c27"));
 		button.AddThemeColorOverride("font_pressed_color", new Color("173c34"));
-		button.AddThemeStyleboxOverride("normal", MakeCardStyle(new Color(accent, 0.92f), accent, ui, 0.18f));
-		button.AddThemeStyleboxOverride("hover", MakeCardStyle(new Color(accent, 1f), new Color("ffffff"), ui, 0.32f));
-		button.AddThemeStyleboxOverride("pressed", MakeCardStyle(new Color(accent, 0.72f), new Color("ffffff"), ui, 0.10f));
-		button.AddThemeStyleboxOverride("focus", MakeCardStyle(new Color(accent, 0.92f), accent, ui, 0.18f));
+		button.SetAccent(accent);
 		return button;
-	}
-
-	private static StyleBoxFlat MakeCardStyle(Color background, Color border, float ui, float shadowAlpha)
-	{
-		var style = new StyleBoxFlat
-		{
-			BgColor = background,
-			BorderColor = new Color(border, 0.72f),
-			CornerRadiusTopLeft = (int)Mathf.Round(UiStyle.CornerRadius * ui),
-			CornerRadiusTopRight = (int)Mathf.Round(UiStyle.CornerRadius * ui),
-			CornerRadiusBottomLeft = (int)Mathf.Round(UiStyle.CornerRadius * ui),
-			CornerRadiusBottomRight = (int)Mathf.Round(UiStyle.CornerRadius * ui),
-			ShadowColor = new Color(0f, 0f, 0f, shadowAlpha),
-			ShadowSize = (int)Mathf.Round(5f * ui)
-		};
-		style.SetBorderWidthAll((int)Mathf.Round(2f * ui));
-		style.ContentMarginLeft = 16f * ui;
-		style.ContentMarginRight = 16f * ui;
-		return style;
 	}
 
 	private Label MakeLabel(string text, int fontSize, Color color)

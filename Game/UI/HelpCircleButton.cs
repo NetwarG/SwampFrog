@@ -3,8 +3,8 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Круглая полупрозрачная кнопка со знаком «?» в правом верхнем углу мини-игры.
-/// Собственный Control, а не Button: круг рисуется кодом, а знак ставится подписью по центру.
+/// Круглая кнопка-стикер со знаком «?» в правом верхнем углу мини-игры: фон рисуется
+/// в общем стиле игры, а знак ставится подписью по центру.
 /// </summary>
 public partial class HelpCircleButton : TouchArea
 {
@@ -14,9 +14,10 @@ public partial class HelpCircleButton : TouchArea
 	/// <summary>Отступ кнопки от правого края поля.</summary>
 	public const float MarginRight = 12f;
 
-	private static readonly Color Fill = new(0.02f, 0.12f, 0.09f, 0.42f);
-	private static readonly Color Outline = new("9ee4c3", 0.5f);
-	private static readonly Color Glyph = new(0.93f, 1f, 0.97f, 0.85f);
+	private static readonly Color Accent = new("b4e863");
+
+	/// <summary>Цвет знака «?»: тёмный, как контур иконок.</summary>
+	private static readonly Color Glyph = new("2b170f");
 
 	public override void _Ready()
 	{
@@ -40,7 +41,7 @@ public partial class HelpCircleButton : TouchArea
 	{
 		Vector2 center = Size * 0.5f;
 		float radius = Mathf.Min(Size.X, Size.Y) * 0.5f - 1f;
-		DrawCircle(center, radius, Fill);
-		DrawCircle(center, radius, Outline, false, 2f);
+		StickerStyle.DrawCirclePanel(this, center, radius,
+			StickerStyle.Light(Accent), StickerStyle.Dark(Accent), StickerStyle.OutlineWidth, true);
 	}
 }

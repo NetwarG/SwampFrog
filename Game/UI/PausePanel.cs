@@ -13,8 +13,9 @@ public partial class PausePanel : TouchArea
 	private const float SlideDuration = 0.16f;
 	private const float CornerRadius = 16f;
 
-	private static readonly Color Background = new(0.02f, 0.12f, 0.09f, 0.55f);
-	private static readonly Color Outline = new("9ee4c3", 0.55f);
+	/// <summary>Тёмная панель в стиле кнопок: тот же коричневый контур, но без блика.</summary>
+	private static readonly Color PanelLight = new(0.08f, 0.24f, 0.19f, 0.88f);
+	private static readonly Color PanelDark = new(0.02f, 0.1f, 0.08f, 0.88f);
 
 	private PauseCircleButton? _button;
 	private Tween? _slide;
@@ -74,20 +75,10 @@ public partial class PausePanel : TouchArea
 		if (!_open) Visible = false;
 	}
 
-	public override void _Draw()
-	{
-		// Скруглённые левые углы: правый край панели совпадает с краем экрана.
-		DrawRect(new Rect2(CornerRadius, 0f, Size.X - CornerRadius, Size.Y), Background);
-		DrawRect(new Rect2(0f, CornerRadius, CornerRadius, Size.Y - CornerRadius * 2f), Background);
-		DrawCircle(new Vector2(CornerRadius, CornerRadius), CornerRadius, Background);
-		DrawCircle(new Vector2(CornerRadius, Size.Y - CornerRadius), CornerRadius, Background);
-
-		DrawLine(new Vector2(CornerRadius, 1f), new Vector2(Size.X, 1f), Outline, 2f);
-		DrawLine(new Vector2(CornerRadius, Size.Y - 1f), new Vector2(Size.X, Size.Y - 1f), Outline, 2f);
-		DrawLine(new Vector2(1f, CornerRadius), new Vector2(1f, Size.Y - CornerRadius), Outline, 2f);
-		DrawArc(new Vector2(CornerRadius, CornerRadius), CornerRadius, Mathf.Pi, Mathf.Pi * 1.5f, 12, Outline, 2f);
-		DrawArc(new Vector2(CornerRadius, Size.Y - CornerRadius), CornerRadius, Mathf.Pi * 0.5f, Mathf.Pi, 12, Outline, 2f);
-	}
+	/// <summary>Скруглены только левые углы: правый край панели совпадает с краем экрана.</summary>
+	public override void _Draw() =>
+		StickerStyle.DrawPanel(this, new Rect2(Vector2.Zero, Size), 0f, 0f, CornerRadius, CornerRadius,
+			PanelLight, PanelDark, StickerStyle.OutlineWidth, false);
 
 	private void UpdateButtonPosition()
 	{

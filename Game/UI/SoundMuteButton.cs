@@ -13,10 +13,12 @@ public partial class SoundMuteButton : TouchArea
 
 	private const float CornerRadius = 16f;
 
-	private static readonly Color Background = new(0.02f, 0.12f, 0.09f, 0.4f);
-	private static readonly Color Outline = new("9ee4c3", 0.5f);
-	private static readonly Color Glyph = new(0.93f, 1f, 0.97f, 0.9f);
-	private static readonly Color Slash = new("ff8c7a");
+	/// <summary>Цвет кнопки: зелёный, как у остальных кнопок меню.</summary>
+	private static readonly Color Accent = new("b4e863");
+
+	/// <summary>Цвет значка динамика: тёмный, как контур иконок.</summary>
+	private static readonly Color Glyph = new("2b170f");
+	private static readonly Color Slash = new("cf3b46");
 
 	private bool _muted;
 
@@ -37,7 +39,8 @@ public partial class SoundMuteButton : TouchArea
 
 	public override void _Draw()
 	{
-		UiStyle.DrawRoundedPanel(this, new Rect2(Vector2.Zero, Size), CornerRadius, Background, Outline, 2f);
+		StickerStyle.DrawPanel(this, new Rect2(Vector2.Zero, Size), CornerRadius,
+			StickerStyle.Light(Accent), StickerStyle.Dark(Accent), StickerStyle.OutlineWidth, true);
 		DrawSpeaker();
 	}
 

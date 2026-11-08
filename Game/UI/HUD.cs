@@ -148,7 +148,7 @@ public partial class HUD : Control
 	private void BuildCounters()
 	{
 		// Счёт и жизни располагаются в одной строке слева, без панели и контейнеров.
-		_scoreLabel = MakeCounter("Score", "Score: 0");
+		_scoreLabel = MakeCounter("Score", "Счет: 0");
 		_healthDisplay = new HealthDisplay
 		{
 			Name = "HP",
@@ -453,7 +453,7 @@ public partial class HUD : Control
 	{
 		if (_scoreLabel != null)
 		{
-			_scoreLabel.Text = $"Score: {score}";
+			_scoreLabel.Text = $"Счет: {score}";
 			UpdateCounterPositions();
 		}
 	}

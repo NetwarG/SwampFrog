@@ -8,9 +8,12 @@ namespace SwampFrog;
 public partial class PauseCircleButton : TouchArea
 {
 	private static readonly Vector2 ButtonSize = new(64f, 64f);
-	private static readonly Color Fill = new("ffd45e");
-	private static readonly Color Outline = new(0.09f, 0.24f, 0.20f, 0.9f);
-	private static readonly Color Bars = new("173c34");
+
+	/// <summary>Цвет круга: жёлтый, как у кнопок «В меню».</summary>
+	private static readonly Color Accent = new("ffd45e");
+
+	/// <summary>Цвет полос паузы: тёмный, как контур иконок.</summary>
+	private static readonly Color Bars = new("2b170f");
 
 	public override void _Ready()
 	{
@@ -22,8 +25,8 @@ public partial class PauseCircleButton : TouchArea
 	{
 		Vector2 center = Size * 0.5f;
 		float radius = Mathf.Min(Size.X, Size.Y) * 0.5f - 1f;
-		DrawCircle(center, radius, new Color(Fill, 0.92f));
-		DrawCircle(center, radius, Outline, false, 2f);
+		StickerStyle.DrawCirclePanel(this, center, radius,
+			StickerStyle.Light(Accent), StickerStyle.Dark(Accent), StickerStyle.OutlineWidth, true);
 
 		// Иконка паузы: две вертикальные полосы.
 		const float barWidth = 7f;

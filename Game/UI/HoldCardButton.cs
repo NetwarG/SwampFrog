@@ -8,8 +8,9 @@ namespace SwampFrog;
 /// и не отпускать в течение <see cref="HoldFor"/> секунд. Случайный короткий клик
 /// выбор не срабатывает. Прогресс удержания заполняет карточку слева направо
 /// (см. <see cref="HoldProgressFill"/>), поэтому заливка видна и под пальцем.
+/// Фон карточки — общий стиль игры (см. <see cref="StickerButton"/>).
 /// </summary>
-public partial class HoldCardButton : Button
+public partial class HoldCardButton : StickerButton
 {
 	/// <summary>Сколько секунд нужно удерживать карточку, чтобы выбрать перк.</summary>
 	public float HoldFor = 1f;
@@ -34,6 +35,7 @@ public partial class HoldCardButton : Button
 
 	public override void _Ready()
 	{
+		base._Ready();
 		ProcessMode = ProcessModeEnum.Always;
 
 		_holdFill = new HoldProgressFill { UiScale = UiScale, FillColor = FillColor };
