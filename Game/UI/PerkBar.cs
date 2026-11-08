@@ -63,6 +63,26 @@ public partial class PerkBar : Control
 		return icon;
 	}
 
+	/// <summary>Всплеск квадратика перка: видно, что перк сработал.</summary>
+	public void Pulse(PerkId id)
+	{
+		PerkIcon? icon = FindIcon(id);
+		icon?.StartPulse();
+	}
+
+	/// <summary>Идёт ли сейчас всплеск квадратика перка (проверки).</summary>
+	public bool IsPulsing(PerkId id) => FindIcon(id)?.IsPulsing == true;
+
+	private PerkIcon? FindIcon(PerkId id)
+	{
+		foreach (PerkIcon icon in _icons)
+		{
+			if (!icon.IsEmpty && icon.Id == id)
+				return icon;
+		}
+		return null;
+	}
+
 	/// <summary>Обновляет масштаб квадратиков (вызывается при ресайзе).</summary>
 	public void SetUiScale(float uiScale)
 	{
@@ -112,6 +132,12 @@ public partial class PerkIcon : Control
 	private static readonly Color EmptyFill = new Color(1f, 1f, 1f, 0.10f);
 	private static readonly Color MaxOutline = new Color("ffd32e");
 
+	/// <summary>Сколько секунд длится всплеск срабатывания.</summary>
+	private const float PulseDuration = 0.4f;
+
+	/// <summary>Насколько слот подрастает на пике всплеска (доля стороны).</summary>
+	private const float PulseGrow = 0.3f;
+
 	private readonly int _level;
 	private readonly int _maxLevel;
 	private readonly Texture2D? _texture;
@@ -120,9 +146,11 @@ public partial class PerkIcon : Control
 	private float _uiScale;
 	private Label? _levelLabel;
 	private Color _accent;
+	private float _pulseT;
 
 	public PerkIcon(PerkId id, int level, Color accent, int maxLevel, float uiScale, bool empty = false)
 	{
+		Id = id;
 		_texture = empty ? null : PerkCatalog.Icon(id);
 		_level = level;
 		_accent = accent;
@@ -131,6 +159,12 @@ public partial class PerkIcon : Control
 		_empty = empty;
 		MouseFilter = MouseFilterEnum.Ignore;
 	}
+
+	/// <summary>Перк, которому принадлежит квадратик (нужен для всплеска срабатывания).</summary>
+	public PerkId Id { get; }
+
+	/// <summary>Идёт ли сейчас всплеск срабатывания перка.</summary>
+	public bool IsPulsing => _pulseT > 0f;
 
 	/// <summary>Пустой слот забега: перк ещё не выбран.</summary>
 	public bool IsEmpty => _empty;
@@ -175,6 +209,23 @@ public partial class PerkIcon : Control
 		UpdateContentLayout();
 	}
 
+	/// <summary>Короткий всплеск: слот подрастает и вспыхивает белым — видно, что перк сработал.</summary>
+	public void StartPulse()
+	{
+		if (_empty)
+			return;
+		_pulseT = PulseDuration;
+		QueueRedraw();
+	}
+
+	public override void _Process(double delta)
+	{
+		if (_pulseT <= 0f)
+			return;
+		_pulseT = Mathf.Max(0f, _pulseT - (float)delta);
+		QueueRedraw();
+	}
+
 	/// <summary>Обновляет масштаб квадратика и его подписи.</summary>
 	public void SetUiScale(float uiScale)
 	{
@@ -210,12 +261,19 @@ public partial class PerkIcon : Control
 	public override void _Draw()
 	{
 		float s = Size.X;
+		// Всплеск срабатывания: слот подрастает, обводка вспыхивает белым.
+		float pulse = _pulseT > 0f ? Mathf.Sin(_pulseT / PulseDuration * Mathf.Pi) : 0f;
+		float grow = PulseGrow * pulse * s * 0.5f;
 
 		// Квадратный слот: заливка акцентом, у пустого слота — едва заметная.
-		DrawRect(new Rect2(1f, 1f, s - 2f, s - 2f), new Color(_accent, _empty ? 0.10f : 0.48f));
+		DrawRect(new Rect2(1f - grow, 1f - grow, s - 2f + grow * 2f, s - 2f + grow * 2f),
+			new Color(_accent, _empty ? 0.10f : 0.48f));
 
-		// Обводка, на максимальном уровне — золотая.
+		// Обводка, на максимальном уровне — золотая, на всплеске — белая.
 		Color outline = _empty ? EmptyOutline : _level >= _maxLevel ? MaxOutline : Outline;
-		DrawRect(new Rect2(0.5f, 0.5f, s - 1f, s - 1f), outline, false, Mathf.Max(1f, 1.5f * _uiScale));
+		if (pulse > 0f)
+			outline = outline.Lerp(Colors.White, pulse * 0.85f);
+		DrawRect(new Rect2(0.5f - grow, 0.5f - grow, s - 1f + grow * 2f, s - 1f + grow * 2f),
+			outline, false, Mathf.Max(1f, 1.5f * _uiScale) * (1f + pulse));
 	}
 }

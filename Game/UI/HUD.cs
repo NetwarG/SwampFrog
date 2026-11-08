@@ -467,6 +467,9 @@ public partial class HUD : Control
 	/// <summary>Обновляет панель выбранных перков внизу экрана.</summary>
 	public void SetPickedPerks(PerkIconInfo[] perks) => _perkBar?.SetPerks(perks, PerkState.MaxDistinctPerks);
 
+	/// <summary>Всплеск квадратика перка в панели: видно, что перк сработал.</summary>
+	public void PulsePerkIcon(PerkId id) => _perkBar?.Pulse(id);
+
 	/// <summary>Обновляет максимум жизней с учётом перка «Панцирь».</summary>
 	public void SetMaxLives(int max)
 	{

@@ -287,15 +287,15 @@ public sealed class PerkEffects
 		}
 		if (lvl == 3)
 		{
-			return 20f;
+			return 15f;
 		}
 		if (lvl == 2)
 		{
-			return 25f;
+			return 18f;
 		}
 		if (lvl == 1)
 		{
-			return 30f;
+			return 20f;
 		}
 		return 0f;
 	}
@@ -314,19 +314,19 @@ public sealed class PerkEffects
 		int lvl = s.LevelOf(PerkId.BasiliskGaze);
 		if (lvl >= 4)
 		{
-			return 15f;
+			return 12f;
 		}
 		if (lvl == 3)
 		{
-			return 30f;
+			return 20f;
 		}
 		if (lvl == 2)
 		{
-			return 30f;
+			return 25f;
 		}
 		if (lvl == 1)
 		{
-			return 40f;
+			return 30f;
 		}
 		return 0f;
 	}

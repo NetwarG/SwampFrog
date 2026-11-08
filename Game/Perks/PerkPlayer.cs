@@ -164,6 +164,13 @@ public sealed class PerkPlayer
 		// Возрождения и таймеры пересчитываются под новый набор перков.
 		RefreshPerkRuntime();
 
+		// Таймерные перки показывают себя уже через половину интервала: эффект виден
+		// сразу после выбора, а не через минуту ожидания.
+		if (id == PerkId.BasiliskGaze)
+			_gazeTimer *= 0.5f;
+		if (id == PerkId.LightningTongue)
+			_autoCatchTimer *= 0.5f;
+
 		Game.SetMaxHeartsFromPerk();
 		Game.HudNode?.HidePerkSelection();
 		Game.EndPerkPause();
@@ -213,18 +220,20 @@ public sealed class PerkPlayer
 				_gazeFreezeTimer = Mathf.Max(_gazeFreezeTimer, PerkEffects.GazeFreezeDuration(_perks));
 				// Волна «изморози» по полю: момент заморозки виден даже на краю экрана.
 				FrostWave();
+				PerkTriggered(PerkId.BasiliskGaze, "Взгляд василиска!");
 			}
 		}
 
-		// Язык-молния: авто-ловля ближайшего фрукта.
+		// Язык-молния: авто-ловля ближайшего фрукта. Пустой разряд не сгорает:
+		// пока цели в поле нет, отсчёт стоит и выстрел случится с первым же фруктом.
 		float lightning = PerkEffects.LightningInterval(_perks);
 		if (lightning > 0f)
 		{
 			_autoCatchTimer -= dt;
-			if (_autoCatchTimer <= 0f)
+			if (_autoCatchTimer <= 0f && LightningAutoCatch())
 			{
 				_autoCatchTimer = lightning;
-				LightningAutoCatch();
+				PerkTriggered(PerkId.LightningTongue);
 			}
 		}
 	}
@@ -354,6 +363,7 @@ public sealed class PerkPlayer
 		_invulnTimer = Mathf.Max(_invulnTimer, PerkEffects.ReviveInvulnDuration(_perks));
 		Vector2 frogPos = Game.FrogNode?.GlobalPosition ?? Vector2.Zero;
 		Game.HudNode?.SpawnPopup(frogPos, "Возрождение!");
+		PerkTriggered(PerkId.SecondLife);
 		// Возрождение видно всегда: вспышка по полю, кольцо от лягушки и золотые искры.
 		Effects?.SpawnFlashWave(frogPos, Game.ViewSize, EffectStyle.Gold, 0.8f);
 		Effects?.SpawnShockwave(frogPos, 150f, EffectStyle.Gold, 0.5f, 8f);
@@ -410,6 +420,7 @@ public sealed class PerkPlayer
 		_goldFreezeCooldown = freeze + PerkEffects.GoldFreezeCooldown;
 		// «Сироп»: поле замирает, волна показывает момент полной остановки.
 		Effects?.SpawnFlashWave(item.GlobalPosition, Game?.ViewSize ?? Playfield.Size, EffectStyle.Syrup, 0.6f);
+		PerkTriggered(PerkId.SlowZone);
 	}
 
 	/// <summary>
@@ -629,19 +640,20 @@ public sealed class PerkPlayer
 		}
 	}
 
-	/// <summary>«Язык-молния»: мгновенно забирает ближайшие фрукты, иногда бьёт по мусору.</summary>
-	private void LightningAutoCatch()
+	/// <summary>«Язык-молния»: мгновенно забирает ближайшие фрукты, иногда бьёт по мусору.
+	/// true — разряд нашёл цель: пустой отсчёт не сбрасывается, заряд ждёт фрукта в поле.</summary>
+	private bool LightningAutoCatch()
 	{
 		Node2D? items = Game?.ItemsNode;
 		Frog? frog = Game?.FrogNode;
 		if (items == null || frog == null || !Game.IsPlaying)
 		{
-			return;
+			return false;
 		}
 		Vector2 frogPos = frog.GlobalPosition;
 		int wanted = PerkEffects.LightningCatchCount(_perks);
 
-		// Берём ближайшие фрукты по одному.
+		// Берём ближайшие фрукты по одному — только те, что уже влетели в поле.
 		var caught = new List<FallingItem>();
 		for (int pick = 0; pick < wanted; pick++)
 		{
@@ -649,7 +661,7 @@ public sealed class PerkPlayer
 			float bestDist = float.PositiveInfinity;
 			foreach (Node child in items.GetChildren())
 			{
-				if (child is not FallingItem item || !IsCatchable(item) || caught.Contains(item))
+				if (child is not FallingItem item || !IsCatchable(item) || !IsInField(item) || caught.Contains(item))
 				{
 					continue;
 				}
@@ -675,14 +687,15 @@ public sealed class PerkPlayer
 			AwardCaught(item);
 		}
 
-		// lvl4: язык заодно уничтожает ближайший мусор.
+		// lvl4: язык заодно уничтожает ближайший мусор в поле.
+		bool smashedTrash = false;
 		if (PerkEffects.LightningDestroysTrash(_perks))
 		{
 			FallingItem? trash = null;
 			float bestDist = float.PositiveInfinity;
 			foreach (Node child in items.GetChildren())
 			{
-				if (child is not FallingItem item || item.ItemType != ItemType.Trash || item.IsCaught || item.IsQueuedForDeletion() || item.ManualPhysics)
+				if (child is not FallingItem item || item.ItemType != ItemType.Trash || item.IsCaught || item.IsQueuedForDeletion() || item.ManualPhysics || !IsInField(item))
 				{
 					continue;
 				}
@@ -695,6 +708,7 @@ public sealed class PerkPlayer
 			}
 			if (trash != null)
 			{
+				smashedTrash = true;
 				Game.HudNode?.SpawnPopup(trash.GlobalPosition, "⚡");
 				// Отдельная ветвь молнии: язык бьёт по мусору и он рассыпается искрами.
 				Effects?.SpawnBolt(frogPos, trash.GlobalPosition, EffectStyle.Frost, 0.24f, 6f);
@@ -702,6 +716,8 @@ public sealed class PerkPlayer
 				trash.Despawn();
 			}
 		}
+
+		return caught.Count > 0 || smashedTrash;
 	}
 
 	/// <summary>Можно ли сейчас «физически» поймать этот предмет (фрукт/золотой на поле).</summary>
@@ -712,6 +728,17 @@ public sealed class PerkPlayer
 			return false;
 		}
 		return item.ItemType == ItemType.Fruit;
+	}
+
+	/// <summary>Предмет уже влетел в поле: «Язык-молния» не бьёт по невидимой цели за верхней границей.</summary>
+	private bool IsInField(FallingItem item) => item.GlobalPosition.Y >= 0f;
+
+	/// <summary>Отклик на срабатывание перка: всплеск квадратика в панели и подпись у лягушки.</summary>
+	private void PerkTriggered(PerkId id, string? text = null)
+	{
+		Game?.HudNode?.PulsePerkIcon(id);
+		if (!string.IsNullOrEmpty(text))
+			Game?.HudNode?.SpawnPopup(Game?.FrogNode?.GlobalPosition ?? Vector2.Zero, text);
 	}
 
 	// ---------- Заморозка, замедление, магнит ----------
