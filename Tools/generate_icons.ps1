@@ -153,6 +153,91 @@ $pen.Dispose()
 Draw-Path $g (New-Polygon $head) $color $color 14
 }
 
+# Заливка и мягкая обводка произвольного цвета: для фона коричневый контур иконок не подходит.
+function Draw-SoftPath($g, $path, $colorA, $colorB, $stroke, $width, $angle = 45) {
+$bounds = $path.GetBounds()
+$brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush $bounds, $colorA, $colorB, $angle
+$g.FillPath($brush, $path)
+$brush.Dispose()
+if ($null -ne $stroke -and $width -gt 0) {
+$pen = New-Pen $stroke $width
+$g.DrawPath($pen, $path)
+$pen.Dispose()
+}
+$path.Dispose()
+}
+
+function Draw-SoftEllipse($g, $rect, $colorA, $colorB, $stroke, $width, $angle = 45) {
+$path = New-Object System.Drawing.Drawing2D.GraphicsPath
+$path.AddEllipse($rect[0], $rect[1], $rect[2], $rect[3])
+Draw-SoftPath $g $path $colorA $colorB $stroke $width $angle
+}
+
+function Get-CirclePoint($cx, $cy, $radius, $degrees) {
+$angle = $degrees * [Math]::PI / 180
+return @([float]($cx + [Math]::Cos($angle) * $radius), [float]($cy + [Math]::Sin($angle) * $radius))
+}
+
+# Диск с вырезом-«пакманом»: так лист кувшинки читается сверху.
+function New-LilyPadPath($cx, $cy, $radius, $notch, $notchAngle) {
+$half = $notch / 2.0
+$first = $notchAngle - $half
+$second = $notchAngle + $half
+$start = Get-CirclePoint $cx $cy $radius $second
+$end = Get-CirclePoint $cx $cy $radius $first
+$path = New-Object System.Drawing.Drawing2D.GraphicsPath
+$path.StartFigure()
+# От кромки выреза через центр, дуга по телу листа (360 − вырез) и обратно в центр.
+$path.AddLine([float]$cx, [float]$cy, $start[0], $start[1])
+$path.AddArc([float]($cx - $radius), [float]($cy - $radius), [float]($radius * 2), [float]($radius * 2), [float]$second, [float](360 - $notch))
+$path.AddLine($end[0], $end[1], [float]$cx, [float]$cy)
+$path.CloseFigure()
+return $path
+}
+
+# Фон пруда: лист кувшинки приглушённых тонов, без коричневого контура иконок.
+function Draw-LilyPad {
+$canvas = New-Canvas; $g = $canvas[1]
+$cx = 256; $cy = 256; $radius = 214
+$notch = 30; $notchAngle = 90
+Draw-SoftPath $g (New-LilyPadPath $cx $cy $radius $notch $notchAngle) (Get-Color '#2f6b50') (Get-Color '#17402f') (Get-Color '#14392a') 8 135
+for ($i = 0; $i -lt 8; $i++) {
+$from = Get-CirclePoint $cx $cy ($radius * 0.20) ($notchAngle + 22.5 + $i * 45)
+$to = Get-CirclePoint $cx $cy ($radius * 0.78) ($notchAngle + 22.5 + $i * 45)
+Draw-Line $g $from $to (Get-Color '#3c7d5e') 7 0
+}
+Fill-Ellipse $g @(($cx - $radius * 0.52), ($cy - $radius * 0.60), ($radius * 0.30), ($radius * 0.42)) ([System.Drawing.Color]::FromArgb(40, 255, 255, 255))
+Fill-Ellipse $g @(($cx - $radius * 0.36), ($cy - $radius * 0.12), ($radius * 0.10), ($radius * 0.12)) ([System.Drawing.Color]::FromArgb(28, 255, 255, 255))
+Save-Icon $canvas 'Game/assets/ui/lily_pad.png'
+}
+
+# Фон пруда: цветок кувшинки — бледные лепестки, тоже без контура иконок.
+function Draw-LilyFlower {
+$canvas = New-Canvas; $g = $canvas[1]
+$cx = 256; $cy = 256
+for ($i = 0; $i -lt 8; $i++) {
+$state = $g.Save()
+$g.TranslateTransform($cx, $cy)
+$g.RotateTransform($i * 45)
+Draw-SoftEllipse $g @(-74, -218, 148, 190) (Get-Color '#ffffff') (Get-Color '#ffe6ef') (Get-Color '#f2c3d4') 11 60
+$g.Restore($state)
+}
+for ($i = 0; $i -lt 6; $i++) {
+$state = $g.Save()
+$g.TranslateTransform($cx, $cy)
+$g.RotateTransform($i * 60 + 30)
+Draw-SoftEllipse $g @(-56, -178, 112, 152) (Get-Color '#ffe7f0') (Get-Color '#f7b6cd') (Get-Color '#e79cb6') 10 90
+$g.Restore($state)
+}
+Draw-SoftEllipse $g @(156, 156, 200, 200) (Get-Color '#ffe066') (Get-Color '#e39b18') (Get-Color '#c8871a') 12 45
+for ($i = 0; $i -lt 12; $i++) {
+$angle = $i * [Math]::PI / 6
+Fill-Ellipse $g @(($cx + [Math]::Cos($angle) * 54 - 10), ($cy + [Math]::Sin($angle) * 54 - 10), 20, 20) (Get-Color '#d99a1c')
+}
+Save-Icon $canvas 'Game/assets/ui/lily_flower.png'
+}
+
+
 function Draw-HealthIcons {
 $canvas = New-Canvas
 Draw-Heart $canvas[1] 256 270 440 $false
@@ -326,5 +411,8 @@ Draw-TrashBounce
 Draw-SecondLife
 Draw-LightningTongue
 Draw-BasiliskGaze
+Draw-LilyPad
+Draw-LilyFlower
 
-Write-Host '14 icons generated.'
+
+Write-Host '16 icons generated.'

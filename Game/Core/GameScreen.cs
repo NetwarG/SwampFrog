@@ -134,18 +134,7 @@ public partial class GameScreen : Control
 	}
 
 	/// <summary>Продолжает градиент воды под HUD и фоном по бокам арены.</summary>
-	private void DrawPondBackground(Rect2 full)
-	{
-		const int steps = 64;
-		float strip = full.Size.Y / steps;
-		for (int i = 0; i < steps; i++)
-		{
-			float y = full.Position.Y + i * strip;
-			// Выше поля вода светлеет (поверхность), ниже границы — глубже и темнее.
-			float t = Mathf.Clamp((y - FieldRect.Position.Y) / FieldRect.Size.Y, 0f, 1f);
-			DrawRect(new Rect2(full.Position.X, y, full.Size.X, strip + 1f), Playfield.PondTop.Lerp(Playfield.PondBottom, t));
-		}
-	}
+	private void DrawPondBackground(Rect2 full) => PondBackdrop.DrawWater(this, full, FieldRect);
 
 	/// <summary>Только визуальные разделители: не добавляют Control, коллизии или ограничения ввода.</summary>
 	private void DrawSideDividers(Rect2 full)

@@ -896,50 +896,10 @@ public partial class Main : Node2D
 			return;
 		}
 
-		// Вертикальный градиент «глубина пруда».
-		const int steps = 64;
-		float strip = size.Y / steps;
-		for (int i = 0; i < steps; i++)
-		{
-			float t = i / (float)(steps - 1);
-			DrawRect(new Rect2(0f, i * strip, size.X, strip + 1f), Playfield.PondTop.Lerp(Playfield.PondBottom, t));
-		}
-
-		float s = ScreenScale;
-
-		// Мягкие блики света на воде.
-		float[][] spots =
-		{
-			new[] { 0.20f, 0.15f, 46f },
-			new[] { 0.72f, 0.22f, 60f },
-			new[] { 0.85f, 0.58f, 34f },
-			new[] { 0.30f, 0.75f, 30f },
-			new[] { 0.62f, 0.38f, 26f },
-		};
-		foreach (float[] sp in spots)
-		{
-			DrawCircle(new Vector2(size.X * sp[0], size.Y * sp[1]), sp[2] * s, new Color(1f, 1f, 1f, 0.05f));
-		}
-
-		// Кувшинки у дна (размер пропорционален экрану).
-		DrawLilyPad(new Vector2(size.X * 0.25f, size.Y * 0.88f), 34f * s);
-		DrawLilyPad(new Vector2(size.X * 0.80f, size.Y * 0.82f), 26f * s);
-		DrawLilyPad(new Vector2(size.X * 0.58f, size.Y * 0.93f), 30f * s);
-		DrawLilyPad(new Vector2(size.X * 0.10f, size.Y * 0.70f), 22f * s);
-	}
-
-	private void DrawLilyPad(Vector2 center, float radius)
-	{
-		DrawCircle(center, radius, new Color(0.22f, 0.55f, 0.33f));
-		DrawCircle(center, radius, new Color(0.16f, 0.44f, 0.26f), false, 4f);
-
-		float start = -0.6f;
-		Vector2[] notch =
-		{
-			center + new Vector2(Mathf.Cos(start), Mathf.Sin(start)) * radius,
-			center + new Vector2(Mathf.Cos(start + 1.8f), Mathf.Sin(start + 1.8f)) * radius,
-			center,
-		};
-		DrawColoredPolygon(notch, new Color("0a352f"));
+		// Вода, виньетка у кромок и декор: всё из общих модулей фона.
+		Rect2 field = new(Vector2.Zero, size);
+		PondBackdrop.DrawWater(this, field, field);
+		PondBackdrop.DrawBottomShade(this, field);
+		PondDecor.Draw(this, size);
 	}
 }
