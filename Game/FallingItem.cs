@@ -47,6 +47,21 @@ public partial class FallingItem : Node2D
 		}
 	}
 
+	/// <summary>
+	/// Вид обездвиживания для отрисовки: лёд «Взгляда василиска» или камень мусора.
+	/// На физику не влияет — её задаёт <see cref="Frozen"/>.
+	/// </summary>
+	public ItemFrost Frost
+	{
+		get => _frost;
+		set
+		{
+			if (_frost == value) return;
+			_frost = value;
+			RefreshFrost();
+		}
+	}
+
 	/// <summary>Золотой фрукт: модификатор любого фрукта — крупнее и даёт больше очков.</summary>
 	public bool IsGolden { get; set; }
 
@@ -132,6 +147,10 @@ public partial class FallingItem : Node2D
 
 	/// <summary>Золотое кольцо поверх спрайта золотого фрукта.</summary>
 	private GoldenGlow? _glow;
+
+	/// <summary>Ледяная или каменная корочка обездвиженного предмета.</summary>
+	private FrostCrust? _crust;
+	private ItemFrost _frost = ItemFrost.None;
 
 	private static readonly Dictionary<string, Texture2D> TextureCache = new();
 
@@ -301,6 +320,25 @@ public partial class FallingItem : Node2D
 		_sprite.Offset = Shape?.SpriteOffset(texture.GetHeight()) ?? Vector2.Zero;
 	}
 
+	/// <summary>Показывает или прячет корочку льда/камня поверх спрайта.</summary>
+	private void RefreshFrost()
+	{
+		if (_frost == ItemFrost.None)
+		{
+			if (_crust != null) _crust.Visible = false;
+			return;
+		}
+		if (_crust == null || !IsInstanceValid(_crust))
+		{
+			_crust = new FrostCrust { Name = "Frost" };
+			AddChild(_crust);
+		}
+		_crust.Look = _frost;
+		_crust.Radius = BaseRadius;
+		_crust.Visible = true;
+		_crust.QueueRedraw();
+	}
+
 	/// <summary>Текстура предмета из Game/assets.</summary>
 	private Texture2D? LoadItemTexture()
 	{
@@ -339,4 +377,28 @@ public partial class FallingItem : Node2D
 		}
 	}
 
+
+		/// <summary>Корочка обездвиженного предмета: изморозь заморозки или трещины камня.</summary>
+	private sealed partial class FrostCrust : Node2D
+	{
+		/// <summary>Радиус предмета в локальных единицах.</summary>
+		public float Radius { get; set; }
+
+		/// <summary>Вид корочки.</summary>
+		public ItemFrost Look { get; set; } = ItemFrost.Ice;
+
+		public override void _Draw()
+		{
+			bool stone = Look == ItemFrost.Stone;
+			Color color = stone ? EffectStyle.Stone : EffectStyle.Ice;
+			DrawCircle(Vector2.Zero, Radius, new Color(color, stone ? 0.34f : 0.22f));
+			DrawCircle(Vector2.Zero, Radius + 1f, new Color(EffectStyle.Outline, 0.5f), false, 3f);
+			// Четыре коротких луча: лучики изморози или трещины камня.
+			for (int i = 0; i < 4; i++)
+			{
+				Vector2 dir = Vector2.FromAngle(Mathf.Pi * 0.5f * i + Mathf.Pi * 0.25f);
+				DrawLine(dir * (Radius * 0.45f), dir * (Radius * 1.05f), new Color(color, 0.85f), 3f);
+			}
+		}
+	}
 }

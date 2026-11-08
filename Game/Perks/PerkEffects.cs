@@ -103,6 +103,16 @@ public sealed class PerkEffects
 
 	// ---------- Зона замедления ----------
 
+	/// <summary>Верхняя граница зоны замедления в долях высоты поля (0 — зоны нет).</summary>
+	public static float SlowZoneTopFraction(PerkState s)
+	{
+		if (s.LevelOf(PerkId.SlowZone) <= 0)
+		{
+			return 0f;
+		}
+		return SlowZoneCoversHalf(s) ? 0.5f : 2f / 3f;
+	}
+
 	/// <summary>Коэффициент скорости падения в зоне замедления (1 — эффекта нет).</summary>
 	public static float FallSlowFactor(PerkState s, ItemType type)
 	{

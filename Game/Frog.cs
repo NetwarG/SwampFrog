@@ -60,6 +60,9 @@ public partial class Frog : Node2D
 	private static readonly Color Hand = new("b4e863");
 	private static readonly Color HandDark = new("3a8a2a");
 
+	/// <summary>Цвет щита неуязвимости: как у перка «Панцирь».</summary>
+	private static readonly Color Shield = new("8fd05a");
+
 	/// <summary>Ссылка на корень игры (устанавливается из Main).</summary>
 	public Main? Game { get; set; }
 
@@ -88,6 +91,9 @@ public partial class Frog : Node2D
 	private float _currentUiScale = 1f;
 	private Sprite2D? _body;
 	private float _eatingTimer;
+
+	/// <summary>Щит неуязвимости («Панцирь» ур. 5, возрождение): контур вокруг тела.</summary>
+	private bool _shield;
 
 	/// <summary>Пойманный предмет, зажатый в ладони (с индексом держащей руки).</summary>
 	private struct CaughtItem
@@ -603,6 +609,14 @@ public partial class Frog : Node2D
 	/// <summary>Поворачивает взгляд лягушки без запуска режима ловли.</summary>
 	public void SetLookTarget(Vector2 target) => UpdateDirection(target);
 
+	/// <summary>Показывает или прячет щит неуязвимости: вызывается из PerkPlayer.</summary>
+	public void SetShield(bool active)
+	{
+		if (_shield == active) return;
+		_shield = active;
+		QueueRedraw();
+	}
+
 	public override void _Draw()
 	{
 		// Геометрия ладоней — в мировых единицах. Pulse увеличивает тело, не сдвигая руки за край.
@@ -611,6 +625,20 @@ public partial class Frog : Node2D
 		{
 			if (!(DecorativeOnly && ThrowPose) && _armLengthsWorld[i] <= 2f) continue;
 			DrawArm(i, unit);
+		}
+		DrawShield(unit);
+	}
+
+	/// <summary>Щит неуязвимости: зелёное кольцо с зубцами вокруг тела.</summary>
+	private void DrawShield(float unit)
+	{
+		if (!_shield) return;
+		float radius = 48f * unit;
+		EffectStyle.Ring(this, Vector2.Zero, radius, Shield, 4f * unit, 0.9f);
+		for (int i = 0; i < 6; i++)
+		{
+			Vector2 dir = Vector2.FromAngle(Mathf.Pi * 2f * i / 6f - Mathf.Pi * 0.5f);
+			DrawLine(dir * radius, dir * (radius + 8f * unit), new Color(Shield, 0.9f), 4f * unit);
 		}
 	}
 

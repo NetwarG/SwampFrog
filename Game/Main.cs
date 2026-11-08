@@ -32,6 +32,8 @@ public partial class Main : Node2D
 
 	private Frog? _frog;
 	private Node2D? _items;
+	private EffectLayer? _effects;
+	private SlowZoneView? _zoneView;
 	private HUD? _hud;
 	private SuikaGame? _suika;
 	private Timer? _spawnTimer;
@@ -74,6 +76,9 @@ public partial class Main : Node2D
 	public Frog? FrogNode => _frog;
 	public Node2D? ItemsNode => _items;
 	public HUD? HudNode => _hud;
+
+	/// <summary>Слой эффектов перков: сюда пишут моменты срабатывания.</summary>
+	public EffectLayer? Effects => _effects;
 	public RandomNumberGenerator GameRng => _rng;
 	public XpSystem Xp => _xp;
 	public bool IsPlaying => _state == GameState.Playing;
@@ -82,6 +87,9 @@ public partial class Main : Node2D
 
 	/// <summary>Состояние субперков забега (для PerkPlayer и окна паузы).</summary>
 	public SubPerkState SubPerks => _subPerkPlayer.State;
+
+	/// <summary>Рантайм-логика перков: состояние и таймеры для визуальных эффектов.</summary>
+	public PerkPlayer Perks => _perkPlayer;
 
 	/// <summary>Ставит игру на паузу выбора перка.</summary>
 	public void StartPerkPause()
@@ -295,6 +303,13 @@ public partial class Main : Node2D
 		_hud.SetGameplayVisible(false);
 		_hud.SetXp(_xp.Level, _xp.LevelProgress);
 		_suika.Visible = false;
+
+		// Индикатор зоны замедления лежит под лягушкой и предметами, слой эффектов — поверх них.
+		_zoneView = new SlowZoneView { Name = "SlowZone", Visible = false };
+		AddChild(_zoneView);
+		MoveChild(_zoneView, 0);
+		_effects = new EffectLayer { Name = "Effects", ZIndex = 5 };
+		AddChild(_effects);
 	}
 
 	private void BuildClassicWalls()
@@ -377,6 +392,7 @@ public partial class Main : Node2D
 
 		// Перки: модификаторы лягушки и таймеры.
 		_perkPlayer.Update(dt, _frog);
+		_perkPlayer.SyncSlowZoneView(_zoneView, ViewSize);
 		if (_state != GameState.Playing) return;
 		_frog.UpdateMovement(dt);
 		_frog.UpdateArms(dt);
@@ -683,6 +699,14 @@ public partial class Main : Node2D
 			}
 		}
 		_frog?.ClearCaughtItems();
+		ClearEffects();
+	}
+
+	/// <summary>Убирает живые эффекты и индикатор зоны: рестарт, меню, конец партии.</summary>
+	private void ClearEffects()
+	{
+		_effects?.Clear();
+		_zoneView?.SetZone(0f, ViewSize, 0.05f);
 	}
 
 	private void ResetMainRoundData()
@@ -703,6 +727,7 @@ public partial class Main : Node2D
 	private void GameOver()
 	{
 		_state = GameState.GameOver;
+		ClearEffects();
 		if (_items != null)
 		{
 			foreach (Node child in _items.GetChildren())

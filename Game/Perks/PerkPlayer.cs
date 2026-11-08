@@ -12,6 +12,9 @@ public sealed class PerkPlayer
 
 	private readonly PerkState _perks = new();
 
+	/// <summary>Слой эффектов мира: сюда пишут моменты срабатывания перков.</summary>
+	private EffectLayer? Effects => Game?.Effects;
+
 	/// <summary>Отсчёт авто-ловли «Языка-молнии».</summary>
 	private float _autoCatchTimer;
 	/// <summary>Отсчёт до заморозки «Взгляда василиска».</summary>
@@ -159,9 +162,7 @@ public sealed class PerkPlayer
 		}
 
 		// Возрождения и таймеры пересчитываются под новый набор перков.
-		_revivesLeft = PerkEffects.ReviveCount(_perks);
-		_gazeTimer = PerkEffects.GazeInterval(_perks);
-		_autoCatchTimer = PerkEffects.LightningInterval(_perks);
+		RefreshPerkRuntime();
 
 		Game.SetMaxHeartsFromPerk();
 		Game.HudNode?.HidePerkSelection();
@@ -186,6 +187,8 @@ public sealed class PerkPlayer
 		{
 			_invulnTimer = Mathf.Max(0f, _invulnTimer - dt);
 		}
+		// Щит неуязвимости («Панцирь» ур. 5, возрождение) виден контуром на лягушке.
+		frog?.SetShield(_invulnTimer > 0f);
 		if (_worldFreezeTimer > 0f)
 		{
 			_worldFreezeTimer = Mathf.Max(0f, _worldFreezeTimer - dt);
@@ -208,6 +211,8 @@ public sealed class PerkPlayer
 			{
 				_gazeTimer = gaze;
 				_gazeFreezeTimer = Mathf.Max(_gazeFreezeTimer, PerkEffects.GazeFreezeDuration(_perks));
+				// Волна «изморози» по полю: момент заморозки виден даже на краю экрана.
+				FrostWave();
 			}
 		}
 
@@ -229,6 +234,7 @@ public sealed class PerkPlayer
 	{
 		bool frozen = IsItemFrozen(item);
 		item.Frozen = frozen;
+		item.Frost = frozen ? FrostLook(item) : ItemFrost.None;
 		if (!frozen)
 		{
 			ApplySlowZone(item, viewSize, dt);
@@ -281,6 +287,8 @@ public sealed class PerkPlayer
 		if (item.Frozen)
 		{
 			Game.HudNode?.SpawnPopup(item.GlobalPosition, "Камень!");
+			Effects?.SpawnShockwave(item.GlobalPosition, 62f, EffectStyle.Stone, 0.3f, 5f, false);
+			Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Stone, 10, 200f, 0.45f);
 			item.Despawn();
 			return;
 		}
@@ -291,6 +299,8 @@ public sealed class PerkPlayer
 			// Отброс: мусор улетает вверх, урона нет.
 			item.Velocity = new Vector2(item.Velocity.X * 0.4f, -Mathf.Abs(item.Velocity.Y) - 170f);
 			Game.HudNode?.SpawnPopup(item.GlobalPosition, "Отскок!");
+			Effects?.SpawnShockwave(item.GlobalPosition, 54f, EffectStyle.White, 0.28f, 4f, false);
+			Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.White, 8, 190f, 0.4f);
 			return;
 		}
 
@@ -342,7 +352,12 @@ public sealed class PerkPlayer
 		_revivesLeft--;
 		Game.SetLivesFromPerk(PerkEffects.ReviveHp(_perks));
 		_invulnTimer = Mathf.Max(_invulnTimer, PerkEffects.ReviveInvulnDuration(_perks));
-		Game.HudNode?.SpawnPopup(Game.FrogNode?.GlobalPosition ?? Vector2.Zero, "Возрождение!");
+		Vector2 frogPos = Game.FrogNode?.GlobalPosition ?? Vector2.Zero;
+		Game.HudNode?.SpawnPopup(frogPos, "Возрождение!");
+		// Возрождение видно всегда: вспышка по полю, кольцо от лягушки и золотые искры.
+		Effects?.SpawnFlashWave(frogPos, Game.ViewSize, EffectStyle.Gold, 0.8f);
+		Effects?.SpawnShockwave(frogPos, 150f, EffectStyle.Gold, 0.5f, 8f);
+		Effects?.SpawnSparks(frogPos, EffectStyle.Gold, 16, 280f, 0.6f);
 
 		// lvl5: полная очистка экрана от мусора.
 		if (PerkEffects.ReviveClearsTrash(_perks))
@@ -364,6 +379,7 @@ public sealed class PerkPlayer
 		{
 			if (child is FallingItem item && item.ItemType == ItemType.Trash)
 			{
+				Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Stone, 8, 200f, 0.45f);
 				item.Despawn();
 			}
 		}
@@ -392,6 +408,8 @@ public sealed class PerkPlayer
 			return;
 		_worldFreezeTimer = Mathf.Max(_worldFreezeTimer, freeze);
 		_goldFreezeCooldown = freeze + PerkEffects.GoldFreezeCooldown;
+		// «Сироп»: поле замирает, волна показывает момент полной остановки.
+		Effects?.SpawnFlashWave(item.GlobalPosition, Game?.ViewSize ?? Playfield.Size, EffectStyle.Syrup, 0.6f);
 	}
 
 	/// <summary>
@@ -420,6 +438,13 @@ public sealed class PerkPlayer
 		{
 			// Золотой фрукт — тот же фрукт, но ценнее в N раз («Золотая лихорадка»).
 			basePoints = item.IsGolden ? 10 * PerkEffects.GoldenScoreMultiplier(_perks) : 10;
+		}
+
+		// Золотая поимка видна отдельно: золотая волна и брызги.
+		if (item.IsGolden && !fromExplosion)
+		{
+			Effects?.SpawnShockwave(item.GlobalPosition, 110f, EffectStyle.Gold, 0.45f, 7f);
+			Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Gold, 14, 250f, 0.55f);
 		}
 
 		// Замороженные фрукты «Взгляда василиска» (lvl5) дают x2.
@@ -540,6 +565,10 @@ public sealed class PerkPlayer
 			return;
 		}
 
+		// Ударная волна и осколки: видно, как взрыв собирает фрукты вокруг.
+		Effects?.SpawnShockwave(source.GlobalPosition, radius, EffectStyle.Spark, 0.4f, 7f);
+		Effects?.SpawnSparks(source.GlobalPosition, EffectStyle.Spark, 12, 240f, 0.5f);
+
 		int bonusPerFruit = PerkEffects.ExplosionBonusPerFruit(_perks);
 		int bonusTotal = 0;
 
@@ -576,12 +605,14 @@ public sealed class PerkPlayer
 					// lvl4+: взрыв уничтожает мусор рядом.
 					if (PerkEffects.ExplosionDestroysTrash(_perks))
 					{
+						Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Stone, 10, 220f, 0.5f);
 						item.Despawn();
 					}
 					continue;
 				}
 
 				Vector2 at = item.GlobalPosition;
+				Effects?.SpawnSparks(at, EffectStyle.Spark, 8, 200f, 0.42f);
 				bonusTotal += bonusPerFruit;
 				AwardCaught(item, true);
 				if (cascade)
@@ -639,6 +670,8 @@ public sealed class PerkPlayer
 		foreach (FallingItem item in caught)
 		{
 			Game.HudNode?.SpawnPopup(item.GlobalPosition, "⚡");
+			Effects?.SpawnBolt(frogPos, item.GlobalPosition, EffectStyle.Gold);
+			Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Gold, 8, 200f, 0.42f);
 			AwardCaught(item);
 		}
 
@@ -663,6 +696,9 @@ public sealed class PerkPlayer
 			if (trash != null)
 			{
 				Game.HudNode?.SpawnPopup(trash.GlobalPosition, "⚡");
+				// Отдельная ветвь молнии: язык бьёт по мусору и он рассыпается искрами.
+				Effects?.SpawnBolt(frogPos, trash.GlobalPosition, EffectStyle.Frost, 0.24f, 6f);
+				Effects?.SpawnSparks(trash.GlobalPosition, EffectStyle.Frost, 12, 240f, 0.5f);
 				trash.Despawn();
 			}
 		}
@@ -699,6 +735,45 @@ public sealed class PerkPlayer
 		return false;
 	}
 
+	/// <summary>Вид корочки обездвиженного предмета: камень для мусора, лёд для фруктов.</summary>
+	private ItemFrost FrostLook(FallingItem item) =>
+		item.ItemType == ItemType.Trash && _gazeFreezeTimer > 0f && PerkEffects.GazeStonesTrash(_perks)
+			? ItemFrost.Stone
+			: ItemFrost.Ice;
+
+	/// <summary>Действует ли неуязвимость («Панцирь» ур. 5 или возрождение).</summary>
+	public bool Invulnerable => _invulnTimer > 0f;
+
+	/// <summary>Пересчитывает производные от набора перков значения: возрождения и таймеры.</summary>
+	public void RefreshPerkRuntime()
+	{
+		_revivesLeft = PerkEffects.ReviveCount(_perks);
+		_gazeTimer = PerkEffects.GazeInterval(_perks);
+		_autoCatchTimer = PerkEffects.LightningInterval(_perks);
+	}
+
+	/// <summary>Показывает зону замедления под полем: где именно падение замедляется.</summary>
+	public void SyncSlowZoneView(SlowZoneView? view, Vector2 fieldSize)
+	{
+		if (view == null)
+		{
+			return;
+		}
+		float fraction = PerkEffects.SlowZoneTopFraction(_perks);
+		view.SetZone(fraction <= 0f ? 0f : fieldSize.Y * fraction, fieldSize,
+			0.05f + 0.02f * _perks.LevelOf(PerkId.SlowZone));
+	}
+
+	/// <summary>Волна «изморози» по всему полю: момент заморозки «Взгляда василиска».</summary>
+	private void FrostWave()
+	{
+		if (Game == null)
+		{
+			return;
+		}
+		Effects?.SpawnFlashWave(Game.FrogNode?.GlobalPosition ?? Vector2.Zero, Game.ViewSize, EffectStyle.Frost, 0.7f);
+	}
+
 	/// <summary>«Зона замедления»: плавно замедляет падение предметов в нижней зоне экрана.</summary>
 	private void ApplySlowZone(FallingItem item, Vector2 viewSize, float dt)
 	{
@@ -707,8 +782,8 @@ public sealed class PerkPlayer
 		{
 			return;
 		}
-		float zoneStart = PerkEffects.SlowZoneCoversHalf(_perks) ? viewSize.Y * 0.5f : viewSize.Y * (2f / 3f);
-		if (item.Position.Y < zoneStart)
+		float zoneStart = viewSize.Y * PerkEffects.SlowZoneTopFraction(_perks);
+		if (zoneStart <= 0f || item.Position.Y < zoneStart)
 		{
 			return;
 		}
