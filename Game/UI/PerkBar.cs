@@ -73,6 +73,16 @@ public partial class PerkBar : Control
 	/// <summary>Идёт ли сейчас всплеск квадратика перка (проверки).</summary>
 	public bool IsPulsing(PerkId id) => FindIcon(id)?.IsPulsing == true;
 
+	/// <summary>Прогресс перезарядки перка в панели: 0 — только что сработал, 1 — готов.</summary>
+	public void SetCooldown(PerkId id, float progress)
+	{
+		PerkIcon? icon = FindIcon(id);
+		icon?.SetCooldown(progress);
+	}
+
+	/// <summary>Что показывает квадратик перка: -1 — перезарядка не показывается (проверки).</summary>
+	public float CooldownOf(PerkId id) => FindIcon(id)?.Cooldown ?? -1f;
+
 	private PerkIcon? FindIcon(PerkId id)
 	{
 		foreach (PerkIcon icon in _icons)
@@ -147,6 +157,7 @@ public partial class PerkIcon : Control
 	private Label? _levelLabel;
 	private Color _accent;
 	private float _pulseT;
+	private float _cooldown = -1f;
 
 	public PerkIcon(PerkId id, int level, Color accent, int maxLevel, float uiScale, bool empty = false)
 	{
@@ -226,6 +237,20 @@ public partial class PerkIcon : Control
 		QueueRedraw();
 	}
 
+	/// <summary>Прогресс перезарядки перка: 0 — только что сработал, 1 — готов (-1 — не показывается).</summary>
+	public float Cooldown => _cooldown;
+
+	/// <summary>Передаёт прогресс перезарядки: рисуется дугой по кромке слота.</summary>
+	public void SetCooldown(float progress)
+	{
+		float value = Mathf.Clamp(progress, 0f, 1f);
+		// Перерисовка только на заметном шаге: цикл — это ~100 кадров вместо 60 в секунду.
+		if (Mathf.Abs(value - _cooldown) < 0.01f)
+			return;
+		_cooldown = value;
+		QueueRedraw();
+	}
+
 	/// <summary>Обновляет масштаб квадратика и его подписи.</summary>
 	public void SetUiScale(float uiScale)
 	{
@@ -275,5 +300,25 @@ public partial class PerkIcon : Control
 			outline = outline.Lerp(Colors.White, pulse * 0.85f);
 		DrawRect(new Rect2(0.5f - grow, 0.5f - grow, s - 1f + grow * 2f, s - 1f + grow * 2f),
 			outline, false, Mathf.Max(1f, 1.5f * _uiScale) * (1f + pulse));
+
+		DrawCooldown(s);
+	}
+
+	/// <summary>Перезарядка перка: тонкая дуга по кромке слота, готовность — полное кольцо.</summary>
+	private void DrawCooldown(float side)
+	{
+		if (_empty || _cooldown < 0f || side <= 4f)
+			return;
+		Vector2 center = Vector2.One * (side * 0.5f);
+		float ring = side * 0.5f - Mathf.Max(1.5f, 2f * _uiScale);
+		float width = Mathf.Max(1.5f, 2f * _uiScale);
+		float start = -Mathf.Pi * 0.5f;
+		if (_cooldown >= 1f)
+		{
+			DrawArc(center, ring, start, start + Mathf.Tau, 28, MaxOutline, width, true);
+			return;
+		}
+		if (_cooldown > 0.02f)
+			DrawArc(center, ring, start, start + Mathf.Tau * _cooldown, 28, new Color(1f, 1f, 1f, 0.55f), width, true);
 	}
 }

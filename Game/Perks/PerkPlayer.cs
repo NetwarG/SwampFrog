@@ -29,6 +29,9 @@ public sealed class PerkPlayer
 	private float _invulnTimer;
 	/// <summary>Очки комбо текущей серии.</summary>
 	private int _combo;
+
+	/// <summary>Текущий множитель комбо (1 — серии нет): питает ауру вокруг лягушки.</summary>
+	public int ComboMultiplier => PerkEffects.ComboMultiplier(_combo, _perks);
 	/// <summary>Сколько возрождений осталось («Вторая жизнь»).</summary>
 	private int _revivesLeft;
 	/// <summary>Фрукты с момента последнего золотого (гарантия «Золотой лихорадки»).</summary>
@@ -236,6 +239,35 @@ public sealed class PerkPlayer
 				PerkTriggered(PerkId.LightningTongue);
 			}
 		}
+
+		// Панель перков показывает, когда таймерные перки готовы сработать снова.
+		SyncPerkCooldowns();
+	}
+
+	/// <summary>Передаёт в панель перков прогресс перезарядки таймерных перков.</summary>
+	private void SyncPerkCooldowns()
+	{
+		HUD? hud = Game?.HudNode;
+		if (hud == null)
+		{
+			return;
+		}
+		float gaze = PerkEffects.GazeInterval(_perks);
+		if (gaze > 0f)
+		{
+			hud.SetPerkCooldown(PerkId.BasiliskGaze, 1f - Mathf.Clamp(_gazeTimer / gaze, 0f, 1f));
+		}
+		float lightning = PerkEffects.LightningInterval(_perks);
+		if (lightning > 0f)
+		{
+			hud.SetPerkCooldown(PerkId.LightningTongue, 1f - Mathf.Clamp(_autoCatchTimer / lightning, 0f, 1f));
+		}
+		float freeze = PerkEffects.GoldFreezeDuration(_perks);
+		if (freeze > 0f)
+		{
+			float cycle = freeze + PerkEffects.GoldFreezeCooldown;
+			hud.SetPerkCooldown(PerkId.SlowZone, 1f - Mathf.Clamp(_goldFreezeCooldown / cycle, 0f, 1f));
+		}
 	}
 
 	/// <summary>Применяет к предмету заморозку/замедление/магнит перков в этом кадре.</summary>
@@ -326,6 +358,11 @@ public sealed class PerkPlayer
 			TakeDamage();
 			if (!PerkEffects.ComboKeepsOnMiss(_perks))
 			{
+				// Серия разбита: серое кольцо показывает сброс комбо.
+				if (_combo > 0)
+				{
+					ComboBreak();
+				}
 				_combo = 0;
 			}
 		}
@@ -423,6 +460,27 @@ public sealed class PerkPlayer
 		PerkTriggered(PerkId.SlowZone);
 	}
 
+	/// <summary>Поимка фрукта видна вспышкой у ладони: «Резиновый хват» и двойной хват «Липких ладоней».</summary>
+	public void CatchFlash(Vector2 handPosition, bool doubled)
+	{
+		if (doubled)
+		{
+			Game?.HudNode?.SpawnPopup(handPosition, "Двойной хват!");
+			Effects?.SpawnShockwave(handPosition, 62f, EffectStyle.Gold, 0.32f, 5f, false);
+			Effects?.SpawnSparks(handPosition, EffectStyle.Gold, 8, 210f, 0.4f);
+			PerkTriggered(PerkId.StickyPaws);
+			return;
+		}
+		// Без «Резинового хвата» поимка ничем не выделяется: очки и так видны в попапе.
+		if (PerkEffects.BonusScorePerFruit(_perks) <= 0)
+		{
+			return;
+		}
+		Effects?.SpawnShockwave(handPosition, 44f, EffectStyle.Syrup, 0.26f, 4f, false);
+		Effects?.SpawnSparks(handPosition, EffectStyle.Syrup, 4, 170f, 0.32f);
+		PerkTriggered(PerkId.RubberGrip);
+	}
+
 	/// <summary>
 	/// Единая точка начисления очков, комбо и XP. fromExplosion — сборы
 	/// «Фруктового взрыва»: очки без XP и без пополнения запаса Suika.
@@ -516,19 +574,43 @@ public sealed class PerkPlayer
 	/// <summary>Добавляет очки комбо и проверяет награду +1 HP («Комбо-мастер» ур. 4).</summary>
 	private void AddCombo(int amount)
 	{
+		int before = ComboMultiplier;
 		int hpEvery = PerkEffects.ComboHpEvery(_perks);
 		if (hpEvery <= 0)
 		{
 			_combo += amount;
-			return;
 		}
-		int oldTier = (int)(_combo / hpEvery);
-		_combo += amount;
-		int newTier = (int)(_combo / hpEvery);
-		if (newTier > oldTier)
+		else
 		{
-			GiveBonusHp();
+			int oldTier = (int)(_combo / hpEvery);
+			_combo += amount;
+			int newTier = (int)(_combo / hpEvery);
+			if (newTier > oldTier)
+			{
+				GiveBonusHp();
+			}
 		}
+		// Рост множителя виден отдельно: волна, подпись «Комбо x2» и пульс квадратика.
+		if (ComboMultiplier > before)
+		{
+			ComboTierUp(ComboMultiplier);
+		}
+	}
+
+	/// <summary>Момент роста множителя комбо: золотая волна у лягушки и подпись.</summary>
+	private void ComboTierUp(int multiplier)
+	{
+		Vector2 at = Game?.FrogNode?.GlobalPosition ?? Vector2.Zero;
+		Game?.HudNode?.SpawnPopup(at, "Комбо x" + multiplier);
+		Effects?.SpawnShockwave(at, 96f, EffectStyle.Gold, 0.4f, 6f);
+		PerkTriggered(PerkId.ComboMaster);
+	}
+
+	/// <summary>Серия прервана: серое кольцо у лягушки вместо потерянного множителя.</summary>
+	private void ComboBreak()
+	{
+		Vector2 at = Game?.FrogNode?.GlobalPosition ?? Vector2.Zero;
+		Effects?.SpawnShockwave(at, 84f, EffectStyle.Stone, 0.35f, 5f, false);
 	}
 
 	/// <summary>Восстанавливает одну жизнь (не превышая максимума) с попапом.</summary>
@@ -775,8 +857,10 @@ public sealed class PerkPlayer
 	public void RefreshPerkRuntime()
 	{
 		_revivesLeft = PerkEffects.ReviveCount(_perks);
-		_gazeTimer = PerkEffects.GazeInterval(_perks);
-		_autoCatchTimer = PerkEffects.LightningInterval(_perks);
+		// Отсчёты продолжаются, а не начинаются заново: иначе выбор любого перка отбрасывал бы
+		// заморозку василиска и разряд языка назад, и перки «замолкали» на весь забег.
+		_gazeTimer = PerkEffects.CarryCountdown(_gazeTimer, PerkEffects.GazeInterval(_perks));
+		_autoCatchTimer = PerkEffects.CarryCountdown(_autoCatchTimer, PerkEffects.LightningInterval(_perks));
 	}
 
 	/// <summary>Показывает зону замедления под полем: где именно падение замедляется.</summary>

@@ -470,6 +470,9 @@ public partial class HUD : Control
 	/// <summary>Всплеск квадратика перка в панели: видно, что перк сработал.</summary>
 	public void PulsePerkIcon(PerkId id) => _perkBar?.Pulse(id);
 
+	/// <summary>Прогресс перезарядки перка в панели: 0 — только что сработал, 1 — готов.</summary>
+	public void SetPerkCooldown(PerkId id, float progress) => _perkBar?.SetCooldown(id, progress);
+
 	/// <summary>Обновляет максимум жизней с учётом перка «Панцирь».</summary>
 	public void SetMaxLives(int max)
 	{

@@ -12,6 +12,22 @@ public sealed class PerkEffects
 	/// <summary>Сколько игровых пикселей отводим на один «метр» (магнит, взрыв и т.п.).</summary>
 	public const float MetersToPx = 55f;
 
+	/// <summary>Продолжение обратного отсчёта перка при смене набора уровней.
+	/// Ноль означает, что перк только что взят: отсчёт начинается с полного интервала,
+	/// иначе остаток сохраняется (и не больше нового интервала — уровень мог укоротить цикл).</summary>
+	public static float CarryCountdown(float current, float interval)
+	{
+		if (interval <= 0f)
+		{
+			return 0f;
+		}
+		if (current <= 0f)
+		{
+			return interval;
+		}
+		return Mathf.Min(current, interval);
+	}
+
 	/// <summary>Неуязвимость «Панциря» (ур. 5) после урона, секунды.</summary>
 	public const float ShellInvulnDuration = 2f;
 

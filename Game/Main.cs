@@ -34,6 +34,8 @@ public partial class Main : Node2D
 	private Node2D? _items;
 	private EffectLayer? _effects;
 	private SlowZoneView? _zoneView;
+	private HandOverlayView? _handOverlay;
+	private ComboAuraView? _comboAura;
 	private HUD? _hud;
 	private SuikaGame? _suika;
 	private Timer? _spawnTimer;
@@ -308,6 +310,13 @@ public partial class Main : Node2D
 		_zoneView = new SlowZoneView { Name = "SlowZone", Visible = false };
 		AddChild(_zoneView);
 		MoveChild(_zoneView, 0);
+		// Оверлей рук — сразу над водой и под предметами: след ладони идёт за ладонью.
+		_handOverlay = new HandOverlayView { Name = "HandOverlay" };
+		AddChild(_handOverlay);
+		MoveChild(_handOverlay, 1);
+		// Аура комбо видна поверх предметов и под слоем эффектов.
+		_comboAura = new ComboAuraView { Name = "ComboAura", ZIndex = 4 };
+		AddChild(_comboAura);
 		_effects = new EffectLayer { Name = "Effects", ZIndex = 5 };
 		AddChild(_effects);
 	}
@@ -393,6 +402,13 @@ public partial class Main : Node2D
 		// Перки: модификаторы лягушки и таймеры.
 		_perkPlayer.Update(dt, _frog);
 		_perkPlayer.SyncSlowZoneView(_zoneView, ViewSize);
+		// Руки и комбо видны отдельно: след/радиус ладони и аура множителя.
+		_handOverlay?.SetHands(
+			_frog.IsCatching ? _frog.GetHandPositions() : null,
+			_frog.HandHitRadiusWorld,
+			PerkEffects.MagnetRadius(_perkPlayer.State),
+			dt);
+		_comboAura?.SetState(_frog.GlobalPosition, _perkPlayer.ComboMultiplier);
 		if (_state != GameState.Playing) return;
 		_frog.UpdateMovement(dt);
 		_frog.UpdateArms(dt);
@@ -496,6 +512,10 @@ public partial class Main : Node2D
 		if (_frog?.AttachCaughtItem(item, handIndex) == true)
 		{
 			_frog.Pulse();
+			// Поимка с бонусом перка видна вспышкой у ладони; полная ладонь — «Двойной хват!».
+			Vector2[] hands = _frog.GetHandPositions();
+			bool doubled = _frog.MultiCatch && !_frog.CanHold(handIndex);
+			_perkPlayer.CatchFlash(hands[handIndex], doubled);
 		}
 	}
 
@@ -707,6 +727,8 @@ public partial class Main : Node2D
 	{
 		_effects?.Clear();
 		_zoneView?.SetZone(0f, ViewSize, 0.05f);
+		_handOverlay?.Clear();
+		_comboAura?.SetState(Vector2.Zero, 1);
 	}
 
 	private void ResetMainRoundData()
