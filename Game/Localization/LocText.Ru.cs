@@ -64,5 +64,16 @@ internal static partial class LocText
 		[L.PopBonusHp] = "+1 HP",
 		[L.PopExplosion] = "Взрыв +{0}",
 		[L.PopGaze] = "Взгляд василиска!",
+
+		[L.MenuProfile] = "Профиль",
+		[L.ProfileTitle] = "Профиль",
+		[L.ProfileBack] = "Назад",
+		[L.ProfileBestClassic] = "Рекорд: {0}",
+		[L.ProfileBestSuika] = "Рекорд Suika: {0}",
+		[L.ProfileStock] = "Фруктов в запасе: {0}",
+		[L.ProfileRuns] = "Партий сыграно: {0}",
+		[L.ProfileCaught] = "Поймано фруктов: {0}",
+		[L.ProfileGolden] = "Золотых фруктов: {0}",
+		[L.ProfileMerges] = "Слияний в Suika: {0}",
 	};
 }

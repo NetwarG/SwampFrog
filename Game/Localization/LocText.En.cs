@@ -64,5 +64,16 @@ internal static partial class LocText
 		[L.PopBonusHp] = "+1 HP",
 		[L.PopExplosion] = "Blast +{0}",
 		[L.PopGaze] = "Basilisk gaze!",
+
+		[L.MenuProfile] = "Profile",
+		[L.ProfileTitle] = "Profile",
+		[L.ProfileBack] = "Back",
+		[L.ProfileBestClassic] = "Best: {0}",
+		[L.ProfileBestSuika] = "Suika best: {0}",
+		[L.ProfileStock] = "Fruits in stock: {0}",
+		[L.ProfileRuns] = "Runs played: {0}",
+		[L.ProfileCaught] = "Fruits caught: {0}",
+		[L.ProfileGolden] = "Golden fruits: {0}",
+		[L.ProfileMerges] = "Suika merges: {0}",
 	};
 }

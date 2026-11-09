@@ -48,6 +48,9 @@ public partial class Main : Node2D
 	private readonly PerkPlayer _perkPlayer = new();
 	private readonly SubPerkPlayer _subPerkPlayer = new();
 
+	/// <summary>Постоянный профиль игрока: пожизненная статистика (см. Game/Meta/).</summary>
+	private readonly MetaProfile _meta = MetaProfile.Load();
+
 	private int _score;
 	/// <summary>Секунды текущей партии — источник роста сложности.</summary>
 	private float _runTime;
@@ -156,6 +159,12 @@ public partial class Main : Node2D
 		if (frame == _lastBackRequestFrame) return;
 		_lastBackRequestFrame = frame;
 
+		if (_state == GameState.Menu && _hud?.IsProfileOpen == true)
+		{
+			_hud.HideProfile();
+			return;
+		}
+
 		switch (_state)
 		{
 			case GameState.Playing:
@@ -224,6 +233,9 @@ public partial class Main : Node2D
 	public void GameOverFromPerk() => GameOver();
 	public void RegisterFruitFromPerk(FruitKind kind) => RegisterCollectedFruit(kind);
 
+	/// <summary>Учитывает слияние фруктов в Suika для статистики профиля.</summary>
+	public void RegisterSuikaMerge() => _meta.Stats.OnSuikaMerge();
+
 	public Control? UiHost { get; set; }
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
 	public Rect2 ViewBounds => new(Vector2.Zero, ViewSize);
@@ -279,6 +291,7 @@ public partial class Main : Node2D
 		_suika.ExitRequested += CloseSuika;
 		_hud.PlayPressed += StartGame;
 		_hud.MiniGamePressed += OpenSuika;
+		_hud.ProfilePressed += OpenProfile;
 		_hud.ExitPressed += QuitGame;
 		_hud.RestartPressed += Restart;
 		_hud.MenuPressed += GoToMenu;
@@ -524,6 +537,8 @@ public partial class Main : Node2D
 	/// <summary>Фрукт полностью вернулся к лягушке — начисляем награду (очки, комбо, перки).</summary>
 	private void OnCaughtItemReturned(FallingItem item)
 	{
+		if (item.ItemType == ItemType.Fruit)
+			_meta.Stats.OnFruitCaught(item.IsGolden);
 		_perkPlayer.AwardCaught(item);
 	}
 
@@ -678,8 +693,19 @@ public partial class Main : Node2D
 		_suika?.Open();
 	}
 
+	/// <summary>Показывает экран профиля: рекорды, запас и пожизненная статистика.</summary>
+	private void OpenProfile()
+	{
+		if (_state != GameState.Menu)
+		{
+			return;
+		}
+		_hud?.ShowProfile(_meta.Snapshot(_highScore, _suika?.BestScore ?? 0, TotalFruitStock()));
+	}
+
 	private void CloseSuika()
 	{
+		_meta.Save();
 		_suika?.Close();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
@@ -697,6 +723,7 @@ public partial class Main : Node2D
 	public void GoToMenu()
 	{
 		_spawnTimer?.Stop();
+		_meta.Save();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
 		_hud?.HidePause();
@@ -770,6 +797,8 @@ public partial class Main : Node2D
 			_highScore = _score;
 			SaveHighScore(_highScore);
 		}
+		_meta.Stats.OnRunFinished();
+		_meta.Save();
 		_spawnTimer?.Stop();
 		_hud?.ShowGameOver(_score, _highScore);
 	}

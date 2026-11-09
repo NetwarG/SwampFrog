@@ -27,6 +27,7 @@ public partial class HUD : Control
 	private Control? _gameOverRoot;
 	private Control? _startRoot;
 	private Button? _miniGameButton;
+	private Button? _profileButton;
 	private bool _miniGameEnabled = true;
 	private Label? _suikaHintLabel;
 	private Label? _finalScore;
@@ -52,10 +53,14 @@ public partial class HUD : Control
 
 	/// <summary>Выпадающее меню паузы у правого края поля.</summary>
 	private PauseMenu? _pauseMenu;
+
+	/// <summary>Экран профиля игрока поверх главного меню.</summary>
+	private ProfilePanel? _profilePanel;
 	private bool _gameplayVisible;
 
 	public event Action? PlayPressed;
 	public event Action? MiniGamePressed;
+	public event Action? ProfilePressed;
 	public event Action? ExitPressed;
 	public event Action? RestartPressed;
 	public event Action? MenuPressed;
@@ -95,6 +100,9 @@ public partial class HUD : Control
 		_pauseOverlay.ResumePressed += () => ResumePressed?.Invoke();
 		_pauseOverlay.MenuPressed += () => PauseMenuPressed?.Invoke();
 
+		_profilePanel = new ProfilePanel { ZIndex = 75 };
+		AddChild(_profilePanel);
+
 		Loc.Changed += Localize;
 	}
 
@@ -108,6 +116,7 @@ public partial class HUD : Control
 		if (_playButton != null) _playButton.Text = Loc.T(L.MenuPlay);
 		if (_exitButton != null) _exitButton.Text = Loc.T(L.MenuExit);
 		if (_miniGameButton != null) _miniGameButton.Text = Loc.T(L.MenuMiniGame);
+		if (_profileButton != null) _profileButton.Text = Loc.T(L.MenuProfile);
 		if (_gameOverTitle != null) _gameOverTitle.Text = Loc.T(L.GameOverTitle);
 		if (_restartButton != null) _restartButton.Text = Loc.T(L.Restart);
 		if (_gameOverMenuButton != null) _gameOverMenuButton.Text = Loc.T(L.ToMenu);
@@ -289,9 +298,11 @@ public partial class HUD : Control
 		_playButton = UiStyle.MakeButton(Loc.T(L.MenuPlay), ui, new Color("b4e863"));
 		_exitButton = UiStyle.MakeButton(Loc.T(L.MenuExit), ui, new Color("ff8c7a"));
 		_miniGameButton = UiStyle.MakeButton(Loc.T(L.MenuMiniGame), ui, new Color("ffd45e"));
+		_profileButton = UiStyle.MakeButton(Loc.T(L.MenuProfile), ui, new Color("7fd6f2"));
 		_playButton.Pressed += () => PlayPressed?.Invoke();
 		_exitButton.Pressed += () => ExitPressed?.Invoke();
 		_miniGameButton!.Pressed += () => MiniGamePressed?.Invoke();
+		_profileButton!.Pressed += () => ProfilePressed?.Invoke();
 		// Применяем состояние, заданное до создания кнопки (например из _Ready).
 		SetMiniGameEnabled(_miniGameEnabled);
 
@@ -300,6 +311,7 @@ public partial class HUD : Control
 		box.AddChild(_startSub2);
 		box.AddChild(_playButton);
 		box.AddChild(_miniGameButton!);
+		box.AddChild(_profileButton!);
 		box.AddChild(_exitButton);
 
 		var madeByText = UiStyle.MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f));
@@ -352,6 +364,15 @@ public partial class HUD : Control
 			_startRoot.Visible = false;
 		}
 	}
+
+	/// <summary>Показывает экран профиля поверх главного меню.</summary>
+	public void ShowProfile(ProfileSnapshot snapshot) => _profilePanel?.Show(snapshot);
+
+	/// <summary>Скрывает экран профиля.</summary>
+	public void HideProfile() => _profilePanel?.Hide();
+
+	/// <summary>Открыт ли экран профиля: Escape/«Назад» закрывает его первым.</summary>
+	public bool IsProfileOpen => _profilePanel?.Visible ?? false;
 
 	/// <summary>
 	/// Блокирует/разблокирует кнопку «Мини-игра: Suika» в зависимости от того,

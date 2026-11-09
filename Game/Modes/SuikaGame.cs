@@ -84,6 +84,9 @@ public partial class SuikaGame : Node2D
 	private bool _active;
 	private bool _gameOver;
 
+	/// <summary>Рекорд мини-игры: используется в профиле игрока.</summary>
+	public int BestScore => _bestScore;
+
 	/// <summary>Запас закончился — ждём, пока последний фрукт упадёт и устаканится.</summary>
 	private bool _stockExhausted;
 

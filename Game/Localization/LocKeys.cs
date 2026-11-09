@@ -69,4 +69,16 @@ public static class L
 	public const string PopBonusHp = "popup.bonusHp";
 	public const string PopExplosion = "popup.explosion";
 	public const string PopGaze = "popup.gaze";
+
+	// ---------- Профиль игрока ----------
+	public const string MenuProfile = "menu.profile";
+	public const string ProfileTitle = "profile.title";
+	public const string ProfileBack = "profile.back";
+	public const string ProfileBestClassic = "profile.bestClassic";
+	public const string ProfileBestSuika = "profile.bestSuika";
+	public const string ProfileStock = "profile.stock";
+	public const string ProfileRuns = "profile.runs";
+	public const string ProfileCaught = "profile.caught";
+	public const string ProfileGolden = "profile.golden";
+	public const string ProfileMerges = "profile.merges";
 }
