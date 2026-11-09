@@ -14,6 +14,12 @@ public partial class PauseOverlay : Control
 
 	private Label? _statsLabel;
 	private Label? _subPerkLabel;
+	private Label? _titleLabel;
+	private Button? _resumeButton;
+	private Button? _menuButton;
+	private int _score;
+	private int _lives;
+	private SubPerkSummary[] _subPerks = System.Array.Empty<SubPerkSummary>();
 
 	public event Action? ResumePressed;
 	public event Action? MenuPressed;
@@ -37,21 +43,46 @@ public partial class PauseOverlay : Control
 		ModalContent.Mount(this, box);
 
 		float ui = UiScale;
-		Label title = UiStyle.MakeLabel("Пауза", (int)Mathf.Round(52f * ui), new Color("ffd45e"));
+		_titleLabel = UiStyle.MakeLabel(Loc.T(L.PauseTitle), (int)Mathf.Round(52f * ui), new Color("ffd45e"));
 		_statsLabel = UiStyle.MakeLabel(string.Empty, (int)Mathf.Round(28f * ui), new Color(1f, 1f, 1f, 0.88f));
 		_subPerkLabel = MakeSubPerkLabel(ui);
-		Button resume = UiStyle.MakeButton("Продолжить", ui, new Color("b4e863"));
-		Button menu = UiStyle.MakeButton("В меню", ui, new Color("ffd45e"));
-		resume.Pressed += () => ResumePressed?.Invoke();
-		menu.Pressed += () => MenuPressed?.Invoke();
+		_resumeButton = UiStyle.MakeButton(Loc.T(L.Resume), ui, new Color("b4e863"));
+		_menuButton = UiStyle.MakeButton(Loc.T(L.ToMenu), ui, new Color("ffd45e"));
+		_resumeButton.Pressed += () => ResumePressed?.Invoke();
+		_menuButton.Pressed += () => MenuPressed?.Invoke();
 
-		box.AddChild(title);
+		box.AddChild(_titleLabel);
 		box.AddChild(_statsLabel);
 		box.AddChild(_subPerkLabel);
-		box.AddChild(resume);
-		box.AddChild(menu);
+		box.AddChild(_resumeButton);
+		box.AddChild(_menuButton);
 
 		Visible = false;
+		Loc.Changed += Localize;
+	}
+
+	public override void _ExitTree() => Loc.Changed -= Localize;
+
+	/// <summary>Перечитывает подписи окна при смене языка.</summary>
+	private void Localize()
+	{
+		if (_titleLabel != null) _titleLabel.Text = Loc.T(L.PauseTitle);
+		if (_resumeButton != null) _resumeButton.Text = Loc.T(L.Resume);
+		if (_menuButton != null) _menuButton.Text = Loc.T(L.ToMenu);
+		RefreshText();
+	}
+
+	/// <summary>Обновляет показатели партии и список субперков на текущем языке.</summary>
+	private void RefreshText()
+	{
+		if (_statsLabel != null)
+		{
+			_statsLabel.Text = Loc.T(L.PauseStats, _score, _lives);
+		}
+		if (_subPerkLabel != null)
+		{
+			_subPerkLabel.Text = FormatSubPerks(_subPerks);
+		}
 	}
 
 	public float UiScale => 1f;
@@ -59,14 +90,10 @@ public partial class PauseOverlay : Control
 	/// <summary>Показывает оверлей с показателями партии и списком активных субперков.</summary>
 	public void Show(int score, int lives, SubPerkSummary[] subPerks)
 	{
-		if (_statsLabel != null)
-		{
-			_statsLabel.Text = $"Счёт: {score}    HP: {lives}";
-		}
-		if (_subPerkLabel != null)
-		{
-			_subPerkLabel.Text = FormatSubPerks(subPerks);
-		}
+		_score = score;
+		_lives = lives;
+		_subPerks = subPerks ?? System.Array.Empty<SubPerkSummary>();
+		RefreshText();
 		Visible = true;
 	}
 
@@ -84,13 +111,13 @@ public partial class PauseOverlay : Control
 	private static string FormatSubPerks(SubPerkSummary[] subPerks)
 	{
 		if (subPerks == null || subPerks.Length == 0)
-			return "Субперков пока нет";
+			return Loc.T(L.SubPerksNone);
 
 		var parts = new System.Collections.Generic.List<string>();
 		foreach (SubPerkSummary perk in subPerks)
 		{
-			parts.Add($"{perk.Name} ур.{perk.Level} ({perk.Percent}%)");
+			parts.Add(Loc.T(L.SubPerkEntry, perk.Name, perk.Level, perk.Percent));
 		}
-		return "Субперки:\n" + string.Join(" · ", parts);
+		return Loc.T(L.SubPerksHeader) + "\n" + string.Join(" · ", parts);
 	}
 }

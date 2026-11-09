@@ -35,6 +35,15 @@ public partial class HUD : Control
 	private Label? _hint;
 	private Control? _popups;
 
+	private int _score;
+	private Label? _startSub;
+	private Label? _startSub2;
+	private Button? _playButton;
+	private Button? _exitButton;
+	private Label? _gameOverTitle;
+	private Button? _restartButton;
+	private Button? _gameOverMenuButton;
+
 	/// <summary>Оверлей выбора перка (работает и на паузе игры).</summary>
 	private PerkSelectionOverlay? _perkOverlay;
 
@@ -85,6 +94,28 @@ public partial class HUD : Control
 		AddChild(_pauseOverlay);
 		_pauseOverlay.ResumePressed += () => ResumePressed?.Invoke();
 		_pauseOverlay.MenuPressed += () => PauseMenuPressed?.Invoke();
+
+		Loc.Changed += Localize;
+	}
+
+	public override void _ExitTree() => Loc.Changed -= Localize;
+
+	/// <summary>Перечитывает подписи интерфейса при смене языка (см. <see cref="Loc.Changed"/>).</summary>
+	private void Localize()
+	{
+		if (_startSub != null) _startSub.Text = Loc.T(L.MenuSubtitle1);
+		if (_startSub2 != null) _startSub2.Text = Loc.T(L.MenuSubtitle2);
+		if (_playButton != null) _playButton.Text = Loc.T(L.MenuPlay);
+		if (_exitButton != null) _exitButton.Text = Loc.T(L.MenuExit);
+		if (_miniGameButton != null) _miniGameButton.Text = Loc.T(L.MenuMiniGame);
+		if (_gameOverTitle != null) _gameOverTitle.Text = Loc.T(L.GameOverTitle);
+		if (_restartButton != null) _restartButton.Text = Loc.T(L.Restart);
+		if (_gameOverMenuButton != null) _gameOverMenuButton.Text = Loc.T(L.ToMenu);
+		if (_scoreLabel != null)
+		{
+			_scoreLabel.Text = Loc.T(L.Score, _score);
+			UpdateCounterPositions();
+		}
 	}
 
 	/// <summary>
@@ -148,7 +179,7 @@ public partial class HUD : Control
 	private void BuildCounters()
 	{
 		// Счёт и жизни располагаются в одной строке слева, без панели и контейнеров.
-		_scoreLabel = MakeCounter("Score", "Счет: 0");
+		_scoreLabel = MakeCounter("Score", Loc.T(L.Score, 0));
 		_healthDisplay = new HealthDisplay
 		{
 			Name = "HP",
@@ -249,27 +280,27 @@ public partial class HUD : Control
 		float ui = UiScale;
 
 		Label title = UiStyle.MakeLabel("Swamp Frog", (int)Mathf.Round(50f * ui), new Color("ffe066"));
-		Label sub = UiStyle.MakeLabel("Собирай фрукты, не лови мусор!", (int)Mathf.Round(24f * ui), new Color("ffffff"));
-		Label sub2 = UiStyle.MakeLabel("Упустишь фрукт — потеряешь жизнь.", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f));
+		_startSub = UiStyle.MakeLabel(Loc.T(L.MenuSubtitle1), (int)Mathf.Round(24f * ui), new Color("ffffff"));
+		_startSub2 = UiStyle.MakeLabel(Loc.T(L.MenuSubtitle2), (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f));
 		// Тень и обводка: на светлом фоне меню надписи остаются читаемыми.
 		AddMenuTextShadow(title, ui);
-		AddMenuTextShadow(sub, ui);
-		AddMenuTextShadow(sub2, ui);
-		Button play = UiStyle.MakeButton("Играть", ui, new Color("b4e863"));
-		Button exit = UiStyle.MakeButton("Выйти", ui, new Color("ff8c7a"));
-		_miniGameButton = UiStyle.MakeButton("Мини-игра: Suika", ui, new Color("ffd45e"));
-		play.Pressed += () => PlayPressed?.Invoke();
-		exit.Pressed += () => ExitPressed?.Invoke();
+		AddMenuTextShadow(_startSub, ui);
+		AddMenuTextShadow(_startSub2, ui);
+		_playButton = UiStyle.MakeButton(Loc.T(L.MenuPlay), ui, new Color("b4e863"));
+		_exitButton = UiStyle.MakeButton(Loc.T(L.MenuExit), ui, new Color("ff8c7a"));
+		_miniGameButton = UiStyle.MakeButton(Loc.T(L.MenuMiniGame), ui, new Color("ffd45e"));
+		_playButton.Pressed += () => PlayPressed?.Invoke();
+		_exitButton.Pressed += () => ExitPressed?.Invoke();
 		_miniGameButton!.Pressed += () => MiniGamePressed?.Invoke();
 		// Применяем состояние, заданное до создания кнопки (например из _Ready).
 		SetMiniGameEnabled(_miniGameEnabled);
 
 		box.AddChild(title);
-		box.AddChild(sub);
-		box.AddChild(sub2);
-		box.AddChild(play);
+		box.AddChild(_startSub);
+		box.AddChild(_startSub2);
+		box.AddChild(_playButton);
 		box.AddChild(_miniGameButton!);
-		box.AddChild(exit);
+		box.AddChild(_exitButton);
 
 		var madeByText = UiStyle.MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f));
 		AddMenuTextShadow(madeByText, ui);
@@ -282,9 +313,12 @@ public partial class HUD : Control
 		madeByText.HorizontalAlignment = HorizontalAlignment.Center;
 		_startRoot.AddChild(madeByText);
 
-		// Управление звуком показывается вместе с меню и скрывается вместе с ним:
-		// в партии, Suika и оверлеях его нет (см. SoundControls).
+		// Управление звуком и языком показывается вместе с меню и скрывается вместе с ним:
+		// в партии, Suika и оверлеях их нет (см. SoundControls, LanguageButton).
 		_startRoot.AddChild(new SoundControls { ZIndex = 20 });
+		var language = new LanguageButton { ZIndex = 20 };
+		_startRoot.AddChild(language);
+		language.Position = new Vector2(16f * ui, 16f * ui);
 	}
 
 	/// <summary>
@@ -343,7 +377,7 @@ public partial class HUD : Control
 			_suikaHintLabel = new Label
 			{
 
-				Text = "Сначала собери фрукты в основном режиме!",
+				Text = Loc.T(L.NeedFruits),
 				MouseFilter = MouseFilterEnum.Ignore,
 				HorizontalAlignment = HorizontalAlignment.Center,
 				ZIndex = 60
@@ -414,19 +448,19 @@ public partial class HUD : Control
 
 		float ui = UiScale;
 
-		Label title = UiStyle.MakeLabel("Игра окончена!", (int)Mathf.Round(48f * ui), new Color("ffd45e"));
-		_finalScore = UiStyle.MakeLabel("Счёт: 0", (int)Mathf.Round(32f * ui), new Color("ffffff"));
-		_finalHigh = UiStyle.MakeLabel("Рекорд: 0", (int)Mathf.Round(32f * ui), new Color("cfe9c2"));
-		Button restart = UiStyle.MakeButton("Заново", ui, new Color("b4e863"));
-		Button menu = UiStyle.MakeButton("В меню", ui, new Color("ffd45e"));
-		restart.Pressed += () => RestartPressed?.Invoke();
-		menu.Pressed += () => MenuPressed?.Invoke();
+		_gameOverTitle = UiStyle.MakeLabel(Loc.T(L.GameOverTitle), (int)Mathf.Round(48f * ui), new Color("ffd45e"));
+		_finalScore = UiStyle.MakeLabel(Loc.T(L.Score, 0), (int)Mathf.Round(32f * ui), new Color("ffffff"));
+		_finalHigh = UiStyle.MakeLabel(Loc.T(L.HighScore, 0), (int)Mathf.Round(32f * ui), new Color("cfe9c2"));
+		_restartButton = UiStyle.MakeButton(Loc.T(L.Restart), ui, new Color("b4e863"));
+		_gameOverMenuButton = UiStyle.MakeButton(Loc.T(L.ToMenu), ui, new Color("ffd45e"));
+		_restartButton.Pressed += () => RestartPressed?.Invoke();
+		_gameOverMenuButton.Pressed += () => MenuPressed?.Invoke();
 
-		box.AddChild(title);
+		box.AddChild(_gameOverTitle);
 		box.AddChild(_finalScore);
 		box.AddChild(_finalHigh);
-		box.AddChild(restart);
-		box.AddChild(menu);
+		box.AddChild(_restartButton);
+		box.AddChild(_gameOverMenuButton);
 	}
 
 	/// <summary>Мимолётная подсказка «держи палец» после старта.</summary>
@@ -436,7 +470,7 @@ public partial class HUD : Control
 		float ui = UiScale;
 		var hint = new Label
 		{
-			Text = "Держи палец на экране — руки тянутся к нему",
+			Text = Loc.T(L.HintTouch),
 			MouseFilter = MouseFilterEnum.Ignore,
 			AnchorLeft = 0.5f,
 			AnchorRight = 0.5f,
@@ -464,9 +498,10 @@ public partial class HUD : Control
 
 	public void SetScore(int score)
 	{
+		_score = score;
 		if (_scoreLabel != null)
 		{
-			_scoreLabel.Text = $"Счет: {score}";
+			_scoreLabel.Text = Loc.T(L.Score, score);
 			UpdateCounterPositions();
 		}
 	}
@@ -529,11 +564,11 @@ public partial class HUD : Control
 	{
 		if (_finalScore != null)
 		{
-			_finalScore.Text = $"Счёт: {score}";
+			_finalScore.Text = Loc.T(L.Score, score);
 		}
 		if (_finalHigh != null)
 		{
-			_finalHigh.Text = $"Рекорд: {highScore}";
+			_finalHigh.Text = Loc.T(L.HighScore, highScore);
 		}
 		if (_gameOverRoot != null)
 		{
@@ -671,7 +706,7 @@ public partial class XpBar : Control
 		{
 			return;
 		}
-		_levelUpLabel.Text = $"Уровень {level}!";
+		_levelUpLabel.Text = Loc.T(L.LevelUp, level);
 		_levelUpLabel.Visible = true;
 
 		Tween tween = CreateTween();
@@ -705,7 +740,7 @@ public partial class XpBar : Control
 
 		int size = (int)Mathf.Round(14f * _uiScale);
 		_levelLabel.AddThemeFontSizeOverride("font_size", size);
-		_levelLabel.Text = $"LV {_level}";
+		_levelLabel.Text = Loc.T(L.LevelShort, _level);
 
 		// Подпись по центру над полосой.
 		float w = Width * _uiScale;

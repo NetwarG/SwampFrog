@@ -54,6 +54,18 @@ public partial class PerkSelectionOverlay : Control
 		Resized += RecenterIfVisible;
 
 		Visible = false;
+		Loc.Changed += OnLanguageChanged;
+	}
+
+	public override void _ExitTree() => Loc.Changed -= OnLanguageChanged;
+
+	/// <summary>Смена языка: карточки перков пересобираются на новом языке, если окно открыто.</summary>
+	private void OnLanguageChanged()
+	{
+		if (!Visible)
+			return;
+		RebuildCards();
+		Recenter();
 	}
 
 	/// <summary>Показывает оверлей с карточками перков.</summary>
@@ -142,19 +154,19 @@ public partial class PerkSelectionOverlay : Control
 		float contentWidth = GetContentWidth(ui);
 		_box.CustomMinimumSize = new Vector2(contentWidth, 0f);
 
-		_box.AddChild(MakeLabel($"Новый перк!  Уровень {_level}", (int)Mathf.Round(44f * ui), new Color("ffd45e")));
-		_box.AddChild(MakeLabel($"Перки: {_selectedCount}/{_maxPerks} — выбери одно улучшение, удерживай карточку 1 сек", (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.92f)));
+		_box.AddChild(MakeLabel(Loc.T(L.PerkNewTitle, _level), (int)Mathf.Round(44f * ui), new Color("ffd45e")));
+		_box.AddChild(MakeLabel(Loc.T(L.PerkCount, _selectedCount, _maxPerks), (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.92f)));
 
 		foreach (PerkOffer card in _cards)
 		{
 			PerkId id = card.Id;
-			string text = $"{card.Name}\nУр. {card.CurrentLevel}/{card.MaxLevel} → {card.CurrentLevel + 1}\n{card.NextLevelEffect}";
+			string text = Loc.T(L.PerkCard, card.Name, card.CurrentLevel, card.MaxLevel, card.CurrentLevel + 1, card.NextLevelEffect);
 			HoldCardButton button = MakeCardButton(text, card.Accent, PerkCatalog.Icon(card.Id), ui);
 			button.Held += () => PerkPicked?.Invoke(id);
 			_box.AddChild(button);
 		}
 
-		_box.AddChild(MakeLabel($"За забег можно взять {_maxPerks} перков — потом их можно докачать до максимума", (int)Mathf.Round(24f * ui), new Color(1f, 1f, 1f, 0.75f)));
+		_box.AddChild(MakeLabel(Loc.T(L.PerkFooter, _maxPerks), (int)Mathf.Round(24f * ui), new Color(1f, 1f, 1f, 0.75f)));
 	}
 
 	private HoldCardButton MakeCardButton(string text, Color accent, Texture2D? icon, float ui)

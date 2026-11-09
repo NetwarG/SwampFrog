@@ -33,18 +33,38 @@ public enum PerkId
 public sealed class PerkDefinition
 {
 	public required PerkId Id;
-	public required string Name;
 
-	/// <summary>Слоган-подзаголовок, например «Фрукты прилипают».</summary>
-	public required string Tagline;
+	/// <summary>Русское имя перка.</summary>
+	public required string NameRu;
+
+	/// <summary>Английское имя перка.</summary>
+	public required string NameEn;
+
+	/// <summary>Слоган-подзаголовок по-русски, например «Фрукты прилипают».</summary>
+	public required string TaglineRu;
+
+	/// <summary>Слоган-подзаголовок по-английски.</summary>
+	public required string TaglineEn;
 
 	public required int MaxLevel;
 
-	/// <summary>Эффект каждого уровня (длина массива == MaxLevel).</summary>
-	public required string[] LevelEffects;
+	/// <summary>Эффект каждого уровня по-русски (длина массива == MaxLevel).</summary>
+	public required string[] LevelEffectsRu;
+
+	/// <summary>Эффект каждого уровня по-английски (длина массива == MaxLevel).</summary>
+	public required string[] LevelEffectsEn;
 
 	/// <summary>Акцентный цвет карточки перка.</summary>
 	public required Color Accent;
+
+	/// <summary>Имя перка на текущем языке интерфейса.</summary>
+	public string Name => Loc.Pick(NameRu, NameEn);
+
+	/// <summary>Слоган на текущем языке интерфейса.</summary>
+	public string Tagline => Loc.Pick(TaglineRu, TaglineEn);
+
+	/// <summary>Эффекты уровней на текущем языке интерфейса.</summary>
+	public string[] LevelEffects => Loc.Pick(LevelEffectsRu, LevelEffectsEn);
 }
 
 /// <summary>Готовая «карточка» перка для оверлея выбора.</summary>

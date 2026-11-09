@@ -1,0 +1,68 @@
+using System.Collections.Generic;
+
+namespace SwampFrog;
+
+/// <summary>Английские строки интерфейса. Ключи — константы <see cref="L"/>.</summary>
+internal static partial class LocText
+{
+	internal static readonly Dictionary<string, string> En = new()
+	{
+		[L.MenuSubtitle1] = "Catch the fruit, dodge the trash!",
+		[L.MenuSubtitle2] = "Miss a fruit and you lose a life.",
+		[L.MenuPlay] = "Play",
+		[L.MenuExit] = "Quit",
+		[L.MenuMiniGame] = "Mini-game: Suika",
+		[L.HintTouch] = "Hold your finger on the screen — the arms reach for it",
+		[L.NeedFruits] = "Collect some fruit in classic mode first!",
+		[L.Score] = "Score: {0}",
+		[L.GameOverTitle] = "Game over!",
+		[L.HighScore] = "Best: {0}",
+		[L.Restart] = "Restart",
+		[L.ToMenu] = "Menu",
+		[L.LevelUp] = "Level {0}!",
+		[L.LevelShort] = "LV {0}",
+
+		[L.PauseTitle] = "Paused",
+		[L.Resume] = "Resume",
+		[L.PauseStats] = "Score: {0}    HP: {1}",
+		[L.SubPerksNone] = "No sub-perks yet",
+		[L.SubPerksHeader] = "Sub-perks:",
+		[L.SubPerkEntry] = "{0} lv.{1} ({2}%)",
+
+		[L.PerkNewTitle] = "New perk!  Level {0}",
+		[L.PerkCount] = "Perks: {0}/{1} — pick one upgrade, hold a card for 1 sec",
+		[L.PerkCard] = "{0}\nLv. {1}/{2} → {3}\n{4}",
+		[L.PerkFooter] = "You can take {0} perks per run — afterwards you can level them to the max",
+
+		[L.SuikaScore] = "Score  {0}",
+		[L.SuikaBest] = "Best  {0}",
+		[L.SuikaStock] = "Fruits: {0}",
+		[L.SuikaNext] = "Next",
+		[L.SuikaHintDrop] = "Release to drop",
+		[L.SuikaOverflow] = "Jar is full",
+		[L.SuikaNoFruits] = "Out of fruits",
+		[L.SuikaGameOverScore] = "Score: {0}",
+		[L.SuikaRetry] = "Play again",
+		[L.SuikaStockTitle] = "Collected fruits",
+		[L.SuikaStockRow] = "{0} — {1}",
+		[L.SuikaStockTotal] = "Total: {0}",
+		[L.SuikaStart] = "Start game",
+		[L.SuikaHowTo] = "How to play",
+		[L.SuikaRule1] = "Drag your finger across the screen — the frog aims. Release — the fruit flies into the jar.",
+		[L.SuikaRule2] = "Two identical fruits merge into the next fruit on contact.",
+		[L.SuikaRule3] = "Fruits come from the stock collected in classic mode.",
+		[L.SuikaRule4] = "Don't let the jar overflow: the overflow line is the limit.",
+		[L.SuikaChain] = "Merge chain:",
+		[L.SuikaGotIt] = "Got it",
+
+		[L.PopStone] = "Stone!",
+		[L.PopBounce] = "Bounce!",
+		[L.PopMiss] = "Miss!",
+		[L.PopRevive] = "Revive!",
+		[L.PopDoubleCatch] = "Double catch!",
+		[L.PopCombo] = "Combo x{0}",
+		[L.PopBonusHp] = "+1 HP",
+		[L.PopExplosion] = "Blast +{0}",
+		[L.PopGaze] = "Basilisk gaze!",
+	};
+}

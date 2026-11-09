@@ -39,18 +39,37 @@ public enum SubPerkPolarity
 public sealed class SubPerkDefinition
 {
 	public required SubPerkId Id;
-	public required string Name;
+
+	/// <summary>Русское имя субперка.</summary>
+	public required string NameRu;
+
+	/// <summary>Английское имя субперка.</summary>
+	public required string NameEn;
+
 	public required SubPerkPolarity Polarity;
 
-	/// <summary>Слоган-подзаголовок, например «Опыт капает».</summary>
-	public required string Tagline;
+	/// <summary>Слоган-подзаголовок по-русски, например «Опыт капает».</summary>
+	public required string TaglineRu;
+
+	/// <summary>Слоган-подзаголовок по-английски.</summary>
+	public required string TaglineEn;
 
 	/// <summary>Акцентный цвет карточки субперка.</summary>
 	public required Color Accent;
+
+	/// <summary>Имя субперка на текущем языке интерфейса.</summary>
+	public string Name => Loc.Pick(NameRu, NameEn);
+
+	/// <summary>Слоган на текущем языке интерфейса.</summary>
+	public string Tagline => Loc.Pick(TaglineRu, TaglineEn);
 }
 
 /// <summary>Готовая «карточка» субперка для оверлея выбора.</summary>
 public record SubPerkOffer(SubPerkId Id, string Name, string Tagline, SubPerkPolarity Polarity, int CurrentLevel, int GainPercent, Color Accent);
 
 /// <summary>Строка списка активных субперков (для окна паузы).</summary>
-public record SubPerkSummary(string Name, int Level, int Percent, SubPerkPolarity Polarity);
+public record SubPerkSummary(SubPerkId Id, int Level, int Percent, SubPerkPolarity Polarity)
+{
+	/// <summary>Имя субперка на текущем языке интерфейса.</summary>
+	public string Name => SubPerkCatalog.Find(Id).Name;
+}

@@ -5,12 +5,14 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Описание одного вида фрукта: отображаемое имя, базовый радиус (половина высоты
-/// холста спрайта) и активность в «классическом» режиме. Форма тела берётся по спрайту
-/// из <see cref="FruitShape"/>, поэтому описания остаются короткими.
+/// Описание одного вида фрукта: отображаемое имя (русское и английское), базовый радиус
+/// (половина высоты холста спрайта) и активность в «классическом» режиме. Форма тела берётся
+/// по спрайту из <see cref="FruitShape"/>, поэтому описания остаются короткими.
 /// </summary>
-public record FruitSpec(FruitKind Kind, string Name, float BaseRadius, bool ActiveInClassic)
+public record FruitSpec(FruitKind Kind, string NameRu, string NameEn, float BaseRadius, bool ActiveInClassic)
 {
+	/// <summary>Имя фрукта на текущем языке интерфейса.</summary>
+	public string Name => Loc.Pick(NameRu, NameEn);
 }
 
 /// <summary>Каталог всех фруктов и списки для режимов.</summary>
@@ -33,16 +35,16 @@ public sealed class FruitCatalog
 	/// <summary>Все виды фруктов (включая те, что для других режимов).</summary>
 	public static FruitSpec[] All =
 	{
-		new FruitSpec(FruitKind.Cherry, "Вишня", 24f, true),
-		new FruitSpec(FruitKind.Strawberry, "Клубника", 27f, true),
-		new FruitSpec(FruitKind.Grape, "Виноград", 20f, true),
-		new FruitSpec(FruitKind.Mandarin, "Мандарин", 31f, true),
-		new FruitSpec(FruitKind.Apple, "Яблоко", 33f, true),
-		new FruitSpec(FruitKind.Pear, "Груша", 33f, true),
-		new FruitSpec(FruitKind.Peach, "Персик", 34f, false),
-		new FruitSpec(FruitKind.Pineapple, "Ананас", 36f, false),
-		new FruitSpec(FruitKind.Melon, "Дыня", 42f, false),
-		new FruitSpec(FruitKind.Watermelon, "Арбуз", 50f, false),
+		new FruitSpec(FruitKind.Cherry, "Вишня", "Cherry", 24f, true),
+		new FruitSpec(FruitKind.Strawberry, "Клубника", "Strawberry", 27f, true),
+		new FruitSpec(FruitKind.Grape, "Виноград", "Grape", 20f, true),
+		new FruitSpec(FruitKind.Mandarin, "Мандарин", "Mandarin", 31f, true),
+		new FruitSpec(FruitKind.Apple, "Яблоко", "Apple", 33f, true),
+		new FruitSpec(FruitKind.Pear, "Груша", "Pear", 33f, true),
+		new FruitSpec(FruitKind.Peach, "Персик", "Peach", 34f, false),
+		new FruitSpec(FruitKind.Pineapple, "Ананас", "Pineapple", 36f, false),
+		new FruitSpec(FruitKind.Melon, "Дыня", "Melon", 42f, false),
+		new FruitSpec(FruitKind.Watermelon, "Арбуз", "Watermelon", 50f, false),
 	};
 
 	/// <summary>Список фруктов, которые можно встретить в этом (классическом) режиме.</summary>

@@ -117,7 +117,7 @@ public sealed class SubPerkState
 		{
 			int level = LevelOf(def.Id);
 			if (level > 0)
-				result.Add(new SubPerkSummary(def.Name, level, PercentOf(def.Id), def.Polarity));
+				result.Add(new SubPerkSummary(def.Id, level, PercentOf(def.Id), def.Polarity));
 		}
 		return result.ToArray();
 	}

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace SwampFrog;
@@ -14,6 +15,14 @@ public partial class SuikaGame
 
 	/// <summary>Ширина окна подсказки: строки правил переносятся по этой ширине.</summary>
 	private const float HelpBoxWidth = 460f;
+
+	/// <summary>Порядок строк правил в окне: используется при переводе на другой язык.</summary>
+	private static readonly string[] HelpRuleKeys = { L.SuikaRule1, L.SuikaRule2, L.SuikaRule3, L.SuikaRule4 };
+
+	private Label? _helpTitle;
+	private Label? _helpChain;
+	private readonly List<Label> _helpRules = new();
+	private Button? _helpClose;
 
 	private void BuildHelp(Control parent)
 	{
@@ -35,17 +44,31 @@ public partial class SuikaGame
 		box.AddThemeConstantOverride("separation", 12);
 		ModalContent.Mount(_helpRoot, box);
 
-		box.AddChild(MakeLabel("Как играть", 40, new Color("ffd45e")));
-		box.AddChild(MakeRuleLabel("Води палец по экрану — лягушка целится. Отпусти — фрукт летит в кувшин."));
-		box.AddChild(MakeRuleLabel("Два одинаковых фрукта при касании сливаются в следующий фрукт."));
-		box.AddChild(MakeRuleLabel("Фрукты берутся из запаса, собранного в классическом режиме."));
-		box.AddChild(MakeRuleLabel("Не дай кувшину переполниться: линия переполнения — предел."));
-		box.AddChild(MakeLabel("Цепочка слияния:", 20, new Color("b4e863")));
+		_helpTitle = MakeLabel(Loc.T(L.SuikaHowTo), 40, new Color("ffd45e"));
+		box.AddChild(_helpTitle);
+		foreach (string ruleKey in HelpRuleKeys)
+		{
+			Label rule = MakeRuleLabel(Loc.T(ruleKey));
+			_helpRules.Add(rule);
+			box.AddChild(rule);
+		}
+		_helpChain = MakeLabel(Loc.T(L.SuikaChain), 20, new Color("b4e863"));
+		box.AddChild(_helpChain);
 		box.AddChild(new FruitChainView { CustomMinimumSize = new Vector2(HelpBoxWidth, 58f) });
 
-		Button close = MakeButton("Понятно", 22, new Color("b4e863"), new Vector2(300f, 54f));
-		close.Pressed += CloseHelp;
-		box.AddChild(close);
+		_helpClose = MakeButton(Loc.T(L.SuikaGotIt), 22, new Color("b4e863"), new Vector2(300f, 54f));
+		_helpClose.Pressed += CloseHelp;
+		box.AddChild(_helpClose);
+	}
+
+	/// <summary>Перечитывает подписи окна подсказки на текущем языке.</summary>
+	private void LocalizeHelp()
+	{
+		if (_helpTitle != null) _helpTitle.Text = Loc.T(L.SuikaHowTo);
+		for (int i = 0; i < _helpRules.Count && i < HelpRuleKeys.Length; i++)
+			_helpRules[i].Text = Loc.T(HelpRuleKeys[i]);
+		if (_helpChain != null) _helpChain.Text = Loc.T(L.SuikaChain);
+		if (_helpClose != null) _helpClose.Text = Loc.T(L.SuikaGotIt);
 	}
 
 	/// <summary>Строка правил: переносится по словам и выравнивается по левому краю окна.</summary>

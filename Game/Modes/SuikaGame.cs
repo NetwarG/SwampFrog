@@ -107,6 +107,10 @@ public partial class SuikaGame : Node2D
 	private Label? _gameOverTitle;
 	private Button? _retryButton;
 	private Label? _gameOverScore;
+	private Button? _backButton;
+	private Button? _gameOverMenuButton;
+	private Label? _stockTitle;
+	private Button? _startButton;
 	/// <summary>Окно со списком собранных фруктов перед началом раунда Suika.</summary>
 	private Control? _stockRoot;
 	private VBoxContainer? _stockListBox;
@@ -182,8 +186,7 @@ public partial class SuikaGame : Node2D
 		if (_heldFruit != null) _heldFruit.Visible = true;
 		if (_nextFruit != null) _nextFruit.Visible = true;
 		_gameOverRoot!.Visible = false;
-		_scoreLabel!.Text = "Счёт  0";
-		_bestLabel!.Text = $"Рекорд  {_bestScore}";
+		LocalizeUi();
 		_hintLabel!.Visible = true;
 		UpdateStockLabel();
 
@@ -580,8 +583,8 @@ public partial class SuikaGame : Node2D
 			_bestScore = _score;
 			SaveBestScore(_bestScore);
 		}
-		_bestLabel!.Text = $"Рекорд  {_bestScore}";
-		_gameOverScore!.Text = $"Счёт: {_score}";
+		_bestLabel!.Text = Loc.T(L.SuikaBest, _bestScore);
+		_gameOverScore!.Text = Loc.T(L.SuikaGameOverScore, _score);
 		_gameOverRoot!.Visible = true;
 		UpdateStockLabel();
 
@@ -589,7 +592,7 @@ public partial class SuikaGame : Node2D
 		_stockEmpty = Game?.TotalFruitStock() <= 0;
 		if (_gameOverTitle != null)
 		{
-			_gameOverTitle.Text = _stockEmpty ? "Фрукты закончились" : "Кувшин полон";
+			_gameOverTitle.Text = _stockEmpty ? Loc.T(L.SuikaNoFruits) : Loc.T(L.SuikaOverflow);
 		}
 		if (_retryButton != null)
 		{

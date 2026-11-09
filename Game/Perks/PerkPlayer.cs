@@ -223,7 +223,7 @@ public sealed class PerkPlayer
 				_gazeFreezeTimer = Mathf.Max(_gazeFreezeTimer, PerkEffects.GazeFreezeDuration(_perks));
 				// Волна «изморози» по полю: момент заморозки виден даже на краю экрана.
 				FrostWave();
-				PerkTriggered(PerkId.BasiliskGaze, "Взгляд василиска!");
+				PerkTriggered(PerkId.BasiliskGaze, Loc.T(L.PopGaze));
 			}
 		}
 
@@ -327,7 +327,7 @@ public sealed class PerkPlayer
 		// Каменный (замороженный) мусор василиска безопасен и разбивается.
 		if (item.Frozen)
 		{
-			Game.HudNode?.SpawnPopup(item.GlobalPosition, "Камень!");
+			Game.HudNode?.SpawnPopup(item.GlobalPosition, Loc.T(L.PopStone));
 			Effects?.SpawnShockwave(item.GlobalPosition, 62f, EffectStyle.Stone, 0.3f, 5f, false);
 			Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Stone, 10, 200f, 0.45f);
 			item.Despawn();
@@ -339,7 +339,7 @@ public sealed class PerkPlayer
 		{
 			// Отброс: мусор улетает вверх, урона нет.
 			item.Velocity = new Vector2(item.Velocity.X * 0.4f, -Mathf.Abs(item.Velocity.Y) - 170f);
-			Game.HudNode?.SpawnPopup(item.GlobalPosition, "Отскок!");
+			Game.HudNode?.SpawnPopup(item.GlobalPosition, Loc.T(L.PopBounce));
 			Effects?.SpawnShockwave(item.GlobalPosition, 54f, EffectStyle.White, 0.28f, 4f, false);
 			Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.White, 8, 190f, 0.4f);
 			return;
@@ -354,7 +354,7 @@ public sealed class PerkPlayer
 	{
 		if (item.ItemType == ItemType.Fruit)
 		{
-			Game?.HudNode?.SpawnPopup(item.GlobalPosition, "Мимо!");
+			Game?.HudNode?.SpawnPopup(item.GlobalPosition, Loc.T(L.PopMiss));
 			TakeDamage();
 			if (!PerkEffects.ComboKeepsOnMiss(_perks))
 			{
@@ -399,7 +399,7 @@ public sealed class PerkPlayer
 		Game.SetLivesFromPerk(PerkEffects.ReviveHp(_perks));
 		_invulnTimer = Mathf.Max(_invulnTimer, PerkEffects.ReviveInvulnDuration(_perks));
 		Vector2 frogPos = Game.FrogNode?.GlobalPosition ?? Vector2.Zero;
-		Game.HudNode?.SpawnPopup(frogPos, "Возрождение!");
+		Game.HudNode?.SpawnPopup(frogPos, Loc.T(L.PopRevive));
 		PerkTriggered(PerkId.SecondLife);
 		// Возрождение видно всегда: вспышка по полю, кольцо от лягушки и золотые искры.
 		Effects?.SpawnFlashWave(frogPos, Game.ViewSize, EffectStyle.Gold, 0.8f);
@@ -465,7 +465,7 @@ public sealed class PerkPlayer
 	{
 		if (doubled)
 		{
-			Game?.HudNode?.SpawnPopup(handPosition, "Двойной хват!");
+			Game?.HudNode?.SpawnPopup(handPosition, Loc.T(L.PopDoubleCatch));
 			Effects?.SpawnShockwave(handPosition, 62f, EffectStyle.Gold, 0.32f, 5f, false);
 			Effects?.SpawnSparks(handPosition, EffectStyle.Gold, 8, 210f, 0.4f);
 			PerkTriggered(PerkId.StickyPaws);
@@ -601,7 +601,7 @@ public sealed class PerkPlayer
 	private void ComboTierUp(int multiplier)
 	{
 		Vector2 at = Game?.FrogNode?.GlobalPosition ?? Vector2.Zero;
-		Game?.HudNode?.SpawnPopup(at, "Комбо x" + multiplier);
+		Game?.HudNode?.SpawnPopup(at, Loc.T(L.PopCombo, multiplier));
 		Effects?.SpawnShockwave(at, 96f, EffectStyle.Gold, 0.4f, 6f);
 		PerkTriggered(PerkId.ComboMaster);
 	}
@@ -621,7 +621,7 @@ public sealed class PerkPlayer
 			return;
 		}
 		Game.SetLivesFromPerk(Game.Lives + 1);
-		Game.HudNode?.SpawnPopup(Game.FrogNode?.GlobalPosition ?? Vector2.Zero, "+1 HP");
+		Game.HudNode?.SpawnPopup(Game.FrogNode?.GlobalPosition ?? Vector2.Zero, Loc.T(L.PopBonusHp));
 	}
 
 	/// <summary>Есть ли другой фрукт в радиусе от точки (бонус «Фруктового взрыва» ур. 1).</summary>
@@ -718,7 +718,7 @@ public sealed class PerkPlayer
 		if (bonusTotal > 0)
 		{
 			Game?.AddScore(bonusTotal);
-			Game?.HudNode?.SpawnPopup(Game?.FrogNode?.GlobalPosition ?? source.GlobalPosition, "Взрыв +" + bonusTotal);
+			Game?.HudNode?.SpawnPopup(Game?.FrogNode?.GlobalPosition ?? source.GlobalPosition, Loc.T(L.PopExplosion, bonusTotal));
 		}
 	}
 

@@ -122,7 +122,7 @@ public partial class SuikaGame
 			CreatePiece(mergedKind, position, velocity * 0.45f);
 			_settleTime = 0f;
 			_score += 10 * ((int)mergedKind + 1);
-			_scoreLabel!.Text = $"Счёт  {_score}";
+			_scoreLabel!.Text = Loc.T(L.SuikaScore, _score);
 		}
 	}
 

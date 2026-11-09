@@ -23,18 +23,18 @@ public partial class SuikaGame
 		root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		root.Resized += UpdateVisuals;
 
-		_scoreLabel = MakeLabel("Счёт  0", 26, new Color("ffffff"));
+		_scoreLabel = MakeLabel(Loc.T(L.SuikaScore, 0), 26, new Color("ffffff"));
 		_scoreLabel.Position = new Vector2(18f, 16f);
 		root.AddChild(_scoreLabel);
-		_bestLabel = MakeLabel($"Рекорд  {_bestScore}", 20, new Color(1f, 1f, 1f, 0.62f));
+		_bestLabel = MakeLabel(Loc.T(L.SuikaBest, _bestScore), 20, new Color(1f, 1f, 1f, 0.62f));
 		_bestLabel.Position = new Vector2(20f, 50f);
 		root.AddChild(_bestLabel);
 
-		_stockLabel = MakeLabel("Фрукты: 0", 20, new Color("ffd45e"));
+		_stockLabel = MakeLabel(Loc.T(L.SuikaStock, 0), 20, new Color("ffd45e"));
 		_stockLabel.Position = new Vector2(20f, 78f);
 		root.AddChild(_stockLabel);
 
-		_nextLabel = MakeLabel("Следующий", 22, new Color("b4e863"));
+		_nextLabel = MakeLabel(Loc.T(L.SuikaNext), 22, new Color("b4e863"));
 		_nextLabel.Position = new Vector2(0f, 15f);
 		_nextLabel.SetAnchorsPreset(Control.LayoutPreset.TopRight);
 		_nextLabel.AnchorLeft = 1f;
@@ -44,12 +44,12 @@ public partial class SuikaGame
 		_nextLabel.HorizontalAlignment = HorizontalAlignment.Center;
 		root.AddChild(_nextLabel);
 
-		Button back = MakeButton("В меню", 24, new Color("ffd45e"), new Vector2(138f, 80f));
-		back.Position = new Vector2(16f, 112f);
-		back.Pressed += () => ExitRequested?.Invoke();
-		root.AddChild(back);
+		_backButton = MakeButton(Loc.T(L.ToMenu), 24, new Color("ffd45e"), new Vector2(138f, 80f));
+		_backButton.Position = new Vector2(16f, 112f);
+		_backButton.Pressed += () => ExitRequested?.Invoke();
+		root.AddChild(_backButton);
 
-		_hintLabel = MakeLabel("Отпусти, чтобы бросить", 18, new Color(1f, 1f, 1f, 0.78f));
+		_hintLabel = MakeLabel(Loc.T(L.SuikaHintDrop), 18, new Color(1f, 1f, 1f, 0.78f));
 		_hintLabel.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
 		_hintLabel.AnchorTop = 1f;
 		_hintLabel.AnchorBottom = 1f;
@@ -75,16 +75,16 @@ public partial class SuikaGame
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
 		ModalContent.Mount(_gameOverRoot, box);
-		_gameOverTitle = MakeLabel("Кувшин полон", 42, new Color("ffd45e"));
+		_gameOverTitle = MakeLabel(Loc.T(L.SuikaOverflow), 42, new Color("ffd45e"));
 		box.AddChild(_gameOverTitle);
-		_gameOverScore = MakeLabel("Счёт: 0", 28, new Color("ffffff"));
+		_gameOverScore = MakeLabel(Loc.T(L.SuikaGameOverScore, 0), 28, new Color("ffffff"));
 		box.AddChild(_gameOverScore);
-		_retryButton = MakeButton("Играть ещё", 22, new Color("b4e863"), new Vector2(300f, 54f));
+		_retryButton = MakeButton(Loc.T(L.SuikaRetry), 22, new Color("b4e863"), new Vector2(300f, 54f));
 		_retryButton!.Pressed += Restart;
 		box.AddChild(_retryButton!);
-		Button menu = MakeButton("В меню", 22, new Color("ffd45e"), new Vector2(300f, 54f));
-		menu.Pressed += () => ExitRequested?.Invoke();
-		box.AddChild(menu);
+		_gameOverMenuButton = MakeButton(Loc.T(L.ToMenu), 22, new Color("ffd45e"), new Vector2(300f, 54f));
+		_gameOverMenuButton.Pressed += () => ExitRequested?.Invoke();
+		box.AddChild(_gameOverMenuButton);
 	}
 
 	/// <summary>Строит окно со списком собранных фруктов и кнопкой старта раунда.</summary>
@@ -102,8 +102,8 @@ public partial class SuikaGame
 		box.AddThemeConstantOverride("separation", 12);
 		ModalContent.Mount(_stockRoot, box);
 
-		Label title = MakeLabel("Собранные фрукты", 34, new Color("ffd45e"));
-		box.AddChild(title);
+		_stockTitle = MakeLabel(Loc.T(L.SuikaStockTitle), 34, new Color("ffd45e"));
+		box.AddChild(_stockTitle);
 
 		_stockListBox = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		_stockListBox.AddThemeConstantOverride("separation", 6);
@@ -111,18 +111,18 @@ public partial class SuikaGame
 
 		foreach (FruitSpec spec in FruitCatalog.All)
 		{
-			Label row = MakeLabel($"{spec.Name} — 0", 24, new Color("ffffff"));
+			Label row = MakeLabel(Loc.T(L.SuikaStockRow, spec.Name, 0), 24, new Color("ffffff"));
 			row.Visible = false;
 			_stockListBox!.AddChild(row);
 			_stockRows.Add(row);
 		}
 
-		_stockTotal = MakeLabel("Всего: 0", 20, new Color("b4e863"));
+		_stockTotal = MakeLabel(Loc.T(L.SuikaStockTotal, 0), 20, new Color("b4e863"));
 		box.AddChild(_stockTotal);
 
-		Button start = MakeButton("Начать игру", 22, new Color("b4e863"), new Vector2(300f, 54f));
-		start.Pressed += StartFromStockDialog;
-		box.AddChild(start);
+		_startButton = MakeButton(Loc.T(L.SuikaStart), 22, new Color("b4e863"), new Vector2(300f, 54f));
+		_startButton.Pressed += StartFromStockDialog;
+		box.AddChild(_startButton);
 	}
 
 	/// <summary>Обновляет и показывает окно со списком фруктов перед началом раунда.</summary>
@@ -135,11 +135,11 @@ public partial class SuikaGame
 		{
 			Label row = _stockRows[rowIndex++];
 			int count = Game?.FruitStock(spec.Kind) ?? 0;
-			row.Text = $"{spec.Name} — {count}";
+			row.Text = Loc.T(L.SuikaStockRow, spec.Name, count);
 			row.Visible = count > 0;
 			total += count;
 		}
-		if (_stockTotal != null) _stockTotal.Text = $"Всего: {total}";
+		if (_stockTotal != null) _stockTotal.Text = Loc.T(L.SuikaStockTotal, total);
 		_stockRoot.Visible = true;
 	}
 
@@ -177,6 +177,27 @@ public partial class SuikaGame
 	{
 		if (_stockLabel == null) return;
 		int total = Game?.TotalFruitStock() ?? 0;
-		_stockLabel.Text = $"Фрукты: {total}";
+		_stockLabel.Text = Loc.T(L.SuikaStock, total);
+	}
+
+	/// <summary>
+	/// Перечитывает статические подписи мини-игры на текущем языке: вызывается при открытии
+	/// раунда и после смены языка в меню (кнопка языка только в главном меню).
+	/// </summary>
+	private void LocalizeUi()
+	{
+		if (_scoreLabel != null) _scoreLabel.Text = Loc.T(L.SuikaScore, _score);
+		if (_bestLabel != null) _bestLabel.Text = Loc.T(L.SuikaBest, _bestScore);
+		if (_nextLabel != null) _nextLabel.Text = Loc.T(L.SuikaNext);
+		if (_hintLabel != null) _hintLabel.Text = Loc.T(L.SuikaHintDrop);
+		if (_backButton != null) _backButton.Text = Loc.T(L.ToMenu);
+		if (_gameOverTitle != null) _gameOverTitle.Text = _stockEmpty ? Loc.T(L.SuikaNoFruits) : Loc.T(L.SuikaOverflow);
+		if (_gameOverScore != null) _gameOverScore.Text = Loc.T(L.SuikaGameOverScore, _score);
+		if (_retryButton != null) _retryButton.Text = Loc.T(L.SuikaRetry);
+		if (_gameOverMenuButton != null) _gameOverMenuButton.Text = Loc.T(L.ToMenu);
+		if (_stockTitle != null) _stockTitle.Text = Loc.T(L.SuikaStockTitle);
+		if (_startButton != null) _startButton.Text = Loc.T(L.SuikaStart);
+		UpdateStockLabel();
+		LocalizeHelp();
 	}
 }
