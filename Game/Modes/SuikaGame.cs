@@ -133,6 +133,8 @@ public partial class SuikaGame : Node2D
 	public void RefreshViewSize()
 	{
 		UpdateBowl();
+		// Фон считается от размера поля: окно могло измениться без сдвига кувшина.
+		QueueRedraw();
 		UpdateFrog(0f);
 		UpdateVisuals();
 		UpdateHelpButtonPosition();
@@ -288,34 +290,17 @@ public partial class SuikaGame : Node2D
 		if (Game?.UiHost != null && IsInstanceValid(_uiRoot)) _uiRoot!.QueueFree();
 	}
 
+	/// <summary>
+	/// Фон мини-игры и кувшин: модули <see cref="SuikaBackdrop"/> и <see cref="SuikaBowlView"/>,
+	/// поэтому оформление правится отдельно от раунда, ввода и физики.
+	/// </summary>
 	public override void _Draw()
 	{
 		Vector2 size = ViewSize;
 		if (size.X <= 0f || size.Y <= 0f) return;
 
-		Color top = new("234f54");
-		Color bottom = new("102d36");
-		float strip = size.Y / 48f;
-		for (int i = 0; i < 48; i++)
-		{
-			float t = i / 47f;
-			DrawRect(new Rect2(0f, i * strip, size.X, strip + 1f), top.Lerp(bottom, t));
-		}
-
-		DrawCircle(new Vector2(size.X * 0.84f, size.Y * 0.19f), 94f, new Color(1f, 1f, 1f, 0.035f));
-		DrawCircle(new Vector2(size.X * 0.15f, size.Y * 0.76f), 120f, new Color(0.2f, 0.9f, 0.67f, 0.035f));
-
-		// Стеклянное тело кувшина и его толстый контур: стенки вертикальны, дно горизонтально.
-		DrawRect(_bowl, new Color(0.03f, 0.14f, 0.16f, 0.72f));
-		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y), new Vector2(_bowl.End.X, _bowl.Position.Y), new Color("9ee4c3"), 3f);
-		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y), new Vector2(_bowl.Position.X, _bowl.End.Y), new Color("7acbb2"), 6f);
-		DrawLine(new Vector2(_bowl.End.X, _bowl.Position.Y), new Vector2(_bowl.End.X, _bowl.End.Y), new Color("7acbb2"), 6f);
-		DrawLine(new Vector2(_bowl.Position.X, _bowl.End.Y), new Vector2(_bowl.End.X, _bowl.End.Y), new Color("9ee4c3"), 8f);
-		DrawLine(new Vector2(_bowl.Position.X, _bowl.Position.Y + 30f), new Vector2(_bowl.End.X, _bowl.Position.Y + 30f), new Color(0.62f, 0.93f, 0.8f, 0.18f), 2f);
-
-		// Линия переполнения помогает понять, когда кувшин уже заполнен.
-		float dangerY = _bowl.Position.Y + OverflowRimOffset;
-		DrawLine(new Vector2(_bowl.Position.X + 5f, dangerY), new Vector2(_bowl.End.X - 5f, dangerY), new Color(1f, 0.55f, 0.38f, 0.33f), 2f);
+		SuikaBackdrop.Draw(this, size, _bowl);
+		SuikaBowlView.Draw(this, _bowl, FloorInset, OverflowRimOffset);
 	}
 
 

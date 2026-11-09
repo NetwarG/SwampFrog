@@ -54,6 +54,21 @@ internal static class StickerDraw
 		target.DrawPolygon(points, colors);
 	}
 
+	/// <summary>Заливка прямоугольника вертикальным градиентом: цвета по углам, без видимых полос.</summary>
+	internal static void FillVerticalGradient(CanvasItem target, Rect2 rect, Color top, Color bottom)
+	{
+		if (rect.Size.X <= 0f || rect.Size.Y <= 0f)
+			return;
+		Vector2[] points =
+		{
+			rect.Position,
+			new(rect.End.X, rect.Position.Y),
+			rect.End,
+			new(rect.Position.X, rect.End.Y),
+		};
+		target.DrawPolygon(points, new[] { top, top, bottom, bottom });
+	}
+
 	/// <summary>Круг заливки: замкнутый многоугольник, градиент идёт по его вершинам.</summary>
 	internal static void FillCircleGradient(CanvasItem target, Vector2 center, float radius, Color light, Color dark)
 	{
