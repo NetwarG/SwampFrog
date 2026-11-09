@@ -239,13 +239,8 @@ public partial class HUD : Control
 		_startRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_startRoot);
 
-		var backdrop = new ColorRect
-		{
-			Color = new Color(0.02f, 0.12f, 0.09f, 0.55f),
-			MouseFilter = Control.MouseFilterEnum.Ignore
-		};
-		backdrop.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-		_startRoot.AddChild(backdrop);
+		// Светлый фон меню: вода, кувшинки, цветки и парящие фрукты по всему экрану.
+		_startRoot.AddChild(new MenuBackground());
 
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
@@ -253,9 +248,13 @@ public partial class HUD : Control
 
 		float ui = UiScale;
 
-		Label title = UiStyle.MakeLabel("Лягушка-охотница", (int)Mathf.Round(50f * ui), new Color("ffe066"));
+		Label title = UiStyle.MakeLabel("Swamp Frog", (int)Mathf.Round(50f * ui), new Color("ffe066"));
 		Label sub = UiStyle.MakeLabel("Собирай фрукты, не лови мусор!", (int)Mathf.Round(24f * ui), new Color("ffffff"));
-		Label sub2 = UiStyle.MakeLabel("Упустишь фрукт — потеряешь жизнь.", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
+		Label sub2 = UiStyle.MakeLabel("Упустишь фрукт — потеряешь жизнь.", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f));
+		// Тень и обводка: на светлом фоне меню надписи остаются читаемыми.
+		AddMenuTextShadow(title, ui);
+		AddMenuTextShadow(sub, ui);
+		AddMenuTextShadow(sub2, ui);
 		Button play = UiStyle.MakeButton("Играть", ui, new Color("b4e863"));
 		Button exit = UiStyle.MakeButton("Выйти", ui, new Color("ff8c7a"));
 		_miniGameButton = UiStyle.MakeButton("Мини-игра: Suika", ui, new Color("ffd45e"));
@@ -272,7 +271,8 @@ public partial class HUD : Control
 		box.AddChild(_miniGameButton!);
 		box.AddChild(exit);
 
-		var madeByText = UiStyle.MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.8f));
+		var madeByText = UiStyle.MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f));
+		AddMenuTextShadow(madeByText, ui);
 		// Текст по центру в самом низу стартового экрана (вне центрируемого меню).
 		madeByText.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
 		madeByText.AnchorTop = 1f;
@@ -285,6 +285,19 @@ public partial class HUD : Control
 		// Управление звуком показывается вместе с меню и скрывается вместе с ним:
 		// в партии, Suika и оверлеях его нет (см. SoundControls).
 		_startRoot.AddChild(new SoundControls { ZIndex = 20 });
+	}
+
+	/// <summary>
+	/// Тень и обводка надписи меню: на светлом фоне сохраняется контраст.
+	/// Общие стили не меняются — только метки стартового экрана.
+	/// </summary>
+	private static void AddMenuTextShadow(Label label, float ui)
+	{
+		label.AddThemeColorOverride("font_outline_color", new Color(0.03f, 0.16f, 0.13f, 1f));
+		label.AddThemeConstantOverride("outline_size", (int)Mathf.Round(6f * ui));
+		label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0.05f, 0.04f, 0.45f));
+		label.AddThemeConstantOverride("shadow_offset_x", (int)Mathf.Round(2f * ui));
+		label.AddThemeConstantOverride("shadow_offset_y", (int)Mathf.Round(3f * ui));
 	}
 
 	/// <summary>Показывает главное меню с запуском режимов и выходом.</summary>
