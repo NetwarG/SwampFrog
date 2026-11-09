@@ -3,8 +3,9 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Маленький рычажок слева от кнопки mute: тап раскрывает и сворачивает ползунок громкости.
-/// Шеврон показывает направление: раскрытие — влево, сворачивание — вправо.
+/// Маленький рычажок слева от кнопки mute: тап раскрывает и сворачивает панель
+/// с ползунками громкости. Шеврон показывает направление: раскрытие — вниз,
+/// сворачивание — вверх.
 /// </summary>
 public partial class SliderHandle : TouchArea
 {
@@ -27,7 +28,7 @@ public partial class SliderHandle : TouchArea
 		Size = HandleSize;
 	}
 
-	/// <summary>Раскрыт ли ползунок: меняет направление шеврона.</summary>
+	/// <summary>Раскрыта ли панель: меняет направление шеврона.</summary>
 	public void SetExpanded(bool expanded)
 	{
 		if (_expanded == expanded)
@@ -42,9 +43,10 @@ public partial class SliderHandle : TouchArea
 			StickerStyle.Light(Accent), StickerStyle.Dark(Accent), StickerStyle.OutlineWidth, true);
 
 		Vector2 c = Size * 0.5f;
-		float sign = _expanded ? 1f : -1f;
-		Vector2 apex = new(c.X + 5f * sign, c.Y);
-		DrawLine(new Vector2(c.X - 5f * sign, c.Y - 8f), apex, Glyph, 3f);
-		DrawLine(apex, new Vector2(c.X - 5f * sign, c.Y + 8f), Glyph, 3f);
+		// Пока панель скрыта — шеврон вниз (раскрытие), пока показана — вверх.
+		float sign = _expanded ? -1f : 1f;
+		Vector2 apex = new(c.X, c.Y + 5f * sign);
+		DrawLine(new Vector2(c.X - 8f, c.Y - 5f * sign), apex, Glyph, 3f);
+		DrawLine(new Vector2(c.X + 8f, c.Y - 5f * sign), apex, Glyph, 3f);
 	}
 }

@@ -122,6 +122,8 @@ public partial class SuikaGame
 			CreatePiece(mergedKind, position, velocity * 0.45f);
 			_settleTime = 0f;
 			_score += 10 * ((int)mergedKind + 1);
+			// Питч по уровню фрукта: слияния звучат как лестница вверх.
+			Sfx.Play(SfxId.SuikaMerge, 0.9f + (int)mergedKind * 0.08f);
 			_scoreLabel!.Text = Loc.T(L.SuikaScore, _score);
 		}
 	}

@@ -4,28 +4,40 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Ползунок громкости: скруглённый трек и круглый бегунок. Нажатие или перетаскивание
-/// задают громкость от 0 до 1. Собственный Control: трек и бегунок рисуются кодом.
+/// Вертикальный ползунок громкости: скруглённый трек и круглый бегунок.
+/// Нажатие или перетаскивание задают громкость от 0 (снизу) до 1 (сверху).
+/// Собственный Control: трек, заливка и бегунок рисуются кодом.
 /// </summary>
 public partial class VolumeSlider : TouchArea
 {
-	/// <summary>Размер ползунка в логических единицах.</summary>
-	public static readonly Vector2 SliderSize = new(150f, 40f);
+	/// <summary>Размер ползунка в логических единицах: узкий и высокий.</summary>
+	public static readonly Vector2 SliderSize = new(40f, 170f);
 
 	private const float KnobRadius = 15f;
-	private const float TrackHeight = 10f;
+	private const float TrackWidth = 10f;
 
 	/// <summary>Толщина коричневого контура трека и бегунка.</summary>
 	private const float OutlineWidth = 2.5f;
 
-	private static readonly Color TrackLight = new(0.08f, 0.24f, 0.19f, 0.72f);
-	private static readonly Color TrackDark = new(0.02f, 0.1f, 0.08f, 0.72f);
-	private static readonly Color Fill = new("b4e863");
+	private static readonly Color TrackLight = new(0.36f, 0.58f, 0.50f, 0.55f);
+	private static readonly Color TrackDark = new(0.18f, 0.38f, 0.32f, 0.55f);
 	private static readonly Color Knob = new("f4fff0");
 
 	private float _value = 1f;
 	private bool _dragging;
 	private bool _muted;
+	private Color _accent = new("b4e863");
+
+	/// <summary>Цвет заливки: отличает ползунок музыки от ползунка эффектов.</summary>
+	public Color Accent
+	{
+		get => _accent;
+		set
+		{
+			_accent = value;
+			QueueRedraw();
+		}
+	}
 
 	/// <summary>Громкость изменилась во время нажатия или перетаскивания.</summary>
 	public event Action<float>? ValueChanged;
@@ -81,18 +93,19 @@ public partial class VolumeSlider : TouchArea
 
 	private void SetFromEvent(InputEvent @event)
 	{
-		float x = @event switch
+		float y = @event switch
 		{
-			InputEventScreenTouch touch => touch.Position.X,
-			InputEventScreenDrag drag => drag.Position.X,
-			InputEventMouseButton button => button.Position.X,
-			InputEventMouseMotion motion => motion.Position.X,
+			InputEventScreenTouch touch => touch.Position.Y,
+			InputEventScreenDrag drag => drag.Position.Y,
+			InputEventMouseButton button => button.Position.Y,
+			InputEventMouseMotion motion => motion.Position.Y,
 			_ => float.NaN
 		};
-		if (float.IsNaN(x))
+		if (float.IsNaN(y))
 			return;
-		float usable = Mathf.Max(1f, Size.X - KnobRadius * 2f);
-		float value = Mathf.Clamp((x - KnobRadius) / usable, 0f, 1f);
+		float usable = Mathf.Max(1f, Size.Y - KnobRadius * 2f);
+		// Верх — максимум, низ — минимум.
+		float value = Mathf.Clamp(1f - (y - KnobRadius) / usable, 0f, 1f);
 		if (Mathf.IsEqualApprox(value, _value))
 			return;
 		_value = value;
@@ -103,23 +116,24 @@ public partial class VolumeSlider : TouchArea
 	/// <summary>Трек и бегунок в общем стиле кнопок: градиент и коричневый контур.</summary>
 	public override void _Draw()
 	{
-		float cy = Size.Y * 0.5f;
-		float trackLeft = KnobRadius;
-		float trackRight = Size.X - KnobRadius;
-		var track = new Rect2(trackLeft, cy - TrackHeight * 0.5f, trackRight - trackLeft, TrackHeight);
-		StickerStyle.DrawPanel(this, track, TrackHeight * 0.5f, TrackLight, TrackDark, OutlineWidth, false);
+		float cx = Size.X * 0.5f;
+		float trackTop = KnobRadius;
+		float trackBottom = Size.Y - KnobRadius;
+		var track = new Rect2(cx - TrackWidth * 0.5f, trackTop, TrackWidth, trackBottom - trackTop);
+		StickerStyle.DrawPanel(this, track, TrackWidth * 0.5f, TrackLight, TrackDark, OutlineWidth, false);
 
-		float knobX = trackLeft + _value * (trackRight - trackLeft);
-		float fillWidth = knobX - trackLeft;
-		if (fillWidth > 1f)
+		float knobY = trackBottom - _value * (trackBottom - trackTop);
+		// Заливка от бегунка вниз: видно, сколько громкости уже набрано.
+		float fillHeight = trackBottom - knobY;
+		if (fillHeight > 1f)
 		{
-			Color fill = _muted ? new Color(Fill, 0.35f) : Fill;
-			StickerStyle.DrawPanel(this, new Rect2(track.Position, new Vector2(fillWidth, TrackHeight)),
-				TrackHeight * 0.5f, StickerStyle.Light(fill), StickerStyle.Dark(fill), 0f, false);
+			Color fill = _muted ? new Color(_accent, 0.35f) : _accent;
+			StickerStyle.DrawPanel(this, new Rect2(cx - TrackWidth * 0.5f, knobY, TrackWidth, fillHeight),
+				TrackWidth * 0.5f, StickerStyle.Light(fill), StickerStyle.Dark(fill), 0f, false);
 		}
 
 		Color knob = _muted ? new Color(Knob, 0.5f) : Knob;
-		StickerStyle.DrawCirclePanel(this, new Vector2(knobX, cy), KnobRadius,
+		StickerStyle.DrawCirclePanel(this, new Vector2(cx, knobY), KnobRadius,
 			StickerStyle.Light(knob), StickerStyle.Dark(knob), OutlineWidth, true);
 	}
 }

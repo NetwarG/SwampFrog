@@ -217,6 +217,7 @@ public partial class Main : Node2D
 		_hud?.SetLives(_lives);
 		_hud?.FlashRed();
 		_frog?.Flash();
+		Sfx.Play(SfxId.Damage);
 	}
 
 	public void SetMaxHeartsFromPerk() => _hud?.SetMaxLives(MaxLives);
@@ -512,6 +513,7 @@ public partial class Main : Node2D
 		if (_frog?.AttachCaughtItem(item, handIndex) == true)
 		{
 			_frog.Pulse();
+			Sfx.Play(item.IsGolden ? SfxId.Golden : SfxId.Catch);
 			// Поимка с бонусом перка видна вспышкой у ладони; полная ладонь — «Двойной хват!».
 			Vector2[] hands = _frog.GetHandPositions();
 			bool doubled = _frog.MultiCatch && !_frog.CanHold(handIndex);
@@ -535,6 +537,7 @@ public partial class Main : Node2D
 		_lives++;
 		_hud?.SetLives(_lives);
 		_hud?.SpawnPopup(atGlobalPos, "+1");
+		Sfx.Play(SfxId.Heal);
 	}
 
 	// ---------- Спавн ----------
@@ -749,6 +752,7 @@ public partial class Main : Node2D
 	private void GameOver()
 	{
 		_state = GameState.GameOver;
+		Sfx.Play(SfxId.GameOver);
 		ClearEffects();
 		if (_items != null)
 		{

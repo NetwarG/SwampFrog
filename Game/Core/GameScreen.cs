@@ -42,6 +42,8 @@ public partial class GameScreen : Control
 		// Сохранённые громкость и mute применяются до запуска музыки.
 		SoundSettings.Load();
 		AddChild(new BackgroundMusic { Name = "BackgroundMusic" });
+		// Пул звуковых эффектов: шина SFX, работает и на паузе (звуки кнопок меню).
+		AddChild(new SfxPlayer { Name = "Sfx" });
 		RefreshLayout();
 		Game = GD.Load<PackedScene>("res://Scenes/Main.tscn").Instantiate<Main>();
 		Game.ConfigureViewSize(_worldSize);

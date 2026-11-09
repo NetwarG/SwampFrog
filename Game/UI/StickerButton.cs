@@ -47,6 +47,8 @@ public partial class StickerButton : Button
 		ButtonUp += () => ApplyPressed(false);
 		MouseEntered += () => SetHovered(true);
 		MouseExited += () => SetHovered(false);
+		// Тихий щелчок на нажатие: единая озвучка кнопок меню, итогов и пауз.
+		ButtonDown += () => Sfx.Play(SfxId.UiTap);
 	}
 
 	/// <summary>Задаёт цвет кнопки: можно вызывать и до добавления в дерево.</summary>

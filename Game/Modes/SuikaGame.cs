@@ -463,6 +463,7 @@ public partial class SuikaGame : Node2D
 		_currentKind = _nextKind;
 		_nextKind = PickStartFruit();
 		_dropCooldown = 0.3f;
+		Sfx.Play(SfxId.SuikaThrow);
 		_hintLabel!.Visible = false;
 		UpdateVisuals();
 
@@ -570,6 +571,7 @@ public partial class SuikaGame : Node2D
 	{
 		_gameOver = true;
 		_active = true;
+		Sfx.Play(SfxId.GameOver);
 		// Окно подсказки уступает место итогам раунда.
 		CloseHelp();
 		UpdateHelpButton();

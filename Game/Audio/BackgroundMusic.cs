@@ -10,6 +10,8 @@ public partial class BackgroundMusic : AudioStreamPlayer
 	public override void _Ready()
 	{
 		ProcessMode = ProcessModeEnum.Always;
+		AudioBuses.Ensure();
+		Bus = AudioBuses.MusicName;
 		VolumeDb = -6f;
 		AudioStreamWav stream = GD.Load<AudioStreamWav>(MusicPath);
 		stream.LoopMode = AudioStreamWav.LoopModeEnum.Forward;

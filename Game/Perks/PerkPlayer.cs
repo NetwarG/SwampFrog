@@ -101,6 +101,7 @@ public sealed class PerkPlayer
 			return;
 		}
 		Game?.HudNode?.ShowLevelUp(level);
+		Sfx.Play(SfxId.LevelUp);
 	}
 
 	/// <summary>
@@ -122,6 +123,7 @@ public sealed class PerkPlayer
 		}
 		Game.StartPerkPause();
 		ShowCards(Game.Xp.Level, offers);
+		Sfx.Play(SfxId.PerkOffer);
 	}
 
 	private void ShowCards(int level, PerkId[] offers)
@@ -157,6 +159,7 @@ public sealed class PerkPlayer
 
 		// Панель выбранных перков обновляется сразу после выбора.
 		Game.HudNode?.SetPickedPerks(_perks.PickedSnapshot());
+		Sfx.Play(SfxId.PerkPick);
 
 		// «Панцирь» тут же даёт новую жизнь (до нового максимума).
 		if (id == PerkId.Shell)
@@ -330,6 +333,7 @@ public sealed class PerkPlayer
 			Game.HudNode?.SpawnPopup(item.GlobalPosition, Loc.T(L.PopStone));
 			Effects?.SpawnShockwave(item.GlobalPosition, 62f, EffectStyle.Stone, 0.3f, 5f, false);
 			Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Stone, 10, 200f, 0.45f);
+			Sfx.Play(SfxId.Deflect);
 			item.Despawn();
 			return;
 		}
@@ -342,6 +346,7 @@ public sealed class PerkPlayer
 			Game.HudNode?.SpawnPopup(item.GlobalPosition, Loc.T(L.PopBounce));
 			Effects?.SpawnShockwave(item.GlobalPosition, 54f, EffectStyle.White, 0.28f, 4f, false);
 			Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.White, 8, 190f, 0.4f);
+			Sfx.Play(SfxId.Deflect);
 			return;
 		}
 
@@ -603,6 +608,8 @@ public sealed class PerkPlayer
 		Vector2 at = Game?.FrogNode?.GlobalPosition ?? Vector2.Zero;
 		Game?.HudNode?.SpawnPopup(at, Loc.T(L.PopCombo, multiplier));
 		Effects?.SpawnShockwave(at, 96f, EffectStyle.Gold, 0.4f, 6f);
+		// Питч растёт вместе с множителем: серия звучит как лестница вверх.
+		Sfx.Play(SfxId.Combo, 1f + (multiplier - 2) * 0.05f);
 		PerkTriggered(PerkId.ComboMaster);
 	}
 
