@@ -13,6 +13,7 @@ public partial class ProfilePanel : Control
 	private const float ContentWidth = 390f;
 
 	private Label? _titleLabel;
+	private Label? _coins;
 	private Label? _bestClassic;
 	private Label? _bestSuika;
 	private Label? _stock;
@@ -52,6 +53,7 @@ public partial class ProfilePanel : Control
 		_bestClassic = MakeRow(box, ui);
 		_bestSuika = MakeRow(box, ui);
 		_stock = MakeRow(box, ui);
+		_coins = MakeRow(box, ui);
 		_runs = MakeRow(box, ui);
 		_caught = MakeRow(box, ui);
 		_golden = MakeRow(box, ui);
@@ -91,6 +93,7 @@ public partial class ProfilePanel : Control
 		if (_bestClassic != null) _bestClassic.Text = Loc.T(L.ProfileBestClassic, _snapshot.BestClassic);
 		if (_bestSuika != null) _bestSuika.Text = Loc.T(L.ProfileBestSuika, _snapshot.BestSuika);
 		if (_stock != null) _stock.Text = Loc.T(L.ProfileStock, _snapshot.StockTotal);
+		if (_coins != null) _coins.Text = Loc.T(L.SlimeLabel, _snapshot.Coins);
 		if (_runs != null) _runs.Text = Loc.T(L.ProfileRuns, _snapshot.RunsPlayed);
 		if (_caught != null) _caught.Text = Loc.T(L.ProfileCaught, _snapshot.FruitsCaught);
 		if (_golden != null) _golden.Text = Loc.T(L.ProfileGolden, _snapshot.GoldenCaught);

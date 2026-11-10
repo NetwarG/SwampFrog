@@ -81,6 +81,8 @@ public partial class SuikaGame : Node2D
 	private float _throwTimer;
 	private int _score;
 	private int _bestScore;
+	/// <summary>Слияния текущего раунда: из них считается слизь за раунд.</summary>
+	private int _roundMerges;
 	private bool _active;
 	private bool _gameOver;
 
@@ -179,6 +181,7 @@ public partial class SuikaGame : Node2D
 		_settleTime = 0f;
 		_completionTimer = 0f;
 		_score = 0;
+		_roundMerges = 0;
 		_overflowTime = 0f;
 		_dropCooldown = 0.25f;
 		_throwTimer = 0f;
@@ -573,6 +576,7 @@ public partial class SuikaGame : Node2D
 			_bestScore = _score;
 			SaveBestScore(_bestScore);
 		}
+		Game?.OnSuikaRoundFinished(_score, _roundMerges);
 		_bestLabel!.Text = Loc.T(L.SuikaBest, _bestScore);
 		_gameOverScore!.Text = Loc.T(L.SuikaGameOverScore, _score);
 		_gameOverRoot!.Visible = true;

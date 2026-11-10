@@ -121,6 +121,7 @@ public partial class SuikaGame
 			RemovePiece(b);
 			CreatePiece(mergedKind, position, velocity * 0.45f);
 			Game?.RegisterSuikaMerge();
+			_roundMerges++;
 			_settleTime = 0f;
 			_score += 10 * ((int)mergedKind + 1);
 			// Питч по уровню фрукта: слияния звучат как лестница вверх.

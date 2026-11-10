@@ -75,5 +75,6 @@ internal static partial class LocText
 		[L.ProfileCaught] = "Fruits caught: {0}",
 		[L.ProfileGolden] = "Golden fruits: {0}",
 		[L.ProfileMerges] = "Suika merges: {0}",
+		[L.SlimeLabel] = "Slime: {0}",
 	};
 }

@@ -28,6 +28,7 @@ public partial class HUD : Control
 	private Control? _startRoot;
 	private Button? _miniGameButton;
 	private Button? _profileButton;
+	private WalletBadge? _walletBadge;
 	private bool _miniGameEnabled = true;
 	private Label? _suikaHintLabel;
 	private Label? _finalScore;
@@ -309,6 +310,8 @@ public partial class HUD : Control
 		box.AddChild(title);
 		box.AddChild(_startSub);
 		box.AddChild(_startSub2);
+		_walletBadge = new WalletBadge();
+		box.AddChild(_walletBadge);
 		box.AddChild(_playButton);
 		box.AddChild(_miniGameButton!);
 		box.AddChild(_profileButton!);
@@ -367,6 +370,9 @@ public partial class HUD : Control
 
 	/// <summary>Показывает экран профиля поверх главного меню.</summary>
 	public void ShowProfile(ProfileSnapshot snapshot) => _profilePanel?.Show(snapshot);
+
+	/// <summary>Показывает баланс валюты «Слизь» в меню.</summary>
+	public void SetWallet(int amount) => _walletBadge?.SetAmount(amount);
 
 	/// <summary>Скрывает экран профиля.</summary>
 	public void HideProfile() => _profilePanel?.Hide();

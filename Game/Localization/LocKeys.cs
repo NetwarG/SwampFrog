@@ -81,4 +81,5 @@ public static class L
 	public const string ProfileCaught = "profile.caught";
 	public const string ProfileGolden = "profile.golden";
 	public const string ProfileMerges = "profile.merges";
+	public const string SlimeLabel = "slime.label";
 }

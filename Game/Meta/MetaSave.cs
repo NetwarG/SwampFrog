@@ -11,6 +11,7 @@ public static class MetaSave
 	private const string Path = "user://save.cfg";
 	private const string Section = "meta";
 	private const string StatsKey = "stats";
+	private const string CoinsKey = "coins";
 
 	/// <summary>Читает статистику профиля; отсутствие секции или ключа даёт пустые счётчики.</summary>
 	public static MetaStats LoadStats()
@@ -21,12 +22,22 @@ public static class MetaSave
 		return MetaStats.Parse(config.GetValue(Section, StatsKey, string.Empty).ToString());
 	}
 
-	/// <summary>Записывает статистику профиля, не трогая остальные секции save.cfg.</summary>
-	public static void SaveStats(MetaStats stats)
+	/// <summary>Читает баланс слизи; отсутствие секции или ключа даёт ноль.</summary>
+	public static int LoadCoins()
+	{
+		var config = new ConfigFile();
+		if (config.Load(Path) != Error.Ok)
+			return 0;
+		return (int)config.GetValue(Section, CoinsKey, 0);
+	}
+
+	/// <summary>Записывает статистику и баланс слизи одним проходом, не трогая остальные секции.</summary>
+	public static void Save(MetaStats stats, int coins)
 	{
 		var config = new ConfigFile();
 		config.Load(Path);
 		config.SetValue(Section, StatsKey, stats.ToSaveString());
+		config.SetValue(Section, CoinsKey, coins);
 		config.Save(Path);
 	}
 }

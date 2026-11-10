@@ -54,6 +54,8 @@ public partial class Main : Node2D
 	private int _score;
 	/// <summary>Секунды текущей партии — источник роста сложности.</summary>
 	private float _runTime;
+	/// <summary>Поймано фруктов в текущем забеге: используется для начисления слизи.</summary>
+	private int _runCaught;
 	private int _lives = 3;
 	private int _highScore;
 	private GameState _state = GameState.Menu;
@@ -236,6 +238,13 @@ public partial class Main : Node2D
 	/// <summary>Учитывает слияние фруктов в Suika для статистики профиля.</summary>
 	public void RegisterSuikaMerge() => _meta.Stats.OnSuikaMerge();
 
+	/// <summary>Начисляет слизь за завершённый раунд Suika.</summary>
+	public void OnSuikaRoundFinished(int roundScore, int roundMerges)
+	{
+		_meta.Wallet.Add(SlimeReward.Suika(roundMerges, roundScore));
+		_meta.Save();
+	}
+
 	public Control? UiHost { get; set; }
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
 	public Rect2 ViewBounds => new(Vector2.Zero, ViewSize);
@@ -300,6 +309,8 @@ public partial class Main : Node2D
 		_hud.BackRequested += HandleBackRequest;
 		_hud.ResumePressed += ResumeGame;
 		_hud.PauseMenuPressed += PauseToMenu;
+		// Баланс слизи меняется от забегов и Suika — меню обновляет бейдж по событию.
+		_meta.Wallet.Changed += () => _hud?.SetWallet(_meta.Wallet.Balance);
 
 		_highScore = LoadHighScore();
 		LoadCollectedFruits();
@@ -318,6 +329,7 @@ public partial class Main : Node2D
 		_hud.ShowStart();
 		_hud.SetGameplayVisible(false);
 		_hud.SetXp(_xp.Level, _xp.LevelProgress);
+		_hud.SetWallet(_meta.Wallet.Balance);
 		_suika.Visible = false;
 
 		// Индикатор зоны замедления лежит под лягушкой и предметами, слой эффектов — поверх них.
@@ -538,7 +550,10 @@ public partial class Main : Node2D
 	private void OnCaughtItemReturned(FallingItem item)
 	{
 		if (item.ItemType == ItemType.Fruit)
+		{
+			_runCaught++;
 			_meta.Stats.OnFruitCaught(item.IsGolden);
+		}
 		_perkPlayer.AwardCaught(item);
 	}
 
@@ -765,6 +780,7 @@ public partial class Main : Node2D
 	{
 		_score = 0;
 		_runTime = 0f;
+		_runCaught = 0;
 		_frog?.ResetForRound();
 		PositionFrog();
 		_perkPlayer.Reset();
@@ -792,12 +808,14 @@ public partial class Main : Node2D
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
 		_hud?.HidePause();
-		if (_score > _highScore)
+		bool newRecord = _score > _highScore;
+		if (newRecord)
 		{
 			_highScore = _score;
 			SaveHighScore(_highScore);
 		}
 		_meta.Stats.OnRunFinished();
+		_meta.Wallet.Add(SlimeReward.Run(_score, _runCaught, newRecord));
 		_meta.Save();
 		_spawnTimer?.Stop();
 		_hud?.ShowGameOver(_score, _highScore);
