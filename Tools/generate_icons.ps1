@@ -524,6 +524,41 @@ Draw-Line $g @(($px - $side[0] * $half), ($py - $side[1] * $half)) @(($px + $sid
 Draw-Ellipse $g @(($flakeX - 18), ($flakeY - 18), 36, 36) (Get-Color '#e1fffb') (Get-Color '#7fe3d5') 5 45
 Save-Icon $canvas 'Game/assets/perks/basilisk_gaze.png'
 }
+
+# Иконки кнопок меню: профиль (голова лягушки), магазин скинов (домик), улучшения (стрелка вверх).
+function Draw-ProfileIcon {
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-Ellipse $g @(64, 168, 384, 300) (Get-Color '#55a82e') (Get-Color '#357f22') 26
+foreach ($ex in @(168, 344)) {
+Draw-Ellipse $g @(($ex - 88), 104, 176, 176) (Get-Color '#66b83a') (Get-Color '#3d8a24') 24
+Fill-Ellipse $g @(($ex - 52), 140, 104, 104) (Get-Color '#f6ffe9')
+Fill-Ellipse $g @(($ex - 26), 166, 52, 52) (Get-Color '#173b12')
+}
+$mouth = New-Object System.Drawing.Drawing2D.GraphicsPath
+$mouth.AddBezier(150, 356, 210, 412, 302, 412, 362, 356)
+$pen = New-Pen (Get-Color '#173b12') 12
+$g.DrawPath($pen, $mouth)
+$pen.Dispose(); $mouth.Dispose()
+Save-Icon $canvas 'Game/assets/ui/icon_profile.png'
+}
+
+function Draw-ShopIcon {
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-Path $g (New-Polygon @(@(52, 262), @(460, 262), @(256, 78))) (Get-Color '#e0554b') (Get-Color '#c9403a') 26
+Draw-Path $g (New-Polygon @(@(114, 262), @(398, 262), @(398, 452), @(114, 452))) (Get-Color '#f7e6c4') (Get-Color '#e2c894') 26
+Draw-Path $g (New-Polygon @(@(214, 322), @(298, 322), @(298, 452), @(214, 452))) (Get-Color '#a06a3c') (Get-Color '#7d5029') 16
+Fill-Ellipse $g @(272, 382, 22, 22) (Get-Color '#ffd45e')
+Draw-Ellipse $g @(140, 292, 78, 78) (Get-Color '#eaf6ff') (Get-Color '#9fd3f0') 14
+Save-Icon $canvas 'Game/assets/ui/icon_shop.png'
+}
+
+function Draw-UpIcon {
+$canvas = New-Canvas; $g = $canvas[1]
+$arrow = New-Polygon @(@(256, 88), @(356, 216), @(302, 216), @(302, 448), @(210, 448), @(210, 216), @(156, 216))
+Draw-Path $g $arrow (Get-Color '#8ce0b6') (Get-Color '#3fae8a') 26
+Save-Icon $canvas 'Game/assets/ui/icon_upgrade.png'
+}
+
 Draw-HealthIcons
 Draw-StickyPaws
 Draw-RubberGrip
@@ -539,6 +574,9 @@ Draw-LightningTongue
 Draw-BasiliskGaze
 Draw-LilyPad
 Draw-LilyFlower
+Draw-ProfileIcon
+Draw-ShopIcon
+Draw-UpIcon
 
 
-Write-Host '16 icons generated.'
+Write-Host '19 icons generated.'

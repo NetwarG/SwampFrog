@@ -12,6 +12,7 @@ internal static partial class LocText
 		[L.MenuPlay] = "Play",
 		[L.MenuExit] = "Quit",
 		[L.MenuMiniGame] = "Mini-game: Suika",
+		[L.MenuUp] = "Up",
 		[L.HintTouch] = "Hold your finger on the screen — the arms reach for it",
 		[L.NeedFruits] = "Collect some fruit in classic mode first!",
 		[L.Score] = "Score: {0}",
@@ -76,5 +77,16 @@ internal static partial class LocText
 		[L.ProfileGolden] = "Golden fruits: {0}",
 		[L.ProfileMerges] = "Suika merges: {0}",
 		[L.SlimeLabel] = "Slime: {0}",
+
+		[L.SkinsTitle] = "Skins",
+		[L.SkinsBack] = "Back",
+		[L.SkinSelect] = "Select",
+		[L.SkinSelected] = "Selected",
+		[L.SkinBuy] = "Buy: {0}",
+		[L.SkinLockedScore] = "Need {0} points",
+		[L.SkinLockedSuika] = "Suika best {0}",
+		[L.SkinSlotHat] = "Hat",
+		[L.SkinSlotGloves] = "Gloves",
+		[L.SkinSlotStand] = "Stand",
 	};
 }

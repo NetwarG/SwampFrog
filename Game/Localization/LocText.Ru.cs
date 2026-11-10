@@ -12,6 +12,7 @@ internal static partial class LocText
 		[L.MenuPlay] = "Играть",
 		[L.MenuExit] = "Выйти",
 		[L.MenuMiniGame] = "Мини-игра: Suika",
+		[L.MenuUp] = "Up",
 		[L.HintTouch] = "Держи палец на экране — руки тянутся к нему",
 		[L.NeedFruits] = "Сначала собери фрукты в основном режиме!",
 		[L.Score] = "Счёт: {0}",
@@ -76,5 +77,16 @@ internal static partial class LocText
 		[L.ProfileGolden] = "Золотых фруктов: {0}",
 		[L.ProfileMerges] = "Слияний в Suika: {0}",
 		[L.SlimeLabel] = "Слизь: {0}",
+
+		[L.SkinsTitle] = "Скины",
+		[L.SkinsBack] = "Назад",
+		[L.SkinSelect] = "Выбрать",
+		[L.SkinSelected] = "Выбрано",
+		[L.SkinBuy] = "Купить: {0}",
+		[L.SkinLockedScore] = "Нужно {0} очков",
+		[L.SkinLockedSuika] = "Рекорд Suika {0}",
+		[L.SkinSlotHat] = "Шляпа",
+		[L.SkinSlotGloves] = "Перчатки",
+		[L.SkinSlotStand] = "Подставка",
 	};
 }

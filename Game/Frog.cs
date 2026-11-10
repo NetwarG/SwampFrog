@@ -38,19 +38,10 @@ public partial class Frog : Node2D
 	private const float EatingStateTime = 0.7f;
 
 	/// <summary>Высота персонажа в локальных единицах (как у старого процедурного тела).</summary>
-	private const float BodyVisualHeight = 85f;
+	public const float BodyVisualHeight = 85f;
 
 	/// <summary>Высота текстуры тела из Game/assets/frogs.</summary>
 	private const float BodyTextureHeight = 179f;
-
-	/// <summary>Позы тела лягушки — соответствуют файлам в Game/assets/frogs.</summary>
-	private enum FrogPose
-	{
-		Idle,
-		Catching,
-		Eating,
-		Angry,
-	}
 
 	/// <summary>Кэш текстур тела по позе.</summary>
 	private static readonly Dictionary<FrogPose, Texture2D> BodyTextures = new();
@@ -91,6 +82,14 @@ public partial class Frog : Node2D
 	private float _currentUiScale = 1f;
 	private Sprite2D? _body;
 	private float _eatingTimer;
+	/// <summary>Текущая поза тела: от неё зависит и якорь шляпы.</summary>
+	private FrogPose _pose = FrogPose.Idle;
+
+	/// <summary>Слой шляпы поверх тела; выбранный скин слота «Шляпа».</summary>
+	private HatView? _hatNode;
+	private SkinId _hatSkin = SkinId.HatNone;
+	private SkinId _glovesSkin = SkinId.GlovesNone;
+	private SkinId _standSkin = SkinId.StandNone;
 
 	/// <summary>Щит неуязвимости («Панцирь» ур. 5, возрождение): контур вокруг тела.</summary>
 	private bool _shield;
@@ -234,21 +233,13 @@ public partial class Frog : Node2D
 		QueueRedraw();
 	}
 
-	private static string TexturePath(FrogPose pose) => pose switch
-	{
-		FrogPose.Catching => "res://Game/assets/frogs/catching.png",
-		FrogPose.Eating => "res://Game/assets/frogs/eating.png",
-		FrogPose.Angry => "res://Game/assets/frogs/angry.png",
-		_ => "res://Game/assets/frogs/idle.png",
-	};
-
 	private static Texture2D LoadBodyTexture(FrogPose pose)
 	{
 		if (BodyTextures.TryGetValue(pose, out Texture2D? cached))
 		{
 			return cached;
 		}
-		Texture2D loaded = GD.Load<Texture2D>(TexturePath(pose));
+		Texture2D loaded = GD.Load<Texture2D>(FrogPoses.TexturePath(pose));
 		BodyTextures[pose] = loaded;
 		return loaded;
 	}
@@ -257,7 +248,23 @@ public partial class Frog : Node2D
 	{
 		_body = new Sprite2D { Centered = true };
 		AddChild(_body);
+		// Шляпа — отдельный слой после тела: она рисуется поверх спрайта лягушки.
+		_hatNode = new HatView { Name = "Hat" };
+		AddChild(_hatNode);
 		UpdateBodyState();
+	}
+
+	/// <summary>
+	/// Применяет косметические скины: шляпу, перчатки и подставку.
+	/// Пустые слоты (вариант «Нет») отключают соответствующий слой.
+	/// </summary>
+	public void ApplySkin(SkinId hat, SkinId gloves, SkinId stand)
+	{
+		_hatSkin = hat;
+		_glovesSkin = gloves;
+		_standSkin = stand;
+		_hatNode?.SetHat(hat);
+		QueueRedraw();
 	}
 
 	/// <summary>Текущая поза: урон важнее «еды», «еда» важнее ловли.</summary>
@@ -285,14 +292,13 @@ public partial class Frog : Node2D
 		{
 			return;
 		}
-		UpdateBodyTransform();
-
-		FrogPose pose = CurrentPose();
-		Texture2D texture = LoadBodyTexture(pose);
+		_pose = CurrentPose();
+		Texture2D texture = LoadBodyTexture(_pose);
 		if (_body.Texture != texture)
 		{
 			_body.Texture = texture;
 		}
+		UpdateBodyTransform();
 	}
 
 	/// <summary>Масштабирует тело под UiScale, зеркалирует к направлению рук и покачивает.</summary>
@@ -308,6 +314,12 @@ public partial class Frog : Node2D
 		// Лёгкое покачивание как в старом процедурном рисунке.
 		float bob = Mathf.Sin((float)Time.GetTicksMsec() / 380f) * 2.2f;
 		_body.Position = new Vector2(0f, bob);
+		if (_hatNode != null)
+		{
+			// Шляпа следует за головой: у каждой позы своё смещение (см. HatAnchor), а X зеркалится.
+			Vector2 head = HatAnchor.Offset(_pose);
+			_hatNode.Position = new Vector2(flip * head.X, bob + CosmeticDraw.HatAnchorY + head.Y);
+		}
 	}
 
 	public override void _Process(double delta)
@@ -621,6 +633,8 @@ public partial class Frog : Node2D
 	{
 		// Геометрия ладоней — в мировых единицах. Pulse увеличивает тело, не сдвигая руки за край.
 		float unit = _currentUiScale / Mathf.Max(0.001f, Mathf.Abs(GlobalScale.X));
+		// Подставка рисуется первой — под телом лягушки.
+		CosmeticDraw.DrawStand(this, _standSkin, new Vector2(0f, CosmeticDraw.StandAnchorY), unit);
 		for (int i = 0; i < _armLengthsWorld.Length; i++)
 		{
 			if (!(DecorativeOnly && ThrowPose) && _armLengthsWorld[i] <= 2f) continue;
@@ -661,12 +675,20 @@ public partial class Frog : Node2D
 			DrawLine(previous, point, Skin, 5f * unit);
 			previous = point;
 		}
-		DrawCircle(handLocal, 15f * unit, HandDark);
-		DrawCircle(handLocal, 12f * unit, Hand);
-
 		// Кисть свисает: чем сильнее провис, тем больше ладонь смотрит вниз.
 		float tilt = DecorativeOnly ? 0f : ArmSag.PalmTilt(_sag.Amount(_armLengthsWorld[handIndex]));
 		float angle = dirLocal.Angle() + tilt;
+		if (_glovesSkin == SkinId.GlovesNone)
+			DrawPlainHand(handLocal, angle, unit);
+		else
+			CosmeticDraw.DrawGloves(this, _glovesSkin, handLocal, dirLocal.Angle(), unit);
+	}
+
+	/// <summary>Обычная ладонь лягушки: круг и три пальца (когда перчатки не выбраны).</summary>
+	private void DrawPlainHand(Vector2 handLocal, float angle, float unit)
+	{
+		DrawCircle(handLocal, 15f * unit, HandDark);
+		DrawCircle(handLocal, 12f * unit, Hand);
 		for (int fingerIndex = -1; fingerIndex <= 1; fingerIndex++)
 		{
 			Vector2 finger = Vector2.FromAngle(angle + fingerIndex * 0.75f);

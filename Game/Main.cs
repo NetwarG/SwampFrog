@@ -161,6 +161,12 @@ public partial class Main : Node2D
 		if (frame == _lastBackRequestFrame) return;
 		_lastBackRequestFrame = frame;
 
+		if (_state == GameState.Menu && _hud?.IsSkinGalleryOpen == true)
+		{
+			_hud.HideSkinGallery();
+			return;
+		}
+
 		if (_state == GameState.Menu && _hud?.IsProfileOpen == true)
 		{
 			_hud.HideProfile();
@@ -301,6 +307,9 @@ public partial class Main : Node2D
 		_hud.PlayPressed += StartGame;
 		_hud.MiniGamePressed += OpenSuika;
 		_hud.ProfilePressed += OpenProfile;
+		_hud.ShopPressed += OpenSkinGallery;
+		_hud.SkinSelected += OnSkinSelected;
+		_hud.SkinPurchased += OnSkinPurchased;
 		_hud.ExitPressed += QuitGame;
 		_hud.RestartPressed += Restart;
 		_hud.MenuPressed += GoToMenu;
@@ -330,6 +339,7 @@ public partial class Main : Node2D
 		_hud.SetGameplayVisible(false);
 		_hud.SetXp(_xp.Level, _xp.LevelProgress);
 		_hud.SetWallet(_meta.Wallet.Balance);
+		ApplyCosmetics();
 		_suika.Visible = false;
 
 		// Индикатор зоны замедления лежит под лягушкой и предметами, слой эффектов — поверх них.
@@ -716,6 +726,50 @@ public partial class Main : Node2D
 			return;
 		}
 		_hud?.ShowProfile(_meta.Snapshot(_highScore, _suika?.BestScore ?? 0, TotalFruitStock()));
+	}
+
+	/// <summary>Применяет выбранные скины лягушки.</summary>
+	private void ApplyCosmetics() =>
+		_frog?.ApplySkin(_meta.Selected(SkinSlot.Hat), _meta.Selected(SkinSlot.Gloves), _meta.Selected(SkinSlot.Stand));
+
+	/// <summary>Открывает галерею скинов с текущими состояниями карточек.</summary>
+	private void OpenSkinGallery()
+	{
+		if (_state != GameState.Menu)
+		{
+			return;
+		}
+		_hud?.ShowSkinGallery(SkinGalleryState.Build(_meta, _highScore, _suika?.BestScore ?? 0));
+	}
+
+	/// <summary>Игрок выбрал скин: запоминаем выбор, применяем и обновляем галерею.</summary>
+	private void OnSkinSelected(SkinId id)
+	{
+		SkinDefinition def = SkinCatalog.Get(id);
+		if (!SkinUnlockRules.IsUnlocked(def, _meta.Owns(id), _highScore, _suika?.BestScore ?? 0))
+		{
+			return;
+		}
+		_meta.Select(id);
+		_meta.Save();
+		ApplyCosmetics();
+		_hud?.ShowSkinGallery(SkinGalleryState.Build(_meta, _highScore, _suika?.BestScore ?? 0));
+	}
+
+	/// <summary>Игрок купил скин: списываем слизь, запоминаем владение и выбираем его.</summary>
+	private void OnSkinPurchased(SkinId id)
+	{
+		SkinDefinition def = SkinCatalog.Get(id);
+		if (!SkinUnlockRules.CanBuy(def, _meta.Wallet.Balance))
+		{
+			return;
+		}
+		_meta.Wallet.Spend(def.Price);
+		_meta.Own(id);
+		_meta.Select(id);
+		_meta.Save();
+		ApplyCosmetics();
+		_hud?.ShowSkinGallery(SkinGalleryState.Build(_meta, _highScore, _suika?.BestScore ?? 0));
 	}
 
 	private void CloseSuika()

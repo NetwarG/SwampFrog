@@ -13,6 +13,7 @@ public static class L
 	public const string MenuPlay = "menu.play";
 	public const string MenuExit = "menu.exit";
 	public const string MenuMiniGame = "menu.minigame";
+	public const string MenuUp = "menu.up";
 	public const string HintTouch = "hud.hintTouch";
 	public const string NeedFruits = "hud.needFruits";
 	public const string Score = "hud.score";
@@ -82,4 +83,16 @@ public static class L
 	public const string ProfileGolden = "profile.golden";
 	public const string ProfileMerges = "profile.merges";
 	public const string SlimeLabel = "slime.label";
+
+	// ---------- Скины ----------
+	public const string SkinsTitle = "skins.title";
+	public const string SkinsBack = "skins.back";
+	public const string SkinSelect = "skins.select";
+	public const string SkinSelected = "skins.selected";
+	public const string SkinBuy = "skins.buy";
+	public const string SkinLockedScore = "skins.lockedScore";
+	public const string SkinLockedSuika = "skins.lockedSuika";
+	public const string SkinSlotHat = "skins.slotHat";
+	public const string SkinSlotGloves = "skins.slotGloves";
+	public const string SkinSlotStand = "skins.slotStand";
 }

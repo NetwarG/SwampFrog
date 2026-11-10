@@ -27,7 +27,10 @@ public partial class HUD : Control
 	private Control? _gameOverRoot;
 	private Control? _startRoot;
 	private Button? _miniGameButton;
-	private Button? _profileButton;
+	private IconStickerButton? _profileButton;
+	private IconStickerButton? _shopButton;
+	private IconStickerButton? _upButton;
+	private HBoxContainer? _menuIcons;
 	private WalletBadge? _walletBadge;
 	private bool _miniGameEnabled = true;
 	private Label? _suikaHintLabel;
@@ -57,12 +60,25 @@ public partial class HUD : Control
 
 	/// <summary>Экран профиля игрока поверх главного меню.</summary>
 	private ProfilePanel? _profilePanel;
+
+	/// <summary>Галерея скинов лягушки поверх профиля.</summary>
+	private SkinGalleryPanel? _skinGallery;
 	private bool _gameplayVisible;
 
 	public event Action? PlayPressed;
 	public event Action? MiniGamePressed;
 	public event Action? ProfilePressed;
 	public event Action? ExitPressed;
+
+	/// <summary>Игрок открыл магазин скинов (кнопка с домиком).</summary>
+	public event Action? ShopPressed;
+
+	/// <summary>Игрок выбрал скин в галерее.</summary>
+	public event Action<SkinId>? SkinSelected;
+
+	/// <summary>Игрок запросил покупку скина.</summary>
+	public event Action<SkinId>? SkinPurchased;
+
 	public event Action? RestartPressed;
 	public event Action? MenuPressed;
 
@@ -104,6 +120,11 @@ public partial class HUD : Control
 		_profilePanel = new ProfilePanel { ZIndex = 75 };
 		AddChild(_profilePanel);
 
+		_skinGallery = new SkinGalleryPanel { ZIndex = 76 };
+		AddChild(_skinGallery);
+		_skinGallery.SkinSelected += id => SkinSelected?.Invoke(id);
+		_skinGallery.SkinPurchased += id => SkinPurchased?.Invoke(id);
+
 		Loc.Changed += Localize;
 	}
 
@@ -117,7 +138,7 @@ public partial class HUD : Control
 		if (_playButton != null) _playButton.Text = Loc.T(L.MenuPlay);
 		if (_exitButton != null) _exitButton.Text = Loc.T(L.MenuExit);
 		if (_miniGameButton != null) _miniGameButton.Text = Loc.T(L.MenuMiniGame);
-		if (_profileButton != null) _profileButton.Text = Loc.T(L.MenuProfile);
+		if (_upButton != null) _upButton.SetCaption(Loc.T(L.MenuUp));
 		if (_gameOverTitle != null) _gameOverTitle.Text = Loc.T(L.GameOverTitle);
 		if (_restartButton != null) _restartButton.Text = Loc.T(L.Restart);
 		if (_gameOverMenuButton != null) _gameOverMenuButton.Text = Loc.T(L.ToMenu);
@@ -299,11 +320,10 @@ public partial class HUD : Control
 		_playButton = UiStyle.MakeButton(Loc.T(L.MenuPlay), ui, new Color("b4e863"));
 		_exitButton = UiStyle.MakeButton(Loc.T(L.MenuExit), ui, new Color("ff8c7a"));
 		_miniGameButton = UiStyle.MakeButton(Loc.T(L.MenuMiniGame), ui, new Color("ffd45e"));
-		_profileButton = UiStyle.MakeButton(Loc.T(L.MenuProfile), ui, new Color("7fd6f2"));
 		_playButton.Pressed += () => PlayPressed?.Invoke();
 		_exitButton.Pressed += () => ExitPressed?.Invoke();
 		_miniGameButton!.Pressed += () => MiniGamePressed?.Invoke();
-		_profileButton!.Pressed += () => ProfilePressed?.Invoke();
+		BuildMenuIcons(ui);
 		// Применяем состояние, заданное до создания кнопки (например из _Ready).
 		SetMiniGameEnabled(_miniGameEnabled);
 
@@ -314,7 +334,7 @@ public partial class HUD : Control
 		box.AddChild(_walletBadge);
 		box.AddChild(_playButton);
 		box.AddChild(_miniGameButton!);
-		box.AddChild(_profileButton!);
+		box.AddChild(_menuIcons!);
 		box.AddChild(_exitButton);
 
 		var madeByText = UiStyle.MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f));
@@ -373,6 +393,52 @@ public partial class HUD : Control
 
 	/// <summary>Показывает баланс валюты «Слизь» в меню.</summary>
 	public void SetWallet(int amount) => _walletBadge?.SetAmount(amount);
+
+	/// <summary>Строка иконочных кнопок меню: профиль, магазин скинов и улучшения («Up»).</summary>
+	private void BuildMenuIcons(float ui)
+	{
+		_profileButton = MakeIconButton("res://Game/assets/ui/icon_profile.png", new Color("7fd6f2"), ui, "ProfileButton");
+		_shopButton = MakeIconButton("res://Game/assets/ui/icon_shop.png", new Color("ffd45e"), ui, "ShopButton");
+		_upButton = MakeIconButton("res://Game/assets/ui/icon_upgrade.png", new Color("b4e863"), ui, "UpButton");
+		_profileButton.Pressed += () => ProfilePressed?.Invoke();
+		_shopButton.Pressed += () => ShopPressed?.Invoke();
+		// Улучшения (Фаза 2) ещё не сделаны: кнопка приглушена и не нажимается.
+		_upButton.Disabled = true;
+		_upButton.Modulate = new Color(1f, 1f, 1f, 0.4f);
+
+		_menuIcons = new HBoxContainer { Name = "MenuIcons", Alignment = BoxContainer.AlignmentMode.Center };
+		_menuIcons.AddThemeConstantOverride("separation", (int)Mathf.Round(14f * ui));
+		_menuIcons.AddChild(_profileButton);
+		_menuIcons.AddChild(_shopButton);
+		_menuIcons.AddChild(_upButton);
+	}
+
+	/// <summary>Квадратная иконочная кнопка меню в общем стиле кнопок.</summary>
+	private static IconStickerButton MakeIconButton(string iconPath, Color accent, float ui, string name)
+	{
+		const float size = 100f;
+		var button = new IconStickerButton
+		{
+			Name = name,
+			CustomMinimumSize = new Vector2(size * ui, size * ui),
+			MouseFilter = MouseFilterEnum.Pass,
+			FocusMode = FocusModeEnum.None,
+			MouseDefaultCursorShape = CursorShape.PointingHand,
+			CornerRadius = UiStyle.CornerRadius * ui * 1.6f
+		};
+		button.SetAccent(accent);
+		button.SetIcon(iconPath);
+		return button;
+	}
+
+	/// <summary>Показывает галерею скинов поверх профиля.</summary>
+	public void ShowSkinGallery(SkinGalleryEntry[] entries) => _skinGallery?.Show(entries);
+
+	/// <summary>Скрывает галерею скинов.</summary>
+	public void HideSkinGallery() => _skinGallery?.Hide();
+
+	/// <summary>Открыта ли галерея скинов: Escape/«Назад» закрывает её первым.</summary>
+	public bool IsSkinGalleryOpen => _skinGallery?.Visible ?? false;
 
 	/// <summary>Скрывает экран профиля.</summary>
 	public void HideProfile() => _profilePanel?.Hide();

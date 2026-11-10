@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace SwampFrog;
@@ -12,6 +14,10 @@ public static class MetaSave
 	private const string Section = "meta";
 	private const string StatsKey = "stats";
 	private const string CoinsKey = "coins";
+	private const string SkinsKey = "skins";
+	private const string HatKey = "skin_hat";
+	private const string GlovesKey = "skin_gloves";
+	private const string StandKey = "skin_stand";
 
 	/// <summary>Читает статистику профиля; отсутствие секции или ключа даёт пустые счётчики.</summary>
 	public static MetaStats LoadStats()
@@ -31,13 +37,55 @@ public static class MetaSave
 		return (int)config.GetValue(Section, CoinsKey, 0);
 	}
 
-	/// <summary>Записывает статистику и баланс слизи одним проходом, не трогая остальные секции.</summary>
-	public static void Save(MetaStats stats, int coins)
+	/// <summary>Читает список купленных/открытых скинов; неизвестные id игнорируются.</summary>
+	public static List<SkinId> LoadOwnedSkins()
+	{
+		var result = new List<SkinId>();
+		var config = new ConfigFile();
+		if (config.Load(Path) != Error.Ok)
+			return result;
+		foreach (string token in config.GetValue(Section, SkinsKey, string.Empty).ToString()
+			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+		{
+			if (Enum.TryParse(token, out SkinId id) && !result.Contains(id))
+				result.Add(id);
+		}
+		return result;
+	}
+
+	/// <summary>Читает выбранный скин слота; неизвестный id даёт скин по умолчанию.</summary>
+	public static SkinId LoadSelectedSkin(SkinSlot slot)
+	{
+		var config = new ConfigFile();
+		if (config.Load(Path) != Error.Ok)
+			return SkinCatalog.DefaultFor(slot).Id;
+		string raw = config.GetValue(Section, KeyFor(slot), string.Empty).ToString().Trim();
+		return Enum.TryParse(raw, out SkinId id) ? SkinCatalog.Normalize(slot, id) : SkinCatalog.DefaultFor(slot).Id;
+	}
+
+	/// <summary>Записывает статистику, слизь и скины одним проходом, не трогая остальные секции.</summary>
+	public static void Save(MetaStats stats, int coins, IReadOnlyCollection<SkinId> owned,
+		SkinId hat, SkinId gloves, SkinId stand)
 	{
 		var config = new ConfigFile();
 		config.Load(Path);
 		config.SetValue(Section, StatsKey, stats.ToSaveString());
 		config.SetValue(Section, CoinsKey, coins);
+		var ids = new List<string>();
+		foreach (SkinId id in owned) ids.Add(id.ToString());
+		ids.Sort();
+		config.SetValue(Section, SkinsKey, string.Join(",", ids));
+		config.SetValue(Section, HatKey, hat.ToString());
+		config.SetValue(Section, GlovesKey, gloves.ToString());
+		config.SetValue(Section, StandKey, stand.ToString());
 		config.Save(Path);
 	}
+
+	private static string KeyFor(SkinSlot slot) => slot switch
+	{
+		SkinSlot.Gloves => GlovesKey,
+		SkinSlot.Stand => StandKey,
+		_ => HatKey,
+	};
 }
+
