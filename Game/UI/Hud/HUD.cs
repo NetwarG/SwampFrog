@@ -431,8 +431,8 @@ public partial class HUD : Control
 		return button;
 	}
 
-	/// <summary>Показывает галерею скинов поверх профиля.</summary>
-	public void ShowSkinGallery(SkinGalleryEntry[] entries) => _skinGallery?.Show(entries);
+	/// <summary>Показывает магазин скинов поверх профиля.</summary>
+	public void ShowSkinGallery(SkinGalleryEntry[] entries, int coins) => _skinGallery?.Show(entries, coins);
 
 	/// <summary>Скрывает галерею скинов.</summary>
 	public void HideSkinGallery() => _skinGallery?.Hide();

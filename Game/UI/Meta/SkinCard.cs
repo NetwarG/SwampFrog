@@ -4,14 +4,15 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Карточка скина в галерее: превью варианта, имя и действие.
-/// Действие — «Выбрать», «Купить: N» или подпись условия, если скин закрыт.
+/// Карточка скина в магазине: крупное превью, имя и действие («Выбрать» / «Купить: N»).
+/// Фон — стикер в цвете состояния скина (см. <see cref="StickerBackground"/>).
 /// </summary>
 public partial class SkinCard : Control
 {
-	public const float CardWidth = 96f;
-	public const float CardHeight = 132f;
-	private const float PreviewHeight = 62f;
+	public const float CardWidth = 210f;
+	public const float CardHeight = 290f;
+	private const float PreviewHeight = 150f;
+	private const float PreviewIconSize = 130f;
 
 	private SkinGalleryEntry? _entry;
 	private StickerBackground? _background;
@@ -35,26 +36,29 @@ public partial class SkinCard : Control
 
 	public override void _Ready()
 	{
-		MouseFilter = MouseFilterEnum.Pass;
+		// Карточка не перехватывает свайп: его ловит лента, а кнопка действия остаётся кликабельной.
+		MouseFilter = MouseFilterEnum.Ignore;
 		CustomMinimumSize = new Vector2(CardWidth, CardHeight);
 		Size = new Vector2(CardWidth, CardHeight);
 
-		_background = new StickerBackground { CornerRadius = 12f };
+		_background = new StickerBackground { CornerRadius = 20f };
 		AddChild(_background);
 
-		_nameLabel = UiStyle.MakeLabel(string.Empty, 13, new Color("173c34"));
-		_nameLabel.Position = new Vector2(0f, PreviewHeight + 2f);
-		_nameLabel.Size = new Vector2(CardWidth, 16f);
+		_nameLabel = UiStyle.MakeLabel(string.Empty, 22, new Color("173c34"));
+		_nameLabel.Position = new Vector2(0f, PreviewHeight + 8f);
+		_nameLabel.Size = new Vector2(CardWidth, 28f);
 		AddChild(_nameLabel);
 
-		_stateLabel = UiStyle.MakeLabel(string.Empty, 11, new Color("3a2a12"));
+		_stateLabel = UiStyle.MakeLabel(string.Empty, 18, new Color("3a2a12"));
 		_stateLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		_stateLabel.Position = new Vector2(4f, PreviewHeight + 22f);
-		_stateLabel.Size = new Vector2(CardWidth - 8f, 42f);
+		_stateLabel.VerticalAlignment = VerticalAlignment.Center;
+		_stateLabel.Position = new Vector2(10f, PreviewHeight + 46f);
+		_stateLabel.Size = new Vector2(CardWidth - 20f, 60f);
 		AddChild(_stateLabel);
 
-		_actionButton = (StickerButton)UiStyle.MakeButton(string.Empty, 0.62f, new Color("b4e863"), new Vector2(CardWidth - 14f, 34f));
-		_actionButton.Position = new Vector2(7f, PreviewHeight + 22f);
+		_actionButton = (StickerButton)UiStyle.MakeButton(string.Empty, 0.8f, new Color("b4e863"),
+			new Vector2(CardWidth - 28f, 58f));
+		_actionButton.Position = new Vector2(14f, PreviewHeight + 46f);
 		_actionButton.Pressed += OnAction;
 		AddChild(_actionButton);
 
@@ -125,20 +129,19 @@ public partial class SkinCard : Control
 	{
 		if (_entry == null)
 			return;
-		Vector2 center = new(CardWidth * 0.5f, PreviewHeight * 0.62f);
+		Vector2 center = new(CardWidth * 0.5f, PreviewHeight * 0.5f);
 		Texture2D? icon = SkinCatalog.Icon(_entry.Id);
 		if (icon == null)
 		{
 			DrawNone(center);
 			return;
 		}
-		const float size = 54f;
-		var half = new Vector2(size * 0.5f, size * 0.5f);
-		DrawTextureRect(icon, new Rect2(center - half, new Vector2(size, size)), false);
+		var half = new Vector2(PreviewIconSize * 0.5f, PreviewIconSize * 0.5f);
+		DrawTextureRect(icon, new Rect2(center - half, new Vector2(PreviewIconSize, PreviewIconSize)), false);
 	}
 
 	private void DrawNone(Vector2 center) =>
-		DrawArc(center, 18f, 0f, Mathf.Tau, 24, new Color(1f, 1f, 1f, 0.3f), 2f);
+		DrawArc(center, 44f, 0f, Mathf.Tau, 28, new Color(1f, 1f, 1f, 0.3f), 3f);
 
 	private static Color AccentOf(SkinCardState state) => state switch
 	{

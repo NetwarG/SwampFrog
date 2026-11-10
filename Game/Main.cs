@@ -732,14 +732,18 @@ public partial class Main : Node2D
 	private void ApplyCosmetics() =>
 		_frog?.ApplySkin(_meta.Selected(SkinSlot.Hat), _meta.Selected(SkinSlot.Gloves), _meta.Selected(SkinSlot.Stand));
 
-	/// <summary>Открывает галерею скинов с текущими состояниями карточек.</summary>
+	/// <summary>Показывает магазин скинов с текущими состояниями карточек и балансом слизи.</summary>
+	private void ShowShop() =>
+		_hud?.ShowSkinGallery(SkinGalleryState.Build(_meta, _highScore, _suika?.BestScore ?? 0), _meta.Wallet.Balance);
+
+	/// <summary>Открывает магазин скинов с текущими состояниями карточек.</summary>
 	private void OpenSkinGallery()
 	{
 		if (_state != GameState.Menu)
 		{
 			return;
 		}
-		_hud?.ShowSkinGallery(SkinGalleryState.Build(_meta, _highScore, _suika?.BestScore ?? 0));
+		ShowShop();
 	}
 
 	/// <summary>Игрок выбрал скин: запоминаем выбор, применяем и обновляем галерею.</summary>
@@ -753,7 +757,7 @@ public partial class Main : Node2D
 		_meta.Select(id);
 		_meta.Save();
 		ApplyCosmetics();
-		_hud?.ShowSkinGallery(SkinGalleryState.Build(_meta, _highScore, _suika?.BestScore ?? 0));
+		ShowShop();
 	}
 
 	/// <summary>Игрок купил скин: списываем слизь, запоминаем владение и выбираем его.</summary>
@@ -769,7 +773,7 @@ public partial class Main : Node2D
 		_meta.Select(id);
 		_meta.Save();
 		ApplyCosmetics();
-		_hud?.ShowSkinGallery(SkinGalleryState.Build(_meta, _highScore, _suika?.BestScore ?? 0));
+		ShowShop();
 	}
 
 	private void CloseSuika()
