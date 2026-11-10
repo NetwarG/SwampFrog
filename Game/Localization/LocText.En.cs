@@ -88,5 +88,11 @@ internal static partial class LocText
 		[L.SkinSlotHat] = "Hat",
 		[L.SkinSlotGloves] = "Gloves",
 		[L.SkinSlotStand] = "Stand",
+
+		[L.UpgradesTitle] = "Upgrades",
+		[L.UpgradesBack] = "Back",
+		[L.UpgradeBuy] = "Buy: {0}",
+		[L.UpgradeMax] = "Maxed",
+		[L.PerkReroll] = "Reroll ({0})",
 	};
 }

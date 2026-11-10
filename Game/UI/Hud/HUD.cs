@@ -63,6 +63,9 @@ public partial class HUD : Control
 
 	/// <summary>Галерея скинов лягушки поверх профиля.</summary>
 	private SkinGalleryPanel? _skinGallery;
+
+	/// <summary>Экран постоянных улучшений.</summary>
+	private UpgradePanel? _upgradePanel;
 	private bool _gameplayVisible;
 
 	public event Action? PlayPressed;
@@ -72,6 +75,15 @@ public partial class HUD : Control
 
 	/// <summary>Игрок открыл магазин скинов (кнопка с домиком).</summary>
 	public event Action? ShopPressed;
+
+	/// <summary>Игрок открыл экран постоянных улучшений (кнопка Up).</summary>
+	public event Action? UpgradesPressed;
+
+	/// <summary>Игрок купил уровень постоянного улучшения.</summary>
+	public event Action<UpgradeId>? UpgradePurchased;
+
+	/// <summary>Игрок запросил реролл предложения перков.</summary>
+	public event Action? PerkRerollPressed;
 
 	/// <summary>Игрок выбрал скин в галерее.</summary>
 	public event Action<SkinId>? SkinSelected;
@@ -111,6 +123,7 @@ public partial class HUD : Control
 		_perkOverlay = new PerkSelectionOverlay { ZIndex = 80 };
 		AddChild(_perkOverlay);
 		_perkOverlay.PerkPicked += OnPerkPicked;
+		_perkOverlay.RerollRequested += () => PerkRerollPressed?.Invoke();
 
 		_pauseOverlay = new PauseOverlay { ZIndex = 70 };
 		AddChild(_pauseOverlay);
@@ -124,6 +137,10 @@ public partial class HUD : Control
 		AddChild(_skinGallery);
 		_skinGallery.SkinSelected += id => SkinSelected?.Invoke(id);
 		_skinGallery.SkinPurchased += id => SkinPurchased?.Invoke(id);
+
+		_upgradePanel = new UpgradePanel { ZIndex = 77 };
+		AddChild(_upgradePanel);
+		_upgradePanel.UpgradePurchased += id => UpgradePurchased?.Invoke(id);
 
 		Loc.Changed += Localize;
 	}
@@ -402,9 +419,8 @@ public partial class HUD : Control
 		_upButton = MakeIconButton("res://Game/assets/ui/icon_upgrade.png", new Color("b4e863"), ui, "UpButton");
 		_profileButton.Pressed += () => ProfilePressed?.Invoke();
 		_shopButton.Pressed += () => ShopPressed?.Invoke();
-		// Улучшения (Фаза 2) ещё не сделаны: кнопка приглушена и не нажимается.
-		_upButton.Disabled = true;
-		_upButton.Modulate = new Color(1f, 1f, 1f, 0.4f);
+		// «Up» открывает экран постоянных улучшений.
+		_upButton.Pressed += () => UpgradesPressed?.Invoke();
 
 		_menuIcons = new HBoxContainer { Name = "MenuIcons", Alignment = BoxContainer.AlignmentMode.Center };
 		_menuIcons.AddThemeConstantOverride("separation", (int)Mathf.Round(14f * ui));
@@ -622,12 +638,21 @@ public partial class HUD : Control
 		UpdateHp();
 	}
 
-	/// <summary>Показывает оверлей выбора перка с карточками.</summary>
-	public void ShowPerkSelection(int level, PerkOffer[] cards, int selectedCount, int maxPerks)
+	/// <summary>Показывает оверлей выбора перка с карточками и остатком рероллов.</summary>
+	public void ShowPerkSelection(int level, PerkOffer[] cards, int selectedCount, int maxPerks, int rerolls)
 	{
-		_perkOverlay?.Show(level, cards, selectedCount, maxPerks);
+		_perkOverlay?.Show(level, cards, selectedCount, maxPerks, rerolls);
 		UpdatePauseMenu();
 	}
+
+	/// <summary>Показывает экран постоянных улучшений поверх меню.</summary>
+	public void ShowUpgrades(UpgradeEntry[] entries, int coins) => _upgradePanel?.Show(entries, coins);
+
+	/// <summary>Скрывает экран постоянных улучшений.</summary>
+	public void HideUpgrades() => _upgradePanel?.Hide();
+
+	/// <summary>Открыт ли экран улучшений: Escape/«Назад» закрывает его первым.</summary>
+	public bool IsUpgradesOpen => _upgradePanel?.Visible ?? false;
 
 	/// <summary>Скрывает оверлей выбора перка.</summary>
 	public void HidePerkSelection()

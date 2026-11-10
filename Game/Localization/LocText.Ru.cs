@@ -88,5 +88,11 @@ internal static partial class LocText
 		[L.SkinSlotHat] = "Шляпа",
 		[L.SkinSlotGloves] = "Перчатки",
 		[L.SkinSlotStand] = "Подставка",
+
+		[L.UpgradesTitle] = "Улучшения",
+		[L.UpgradesBack] = "Назад",
+		[L.UpgradeBuy] = "Купить: {0}",
+		[L.UpgradeMax] = "Максимум",
+		[L.PerkReroll] = "Реролл ({0})",
 	};
 }

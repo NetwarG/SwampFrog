@@ -25,9 +25,12 @@ public static class SkinUnlockRules
 	public static bool IsFree(SkinDefinition def) =>
 		def.Price == 0 && def.RequiredBestClassic == 0 && def.RequiredBestSuika == 0;
 
-	/// <summary>Скин можно купить прямо сейчас: у него есть цена и хватает слизи.</summary>
-	public static bool CanBuy(SkinDefinition def, int coins)
+	/// <summary>Скин можно купить по базовой цене.</summary>
+	public static bool CanBuy(SkinDefinition def, int coins) => CanBuy(def, coins, def.Price);
+
+	/// <summary>Скин можно купить по указанной цене (условие покупки обязано быть выполнимо).</summary>
+	public static bool CanBuy(SkinDefinition def, int coins, int price)
 	{
-		return def.Price > 0 && def.RequiredBestClassic == 0 && def.RequiredBestSuika == 0 && coins >= def.Price;
+		return price > 0 && def.RequiredBestClassic == 0 && def.RequiredBestSuika == 0 && coins >= price;
 	}
 }

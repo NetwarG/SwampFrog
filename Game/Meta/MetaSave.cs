@@ -15,6 +15,7 @@ public static class MetaSave
 	private const string StatsKey = "stats";
 	private const string CoinsKey = "coins";
 	private const string SkinsKey = "skins";
+	private const string UpgradesKey = "upgrades";
 	private const string HatKey = "skin_hat";
 	private const string GlovesKey = "skin_gloves";
 	private const string StandKey = "skin_stand";
@@ -63,9 +64,31 @@ public static class MetaSave
 		return Enum.TryParse(raw, out SkinId id) ? SkinCatalog.Normalize(slot, id) : SkinCatalog.DefaultFor(slot).Id;
 	}
 
-	/// <summary>Записывает статистику, слизь и скины одним проходом, не трогая остальные секции.</summary>
+	/// <summary>Читает уровни постоянных улучшений; неизвестные id игнорируются.</summary>
+	public static List<KeyValuePair<UpgradeId, int>> LoadUpgrades()
+	{
+		var result = new List<KeyValuePair<UpgradeId, int>>();
+		var config = new ConfigFile();
+		if (config.Load(Path) != Error.Ok)
+			return result;
+		foreach (string token in config.GetValue(Section, UpgradesKey, string.Empty).ToString()
+			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+		{
+			int colon = token.IndexOf(':');
+			if (colon < 0)
+				continue;
+			if (Enum.TryParse(token.Substring(0, colon).Trim(), out UpgradeId id)
+				&& int.TryParse(token.Substring(colon + 1).Trim(), out int level) && level > 0)
+			{
+				result.Add(new KeyValuePair<UpgradeId, int>(id, level));
+			}
+		}
+		return result;
+	}
+
+	/// <summary>Записывает статистику, слизь, скины и улучшения одним проходом.</summary>
 	public static void Save(MetaStats stats, int coins, IReadOnlyCollection<SkinId> owned,
-		SkinId hat, SkinId gloves, SkinId stand)
+		SkinId hat, SkinId gloves, SkinId stand, IReadOnlyDictionary<UpgradeId, int> upgrades)
 	{
 		var config = new ConfigFile();
 		config.Load(Path);
@@ -78,6 +101,11 @@ public static class MetaSave
 		config.SetValue(Section, HatKey, hat.ToString());
 		config.SetValue(Section, GlovesKey, gloves.ToString());
 		config.SetValue(Section, StandKey, stand.ToString());
+		var levels = new List<string>();
+		foreach (KeyValuePair<UpgradeId, int> pair in upgrades)
+			levels.Add($"{pair.Key}:{pair.Value}");
+		levels.Sort();
+		config.SetValue(Section, UpgradesKey, string.Join(",", levels));
 		config.Save(Path);
 	}
 

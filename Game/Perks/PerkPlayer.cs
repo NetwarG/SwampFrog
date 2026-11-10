@@ -139,7 +139,25 @@ public sealed class PerkPlayer
 			int lvl = _perks.LevelOf(id);
 			cards.Add(new PerkOffer(id, def.Name, def.Tagline, lvl, def.LevelEffects[lvl], def.MaxLevel, def.Accent));
 		}
-		Game.HudNode?.ShowPerkSelection(level, cards.ToArray(), _perks.SelectedCount, PerkState.MaxDistinctPerks);
+		Game.HudNode?.ShowPerkSelection(level, cards.ToArray(), _perks.SelectedCount,
+			PerkState.MaxDistinctPerks, Game.PerkRerollsLeft);
+	}
+
+	/// <summary>Пересобирает предложение перков по запросу реролла. Возвращает false, если окно не открыто.</summary>
+	public bool RerollOffers()
+	{
+		if (Game == null || !_perks.WantsOffer(Game.Xp.Level))
+		{
+			return false;
+		}
+		PerkId[] offers = _perks.OfferCandidates(3, Game.GameRng);
+		if (offers.Length == 0)
+		{
+			return false;
+		}
+		ShowCards(Game.Xp.Level, offers);
+		Sfx.Play(SfxId.PerkOffer);
+		return true;
 	}
 
 	/// <summary>Игрок выбрал перк: прокачиваем, применяем мгновенные эффекты и снимаем паузу.</summary>

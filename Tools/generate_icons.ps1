@@ -559,6 +559,49 @@ Draw-Path $g $arrow (Get-Color '#8ce0b6') (Get-Color '#3fae8a') 26
 Save-Icon $canvas 'Game/assets/ui/icon_upgrade.png'
 }
 
+# Иконки постоянных улучшений (экран «Up»).
+function Draw-UpgradeIcons {
+# Копилка: мешочек с монетой.
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-Ellipse $g @(116, 226, 280, 232) (Get-Color '#8a6136') (Get-Color '#5a3d22') 24
+Draw-Path $g (New-Polygon @(@(196, 176), @(316, 176), @(300, 232), @(212, 232))) (Get-Color '#a87a4f') (Get-Color '#7d5029') 20
+Draw-Ellipse $g @(196, 286, 120, 120) (Get-Color '#ffe066') (Get-Color '#e39b18') 20
+Save-Icon $canvas 'Game/assets/ui/upgrade_wallet.png'
+
+# Запасливость: ящик с фруктом.
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-Ellipse $g @(178, 138, 156, 156) (Get-Color '#e0554b') (Get-Color '#b83a3a') 22
+Fill-Ellipse $g @(228, 116, 56, 32) (Get-Color '#6fbf4a')
+Draw-Path $g (New-Polygon @(@(104, 258), @(408, 258), @(408, 448), @(104, 448))) (Get-Color '#c9853f') (Get-Color '#9a5f2a') 24
+Draw-Line $g @(120, 318) @(392, 318) (Get-Color '#7d4a20') 16 0
+Save-Icon $canvas 'Game/assets/ui/upgrade_supply.png'
+
+# Торговец: ценник со скидкой.
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-Path $g (New-Polygon @(@(96, 150), @(300, 150), @(430, 256), @(300, 362), @(96, 362))) (Get-Color '#7fe0c0') (Get-Color '#3fae8a') 24
+Draw-Ellipse $g @(150, 230, 52, 52) (Get-Color '#f6ffe9') (Get-Color '#d8fff2') 14
+Draw-Line $g @(250, 330) @(340, 182) (Get-Color '#173c34') 16 0
+Fill-Ellipse $g @(238, 174, 34, 34) (Get-Color '#173c34')
+Fill-Ellipse $g @(318, 304, 34, 34) (Get-Color '#173c34')
+Save-Icon $canvas 'Game/assets/ui/upgrade_merchant.png'
+
+# Замедление: стрелка вниз.
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-Path $g (New-Polygon @(@(256, 108), @(384, 264), @(302, 264), @(302, 424), @(210, 424), @(210, 264), @(128, 264))) (Get-Color '#9fe0f5') (Get-Color '#3f9ec4') 24
+Save-Icon $canvas 'Game/assets/ui/upgrade_slow.png'
+
+# Запас сил: сердце жизни.
+$canvas = New-Canvas
+Draw-Heart $canvas[1] 256 270 440 $false
+Save-Icon $canvas 'Game/assets/ui/upgrade_vitality.png'
+
+# Реролл: круговые стрелки.
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-ArcArrow $g @(96, 96, 320, 320) 200 130 (Get-Color '#7fd6f2') 34
+Draw-ArcArrow $g @(96, 96, 320, 320) 20 130 (Get-Color '#b4e863') 34
+Save-Icon $canvas 'Game/assets/ui/upgrade_reroll.png'
+}
+
 Draw-HealthIcons
 Draw-StickyPaws
 Draw-RubberGrip
@@ -577,6 +620,7 @@ Draw-LilyFlower
 Draw-ProfileIcon
 Draw-ShopIcon
 Draw-UpIcon
+Draw-UpgradeIcons
 
 
-Write-Host '19 icons generated.'
+Write-Host '25 icons generated.'

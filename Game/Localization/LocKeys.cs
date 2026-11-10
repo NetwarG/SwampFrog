@@ -95,4 +95,11 @@ public static class L
 	public const string SkinSlotHat = "skins.slotHat";
 	public const string SkinSlotGloves = "skins.slotGloves";
 	public const string SkinSlotStand = "skins.slotStand";
+
+	// ---------- Улучшения ----------
+	public const string UpgradesTitle = "upgrades.title";
+	public const string UpgradesBack = "upgrades.back";
+	public const string UpgradeBuy = "upgrades.buy";
+	public const string UpgradeMax = "upgrades.max";
+	public const string PerkReroll = "perk.reroll";
 }

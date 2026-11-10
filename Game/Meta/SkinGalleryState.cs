@@ -54,8 +54,9 @@ public static class SkinGalleryState
 				state = SkinCardState.Buyable;
 
 			int required = def.RequiredBestClassic > 0 ? def.RequiredBestClassic : def.RequiredBestSuika;
+			int price = MetaUpgradeEffects.SkinPrice(def, profile);
 			result.Add(new SkinGalleryEntry(def.Id, def.Name, def.Slot, state,
-				def.Price, required, def.RequiredBestSuika > 0, coins >= def.Price));
+				price, required, def.RequiredBestSuika > 0, coins >= price));
 		}
 		return result.ToArray();
 	}

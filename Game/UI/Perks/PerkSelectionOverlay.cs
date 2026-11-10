@@ -24,7 +24,11 @@ public partial class PerkSelectionOverlay : Control
 	private int _level;
 	private int _selectedCount;
 	private int _maxPerks = PerkState.MaxDistinctPerks;
+	private int _rerolls;
 	private bool _fitQueued;
+
+	/// <summary>Игрок запросил реролл предложения перков.</summary>
+	public event Action? RerollRequested;
 
 	public override void _Ready()
 	{
@@ -69,12 +73,13 @@ public partial class PerkSelectionOverlay : Control
 	}
 
 	/// <summary>Показывает оверлей с карточками перков.</summary>
-	public void Show(int level, PerkOffer[] cards, int selectedCount, int maxPerks)
+	public void Show(int level, PerkOffer[] cards, int selectedCount, int maxPerks, int rerolls)
 	{
 		_level = level;
 		_cards = cards;
 		_selectedCount = selectedCount;
 		_maxPerks = maxPerks;
+		_rerolls = rerolls;
 		RebuildCards();
 		Visible = true;
 		Recenter();
@@ -167,6 +172,14 @@ public partial class PerkSelectionOverlay : Control
 		}
 
 		_box.AddChild(MakeLabel(Loc.T(L.PerkFooter, _maxPerks), (int)Mathf.Round(24f * ui), new Color(1f, 1f, 1f, 0.75f)));
+
+		if (_rerolls > 0)
+		{
+			Button reroll = UiStyle.MakeButton(Loc.T(L.PerkReroll, _rerolls), 0.9f, new Color("7fd6f2"),
+				new Vector2(300f * ui, 62f * ui));
+			reroll.Pressed += () => RerollRequested?.Invoke();
+			_box.AddChild(reroll);
+		}
 	}
 
 	private HoldCardButton MakeCardButton(string text, Color accent, Texture2D? icon, float ui)

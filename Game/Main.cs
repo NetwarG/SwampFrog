@@ -56,6 +56,8 @@ public partial class Main : Node2D
 	private float _runTime;
 	/// <summary>Поймано фруктов в текущем забеге: используется для начисления слизи.</summary>
 	private int _runCaught;
+	/// <summary>Остаток рероллов предложения перков (постоянное улучшение «Реролл»).</summary>
+	private int _perkRerolls;
 	private int _lives = 3;
 	private int _highScore;
 	private GameState _state = GameState.Menu;
@@ -75,8 +77,11 @@ public partial class Main : Node2D
 	public int Score => _score;
 	public int Lives => _lives;
 
-	/// <summary>Максимум жизней: базовые 3 + бонус перка «Панцирь».</summary>
-	public int MaxLives => 3 + PerkEffects.ShellMaxLivesBonus(_perkPlayer.State);
+	/// <summary>Максимум жизней: базовые 3 + бонус улучшения «Запас сил» + бонус перка «Панцирь».</summary>
+	public int MaxLives => 3 + MetaUpgradeEffects.StartLivesBonus(_meta) + PerkEffects.ShellMaxLivesBonus(_perkPlayer.State);
+
+	/// <summary>Остаток рероллов предложения перков за забег.</summary>
+	public int PerkRerollsLeft => _perkRerolls;
 
 	// ---------- Публичные доступы для PerkPlayer (см. Game/Perks/PerkPlayer.cs) ----------
 
@@ -160,6 +165,12 @@ public partial class Main : Node2D
 		ulong frame = Engine.GetProcessFrames();
 		if (frame == _lastBackRequestFrame) return;
 		_lastBackRequestFrame = frame;
+
+		if (_state == GameState.Menu && _hud?.IsUpgradesOpen == true)
+		{
+			_hud.HideUpgrades();
+			return;
+		}
 
 		if (_state == GameState.Menu && _hud?.IsSkinGalleryOpen == true)
 		{
@@ -247,9 +258,12 @@ public partial class Main : Node2D
 	/// <summary>Начисляет слизь за завершённый раунд Suika.</summary>
 	public void OnSuikaRoundFinished(int roundScore, int roundMerges)
 	{
-		_meta.Wallet.Add(SlimeReward.Suika(roundMerges, roundScore));
+		_meta.Wallet.Add(ScaledSlime(SlimeReward.Suika(roundMerges, roundScore)));
 		_meta.Save();
 	}
+
+	/// <summary>Слизь с учётом «Копилки»: постоянное улучшение повышает награду.</summary>
+	private int ScaledSlime(int amount) => (int)Mathf.Round(amount * MetaUpgradeEffects.SlimeMultiplier(_meta));
 
 	public Control? UiHost { get; set; }
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
@@ -310,6 +324,9 @@ public partial class Main : Node2D
 		_hud.ShopPressed += OpenSkinGallery;
 		_hud.SkinSelected += OnSkinSelected;
 		_hud.SkinPurchased += OnSkinPurchased;
+		_hud.UpgradesPressed += OpenUpgrades;
+		_hud.UpgradePurchased += OnUpgradePurchased;
+		_hud.PerkRerollPressed += OnPerkReroll;
 		_hud.ExitPressed += QuitGame;
 		_hud.RestartPressed += Restart;
 		_hud.MenuPressed += GoToMenu;
@@ -637,6 +654,8 @@ public partial class Main : Node2D
 		float speed = Difficulty.FallSpeed(_runTime) + _rng.RandfRange(-25f, 25f);
 		// «Голод»: субперк ускоряет падение всех предметов.
 		speed *= SubPerkEffects.FallSpeedMultiplier(_subPerkPlayer.State);
+		// «Замедление»: постоянное улучшение замедляет падение.
+		speed *= MetaUpgradeEffects.FallSpeedMultiplier(_meta);
 		if (golden)
 		{
 			// «Золотая лихорадка» ур. 4: золотой падает медленнее обычного.
@@ -736,6 +755,41 @@ public partial class Main : Node2D
 	private void ShowShop() =>
 		_hud?.ShowSkinGallery(SkinGalleryState.Build(_meta, _highScore, _suika?.BestScore ?? 0), _meta.Wallet.Balance);
 
+	/// <summary>Показывает экран постоянных улучшений с уровнями и балансом слизи.</summary>
+	private void ShowUpgrades() => _hud?.ShowUpgrades(UpgradeState.Build(_meta), _meta.Wallet.Balance);
+
+	/// <summary>Открывает экран постоянных улучшений из меню.</summary>
+	private void OpenUpgrades()
+	{
+		if (_state != GameState.Menu)
+		{
+			return;
+		}
+		ShowUpgrades();
+	}
+
+	/// <summary>Игрок купил уровень улучшения: списываем слизь и обновляем экран.</summary>
+	private void OnUpgradePurchased(UpgradeId id)
+	{
+		if (!_meta.BuyUpgrade(id))
+		{
+			return;
+		}
+		_meta.Save();
+		ShowUpgrades();
+	}
+
+	/// <summary>Реролл предложения перков из окна выбора: тратит заряд улучшения «Реролл».</summary>
+	private void OnPerkReroll()
+	{
+		if (_perkRerolls <= 0)
+		{
+			return;
+		}
+		if (_perkPlayer.RerollOffers())
+			_perkRerolls--;
+	}
+
 	/// <summary>Открывает магазин скинов с текущими состояниями карточек.</summary>
 	private void OpenSkinGallery()
 	{
@@ -764,11 +818,12 @@ public partial class Main : Node2D
 	private void OnSkinPurchased(SkinId id)
 	{
 		SkinDefinition def = SkinCatalog.Get(id);
-		if (!SkinUnlockRules.CanBuy(def, _meta.Wallet.Balance))
+		int price = MetaUpgradeEffects.SkinPrice(def, _meta);
+		if (!SkinUnlockRules.CanBuy(def, _meta.Wallet.Balance, price))
 		{
 			return;
 		}
-		_meta.Wallet.Spend(def.Price);
+		_meta.Wallet.Spend(price);
 		_meta.Own(id);
 		_meta.Select(id);
 		_meta.Save();
@@ -839,6 +894,7 @@ public partial class Main : Node2D
 		_score = 0;
 		_runTime = 0f;
 		_runCaught = 0;
+		_perkRerolls = MetaUpgradeEffects.PerkRerolls(_meta);
 		_frog?.ResetForRound();
 		PositionFrog();
 		_perkPlayer.Reset();
@@ -873,7 +929,7 @@ public partial class Main : Node2D
 			SaveHighScore(_highScore);
 		}
 		_meta.Stats.OnRunFinished();
-		_meta.Wallet.Add(SlimeReward.Run(_score, _runCaught, newRecord));
+		_meta.Wallet.Add(ScaledSlime(SlimeReward.Run(_score, _runCaught, newRecord)));
 		_meta.Save();
 		_spawnTimer?.Stop();
 		_hud?.ShowGameOver(_score, _highScore);
@@ -930,8 +986,9 @@ public partial class Main : Node2D
 	private void RegisterCollectedFruit(FruitKind kind)
 	{
 		_fruitStock[kind] = StockOf(kind) + 1;
-		// «Запасливость»: с накопленным шансом фрукт попадает в запас дважды.
-		if (_rng.Randf() < SubPerkEffects.StockDoubleChance(_subPerkPlayer.State))
+		// «Запасливость»: субперк и постоянное улучшение складывают шанс двойного фрукта.
+		float doubleChance = SubPerkEffects.StockDoubleChance(_subPerkPlayer.State) + MetaUpgradeEffects.StockDoubleChance(_meta);
+		if (_rng.Randf() < doubleChance)
 			_fruitStock[kind] = StockOf(kind) + 1;
 		SaveCollectedFruits();
 		UpdateSuikaButton();

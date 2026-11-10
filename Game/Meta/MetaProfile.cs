@@ -15,6 +15,7 @@ public sealed class MetaProfile
 	public Wallet Wallet { get; }
 
 	private readonly HashSet<SkinId> _owned = new();
+	private readonly Dictionary<UpgradeId, int> _upgrades = new();
 	private SkinId _hat = SkinCatalog.DefaultFor(SkinSlot.Hat).Id;
 	private SkinId _gloves = SkinCatalog.DefaultFor(SkinSlot.Gloves).Id;
 	private SkinId _stand = SkinCatalog.DefaultFor(SkinSlot.Stand).Id;
@@ -35,11 +36,13 @@ public sealed class MetaProfile
 		profile._hat = MetaSave.LoadSelectedSkin(SkinSlot.Hat);
 		profile._gloves = MetaSave.LoadSelectedSkin(SkinSlot.Gloves);
 		profile._stand = MetaSave.LoadSelectedSkin(SkinSlot.Stand);
+		foreach (KeyValuePair<UpgradeId, int> pair in MetaSave.LoadUpgrades())
+			profile._upgrades[pair.Key] = pair.Value;
 		return profile;
 	}
 
-	/// <summary>Сохраняет профиль (счётчики, слизь и скины) в save.cfg.</summary>
-	public void Save() => MetaSave.Save(Stats, Wallet.Balance, _owned, _hat, _gloves, _stand);
+	/// <summary>Сохраняет профиль (счётчики, слизь, скины и улучшения) в save.cfg.</summary>
+	public void Save() => MetaSave.Save(Stats, Wallet.Balance, _owned, _hat, _gloves, _stand, _upgrades);
 
 	// ---------- Скины ----------
 
@@ -75,6 +78,30 @@ public sealed class MetaProfile
 	}
 
 	private static bool IsFree(SkinId id) => SkinUnlockRules.IsFree(SkinCatalog.Get(id));
+
+	// ---------- Постоянные улучшения ----------
+
+	/// <summary>Текущий уровень постоянного улучшения (0 — ещё не куплено).</summary>
+	public int UpgradeLevel(UpgradeId id) => _upgrades.TryGetValue(id, out int level) ? level : 0;
+
+	/// <summary>Улучшение прокачано до максимума.</summary>
+	public bool IsUpgradeMaxed(UpgradeId id) => UpgradeLevel(id) >= UpgradeCatalog.Get(id).MaxLevel;
+
+	/// <summary>
+	/// Покупает следующий уровень улучшения: списывает слизь.
+	/// Возвращает false, если улучшение максимально или не хватает слизи.
+	/// </summary>
+	public bool BuyUpgrade(UpgradeId id)
+	{
+		UpgradeDefinition def = UpgradeCatalog.Get(id);
+		int level = UpgradeLevel(id);
+		if (level >= def.MaxLevel)
+			return false;
+		if (!Wallet.Spend(def.PriceFor(level + 1)))
+			return false;
+		_upgrades[id] = level + 1;
+		return true;
+	}
 
 	/// <summary>
 	/// Снимок показателей для экрана профиля. Рекорды и запас берутся из уже
