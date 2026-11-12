@@ -12,23 +12,23 @@ public sealed class SkinCatalog
 	{
 		// Шляпа
 		new(SkinId.HatNone, SkinSlot.Hat, "Нет", "None", 0),
-		new(SkinId.PartyHat, SkinSlot.Hat, "Колпак", "Party hat", 25),
-		new(SkinId.TopHat, SkinSlot.Hat, "Цилиндр", "Top hat", 40),
-		new(SkinId.FlowerHat, SkinSlot.Hat, "Цветок", "Flower", 60),
+		new(SkinId.PartyHat, SkinSlot.Hat, "Колпак", "Party hat", 75),
+		new(SkinId.TopHat, SkinSlot.Hat, "Цилиндр", "Top hat", 120),
+		new(SkinId.FlowerHat, SkinSlot.Hat, "Цветок", "Flower", 180),
 		new(SkinId.MushroomHat, SkinSlot.Hat, "Гриб", "Mushroom", 0, RequiredBestClassic: 2500),
 
 		// Перчатки
 		new(SkinId.GlovesNone, SkinSlot.Gloves, "Нет", "None", 0),
-		new(SkinId.BoxingGloves, SkinSlot.Gloves, "Боксёрские", "Boxing", 25),
-		new(SkinId.MintGloves, SkinSlot.Gloves, "Мятные", "Mint", 40),
-		new(SkinId.CaptainGloves, SkinSlot.Gloves, "Капитанские", "Captain", 60),
+		new(SkinId.BoxingGloves, SkinSlot.Gloves, "Боксёрские", "Boxing", 75),
+		new(SkinId.MintGloves, SkinSlot.Gloves, "Мятные", "Mint", 120),
+		new(SkinId.CaptainGloves, SkinSlot.Gloves, "Капитанские", "Captain", 180),
 		new(SkinId.StripedGloves, SkinSlot.Gloves, "Полосатые", "Striped", 0, RequiredBestSuika: 1500),
 
 		// Подставка
 		new(SkinId.StandNone, SkinSlot.Stand, "Нет", "None", 0),
-		new(SkinId.LilyPadStand, SkinSlot.Stand, "Кувшинка", "Lily pad", 20),
-		new(SkinId.CarpetStand, SkinSlot.Stand, "Коврик", "Carpet", 35),
-		new(SkinId.StoneStand, SkinSlot.Stand, "Камень", "Stone", 50),
+		new(SkinId.LilyPadStand, SkinSlot.Stand, "Кувшинка", "Lily pad", 60),
+		new(SkinId.CarpetStand, SkinSlot.Stand, "Коврик", "Carpet", 105),
+		new(SkinId.StoneStand, SkinSlot.Stand, "Камень", "Stone", 150),
 		new(SkinId.StumpStand, SkinSlot.Stand, "Пенёк", "Stump", 0, RequiredBestClassic: 1500),
 	};
 
