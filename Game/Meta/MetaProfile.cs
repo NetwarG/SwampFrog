@@ -16,6 +16,7 @@ public sealed class MetaProfile
 
 	private readonly HashSet<SkinId> _owned = new();
 	private readonly Dictionary<UpgradeId, int> _upgrades = new();
+	private readonly HashSet<AchievementId> _achievements = new();
 	private SkinId _hat = SkinCatalog.DefaultFor(SkinSlot.Hat).Id;
 	private SkinId _gloves = SkinCatalog.DefaultFor(SkinSlot.Gloves).Id;
 	private SkinId _stand = SkinCatalog.DefaultFor(SkinSlot.Stand).Id;
@@ -38,11 +39,39 @@ public sealed class MetaProfile
 		profile._stand = MetaSave.LoadSelectedSkin(SkinSlot.Stand);
 		foreach (KeyValuePair<UpgradeId, int> pair in MetaSave.LoadUpgrades())
 			profile._upgrades[pair.Key] = pair.Value;
+		foreach (AchievementId id in MetaSave.LoadAchievements())
+			profile._achievements.Add(id);
 		return profile;
 	}
 
-	/// <summary>Сохраняет профиль (счётчики, слизь, скины и улучшения) в save.cfg.</summary>
-	public void Save() => MetaSave.Save(Stats, Wallet.Balance, _owned, _hat, _gloves, _stand, _upgrades);
+	/// <summary>Сохраняет профиль (счётчики, слизь, скины, улучшения и достижения) в save.cfg.</summary>
+	public void Save() => MetaSave.Save(Stats, Wallet.Balance, _owned, _hat, _gloves, _stand, _upgrades, _achievements);
+
+	// ---------- Достижения ----------
+
+	/// <summary>Сколько скинов открыто (без бесплатных вариантов «Нет»).</summary>
+	public int OwnedSkinCount => _owned.Count;
+
+	/// <summary>Суммарный уровень всех постоянных улучшений.</summary>
+	public int TotalUpgradeLevels
+	{
+		get
+		{
+			int total = 0;
+			foreach (int level in _upgrades.Values)
+				total += level;
+			return total;
+		}
+	}
+
+	/// <summary>Достижение открыто.</summary>
+	public bool HasAchievement(AchievementId id) => _achievements.Contains(id);
+
+	/// <summary>Отмечает достижение открытым.</summary>
+	public void UnlockAchievement(AchievementId id) => _achievements.Add(id);
+
+	/// <summary>Сколько достижений открыто.</summary>
+	public int AchievementsUnlocked => _achievements.Count;
 
 	// ---------- Скины ----------
 

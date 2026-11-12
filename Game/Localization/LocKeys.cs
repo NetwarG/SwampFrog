@@ -102,4 +102,9 @@ public static class L
 	public const string UpgradeBuy = "upgrades.buy";
 	public const string UpgradeMax = "upgrades.max";
 	public const string PerkReroll = "perk.reroll";
+
+	// ---------- Достижения ----------
+	public const string ProfileAchievements = "profile.achievements";
+	public const string AchievementsCount = "profile.achievementsCount";
+	public const string ProfileTabStats = "profile.tabStats";
 }

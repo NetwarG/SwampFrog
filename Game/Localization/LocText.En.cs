@@ -94,5 +94,9 @@ internal static partial class LocText
 		[L.UpgradeBuy] = "Buy: {0}",
 		[L.UpgradeMax] = "Maxed",
 		[L.PerkReroll] = "Reroll ({0})",
+
+		[L.ProfileAchievements] = "Achievements",
+		[L.AchievementsCount] = "{0}/{1}",
+		[L.ProfileTabStats] = "Statistics",
 	};
 }

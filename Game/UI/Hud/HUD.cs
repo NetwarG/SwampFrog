@@ -406,7 +406,8 @@ public partial class HUD : Control
 	}
 
 	/// <summary>Показывает экран профиля поверх главного меню.</summary>
-	public void ShowProfile(ProfileSnapshot snapshot) => _profilePanel?.Show(snapshot);
+	public void ShowProfile(ProfileSnapshot snapshot, AchievementEntry[] achievements) =>
+		_profilePanel?.Show(snapshot, achievements);
 
 	/// <summary>Показывает баланс валюты «Слизь» в меню.</summary>
 	public void SetWallet(int amount) => _walletBadge?.SetAmount(amount);

@@ -19,6 +19,7 @@ public static class MetaSave
 	private const string HatKey = "skin_hat";
 	private const string GlovesKey = "skin_gloves";
 	private const string StandKey = "skin_stand";
+	private const string AchievementsKey = "achievements";
 
 	/// <summary>Читает статистику профиля; отсутствие секции или ключа даёт пустые счётчики.</summary>
 	public static MetaStats LoadStats()
@@ -86,9 +87,26 @@ public static class MetaSave
 		return result;
 	}
 
-	/// <summary>Записывает статистику, слизь, скины и улучшения одним проходом.</summary>
+	/// <summary>Читает список открытых достижений; неизвестные id игнорируются.</summary>
+	public static List<AchievementId> LoadAchievements()
+	{
+		var result = new List<AchievementId>();
+		var config = new ConfigFile();
+		if (config.Load(Path) != Error.Ok)
+			return result;
+		foreach (string token in config.GetValue(Section, AchievementsKey, string.Empty).ToString()
+			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+		{
+			if (Enum.TryParse(token, out AchievementId id) && !result.Contains(id))
+				result.Add(id);
+		}
+		return result;
+	}
+
+	/// <summary>Записывает статистику, слизь, скины, улучшения и достижения одним проходом.</summary>
 	public static void Save(MetaStats stats, int coins, IReadOnlyCollection<SkinId> owned,
-		SkinId hat, SkinId gloves, SkinId stand, IReadOnlyDictionary<UpgradeId, int> upgrades)
+		SkinId hat, SkinId gloves, SkinId stand, IReadOnlyDictionary<UpgradeId, int> upgrades,
+		IReadOnlyCollection<AchievementId> achievements)
 	{
 		var config = new ConfigFile();
 		config.Load(Path);
@@ -106,6 +124,10 @@ public static class MetaSave
 			levels.Add($"{pair.Key}:{pair.Value}");
 		levels.Sort();
 		config.SetValue(Section, UpgradesKey, string.Join(",", levels));
+		var done = new List<string>();
+		foreach (AchievementId id in achievements) done.Add(id.ToString());
+		done.Sort();
+		config.SetValue(Section, AchievementsKey, string.Join(",", done));
 		config.Save(Path);
 	}
 

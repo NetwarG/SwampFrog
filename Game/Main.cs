@@ -260,10 +260,29 @@ public partial class Main : Node2D
 	{
 		_meta.Wallet.Add(ScaledSlime(SlimeReward.Suika(roundMerges, roundScore)));
 		_meta.Save();
+		CheckAchievements();
 	}
 
 	/// <summary>Слизь с учётом «Копилки»: постоянное улучшение повышает награду.</summary>
 	private int ScaledSlime(int amount) => (int)Mathf.Round(amount * MetaUpgradeEffects.SlimeMultiplier(_meta));
+
+	/// <summary>Показатели профиля для проверки условий достижений.</summary>
+	private AchievementContext AchievementContextNow() =>
+		AchievementContext.From(_meta, _highScore, _suika?.BestScore ?? 0);
+
+	/// <summary>Открывает достижения за выполненную статистику и начисляет слизь за новые.</summary>
+	private void CheckAchievements()
+	{
+		AchievementId[] unlocked = AchievementTracker.NewlyUnlocked(_meta, AchievementContextNow());
+		if (unlocked.Length == 0)
+			return;
+		foreach (AchievementId id in unlocked)
+		{
+			_meta.UnlockAchievement(id);
+			_meta.Wallet.Add(AchievementCatalog.Get(id).Reward);
+		}
+		_meta.Save();
+	}
 
 	public Control? UiHost { get; set; }
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
@@ -357,6 +376,7 @@ public partial class Main : Node2D
 		_hud.SetXp(_xp.Level, _xp.LevelProgress);
 		_hud.SetWallet(_meta.Wallet.Balance);
 		ApplyCosmetics();
+		CheckAchievements();
 		_suika.Visible = false;
 
 		// Индикатор зоны замедления лежит под лягушкой и предметами, слой эффектов — поверх них.
@@ -744,7 +764,8 @@ public partial class Main : Node2D
 		{
 			return;
 		}
-		_hud?.ShowProfile(_meta.Snapshot(_highScore, _suika?.BestScore ?? 0, TotalFruitStock()));
+		_hud?.ShowProfile(_meta.Snapshot(_highScore, _suika?.BestScore ?? 0, TotalFruitStock()),
+			AchievementState.Build(_meta, AchievementContextNow()));
 	}
 
 	/// <summary>Применяет выбранные скины лягушки.</summary>
@@ -776,6 +797,7 @@ public partial class Main : Node2D
 			return;
 		}
 		_meta.Save();
+		CheckAchievements();
 		ShowUpgrades();
 	}
 
@@ -827,6 +849,7 @@ public partial class Main : Node2D
 		_meta.Own(id);
 		_meta.Select(id);
 		_meta.Save();
+		CheckAchievements();
 		ApplyCosmetics();
 		ShowShop();
 	}
@@ -931,6 +954,7 @@ public partial class Main : Node2D
 		_meta.Stats.OnRunFinished();
 		_meta.Wallet.Add(ScaledSlime(SlimeReward.Run(_score, _runCaught, newRecord)));
 		_meta.Save();
+		CheckAchievements();
 		_spawnTimer?.Stop();
 		_hud?.ShowGameOver(_score, _highScore);
 	}
