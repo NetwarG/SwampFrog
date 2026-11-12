@@ -164,6 +164,7 @@ Tools/
 ├── generate_icons.ps1   — генератор иконок HP, хилки, перков и фона пруда (PNG 512×512)
 ├── generate_skins.ps1   — генератор иконок скинов лягушки (PNG 512×512 в Game/assets/skins)
 ├── generate_achievements.ps1 — генератор иконок достижений (PNG 512×512 в Game/assets/achievements)
+├── generate_splash.ps1  — генератор загрузочной заставки (PNG 540×960 в Game/assets/ui/splash.png)
 ├── ShapeDump.tscn       — снятие силуэтов иконок для FruitShape.cs
 └── build_android.bat    — обёртка для двойного клика
 ```
