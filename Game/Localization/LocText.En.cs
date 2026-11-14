@@ -29,6 +29,8 @@ internal static partial class LocText
 		[L.SubPerksNone] = "No sub-perks yet",
 		[L.SubPerksHeader] = "Sub-perks:",
 		[L.SubPerkEntry] = "{0} lv.{1} ({2}%)",
+		[L.SubPerksPositive] = "Positive:",
+		[L.SubPerksNegative] = "Negative:",
 
 		[L.PerkNewTitle] = "New perk!  Level {0}",
 		[L.PerkCount] = "Perks: {0}/{1} — pick one upgrade, hold a card for 1 sec",

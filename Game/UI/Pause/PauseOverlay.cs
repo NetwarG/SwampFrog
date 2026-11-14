@@ -13,7 +13,8 @@ public partial class PauseOverlay : Control
 	private const float ContentWidth = 330f;
 
 	private Label? _statsLabel;
-	private Label? _subPerkLabel;
+	/// <summary>Список активных субперков: положительные и отрицательные группами.</summary>
+	private SubPerkListView? _subPerkBox;
 	private Label? _titleLabel;
 	private Button? _resumeButton;
 	private Button? _menuButton;
@@ -45,7 +46,7 @@ public partial class PauseOverlay : Control
 		float ui = UiScale;
 		_titleLabel = UiStyle.MakeLabel(Loc.T(L.PauseTitle), (int)Mathf.Round(52f * ui), new Color("ffd45e"));
 		_statsLabel = UiStyle.MakeLabel(string.Empty, (int)Mathf.Round(28f * ui), new Color(1f, 1f, 1f, 0.88f));
-		_subPerkLabel = MakeSubPerkLabel(ui);
+		_subPerkBox = new SubPerkListView { CustomMinimumSize = new Vector2(ContentWidth * ui, 0f) };
 		_resumeButton = UiStyle.MakeButton(Loc.T(L.Resume), ui, new Color("b4e863"));
 		_menuButton = UiStyle.MakeButton(Loc.T(L.ToMenu), ui, new Color("ffd45e"));
 		_resumeButton.Pressed += () => ResumePressed?.Invoke();
@@ -53,7 +54,7 @@ public partial class PauseOverlay : Control
 
 		box.AddChild(_titleLabel);
 		box.AddChild(_statsLabel);
-		box.AddChild(_subPerkLabel);
+		box.AddChild(_subPerkBox);
 		box.AddChild(_resumeButton);
 		box.AddChild(_menuButton);
 
@@ -79,9 +80,9 @@ public partial class PauseOverlay : Control
 		{
 			_statsLabel.Text = Loc.T(L.PauseStats, _score, _lives);
 		}
-		if (_subPerkLabel != null)
+		if (_subPerkBox != null)
 		{
-			_subPerkLabel.Text = FormatSubPerks(_subPerks);
+			_subPerkBox.SetItems(_subPerks);
 		}
 	}
 
@@ -98,26 +99,4 @@ public partial class PauseOverlay : Control
 	}
 
 	public void Hide() => Visible = false;
-
-	/// <summary>Панель субперков без бара: список активных субперков с уровнями и процентами.</summary>
-	private static Label MakeSubPerkLabel(float ui)
-	{
-		var label = UiStyle.MakeLabel(string.Empty, (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f, 0.82f));
-		label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		label.CustomMinimumSize = new Vector2(ContentWidth * ui, 0f);
-		return label;
-	}
-
-	private static string FormatSubPerks(SubPerkSummary[] subPerks)
-	{
-		if (subPerks == null || subPerks.Length == 0)
-			return Loc.T(L.SubPerksNone);
-
-		var parts = new System.Collections.Generic.List<string>();
-		foreach (SubPerkSummary perk in subPerks)
-		{
-			parts.Add(Loc.T(L.SubPerkEntry, perk.Name, perk.Level, perk.Percent));
-		}
-		return Loc.T(L.SubPerksHeader) + "\n" + string.Join(" · ", parts);
-	}
 }

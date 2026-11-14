@@ -31,6 +31,8 @@ public static class L
 	public const string SubPerksNone = "pause.subPerksNone";
 	public const string SubPerksHeader = "pause.subPerksHeader";
 	public const string SubPerkEntry = "pause.subPerkEntry";
+	public const string SubPerksPositive = "pause.subPerksPositive";
+	public const string SubPerksNegative = "pause.subPerksNegative";
 
 	// ---------- Выбор перка ----------
 	public const string PerkNewTitle = "perk.newTitle";

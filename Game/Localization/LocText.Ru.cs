@@ -29,6 +29,8 @@ internal static partial class LocText
 		[L.SubPerksNone] = "Субперков пока нет",
 		[L.SubPerksHeader] = "Субперки:",
 		[L.SubPerkEntry] = "{0} ур.{1} ({2}%)",
+		[L.SubPerksPositive] = "Положительные:",
+		[L.SubPerksNegative] = "Отрицательные:",
 
 		[L.PerkNewTitle] = "Новый перк!  Уровень {0}",
 		[L.PerkCount] = "Перки: {0}/{1} — выбери одно улучшение, удерживай карточку 1 сек",
