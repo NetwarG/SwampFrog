@@ -850,6 +850,9 @@ public sealed class PerkPlayer
 
 	// ---------- Заморозка, замедление, магнит ----------
 
+	/// <summary>Поле обездвижено заморозкой: «Взгляд василиска» или пауза после золотого фрукта.</summary>
+	public bool IsWorldFrozen => _gazeFreezeTimer > 0f || _worldFreezeTimer > 0f;
+
 	/// <summary>Должен ли предмет быть обездвижен в этом кадре (заморозки перков).</summary>
 	private bool IsItemFrozen(FallingItem item)
 	{

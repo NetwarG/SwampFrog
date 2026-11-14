@@ -40,7 +40,7 @@ public partial class Main : Node2D
 	private SuikaGame? _suika;
 	private Timer? _spawnTimer;
 
-	/// <summary>Остаток интервала спавна на момент паузы.</summary>
+	/// <summary>Остаток интервала спавна на момент паузы или заморозки перков.</summary>
 	private float _spawnTimerLeft;
 	private CollisionShape2D? _leftWall;
 	private CollisionShape2D? _rightWall;
@@ -474,6 +474,8 @@ public partial class Main : Node2D
 
 		// Перки: модификаторы лягушки и таймеры.
 		_perkPlayer.Update(dt, _frog);
+		// Заморозка перков останавливает спавн: иначе предметы копятся за верхней кромкой.
+		SyncSpawnFreeze();
 		_perkPlayer.SyncSlowZoneView(_zoneView, ViewSize);
 		// Руки и комбо видны отдельно: след/радиус ладони и аура множителя.
 		_handOverlay?.SetHands(
@@ -707,6 +709,28 @@ public partial class Main : Node2D
 			return;
 		}
 		_spawnTimer.WaitTime = Difficulty.SpawnInterval(_runTime, _score, _rng) / SubPerkEffects.SpawnRateMultiplier(_subPerkPlayer.State);
+	}
+
+	/// <summary>
+	/// Заморозка перков останавливает спавн: иначе предметы копятся за верхней кромкой
+	/// и после разморозки валятся разом. Остаток интервала сохраняется, как на паузе.
+	/// </summary>
+	private void SyncSpawnFreeze()
+	{
+		if (_spawnTimer == null)
+		{
+			return;
+		}
+		if (_perkPlayer.IsWorldFrozen)
+		{
+			if (_spawnTimer.IsStopped())
+				return;
+			_spawnTimerLeft = (float)_spawnTimer.TimeLeft;
+			_spawnTimer.Stop();
+			return;
+		}
+		if (_spawnTimer.IsStopped())
+			_spawnTimer.Start(_spawnTimerLeft > 0f ? _spawnTimerLeft : _spawnTimer.WaitTime);
 	}
 
 	// ---------- Игровой цикл ----------
