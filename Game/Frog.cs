@@ -155,7 +155,8 @@ public partial class Frog : Node2D
 		{
 			return;
 		}
-		float speed = Difficulty.FrogSpeed(Game.Score);
+		// Верхний предел по очкам снимает корневой множитель сложности: рост мягче, без телепорта.
+		float speed = Difficulty.FrogSpeed(Game.Score) * Mathf.Sqrt(Difficulty.ScoreFactor(Game.Score));
 		if (speed <= 0f)
 		{
 			return;

@@ -6,6 +6,7 @@ namespace SwampFrog;
 /// Модель сложности классического режима. Чистый C#-класс без Godot-нод,
 /// все балансные константы собраны здесь, чтобы их было легко менять.
 /// Падение предметов усложняется со временем, движение лягушки — с ростом счёта.
+/// Очки дают бесконечный квадратичный множитель сложности (x2 к 100 000).
 /// </summary>
 public sealed class Difficulty
 {
@@ -37,6 +38,24 @@ public sealed class Difficulty
 	public const float FrogAxisTurnInterval = 2.4f;
 	public const float FrogRandomTurnInterval = 1.6f;
 
+	// ---------- Бесконечный рост сложности от очков ----------
+
+	/// <summary>Очков в «квадрате»: множитель x2 при 100 000 и x5 при 200 000.</summary>
+	public const float EndlessScoreScale = 100_000f;
+
+	/// <summary>Абсолютный минимум интервала спавна, сек: иначе поле захлёбывается потоком.</summary>
+	public const float SpawnIntervalFloor = 0.2f;
+
+	/// <summary>Потолок шанса выпадения мусора, 0..1.</summary>
+	public const float TrashChanceCap = 0.5f;
+
+	/// <summary>Множитель сложности от очков: 1 в начале, x2 к 100 000 и резкий рост дальше.</summary>
+	public static float ScoreFactor(int score)
+	{
+		float s = Mathf.Max(0, score) / EndlessScoreScale;
+		return 1f + s * s;
+	}
+
 	public static float FrogSpeed(int score)
 	{
 		if (score < FrogMovementScore)
@@ -53,22 +72,23 @@ public sealed class Difficulty
 		return Mathf.Clamp(runTime / RampUpSeconds, 0f, 1f);
 	}
 
-	/// <summary>Текущий интервал спавна со случайным разбросом ±20%.</summary>
-	public static float SpawnInterval(float runTime, RandomNumberGenerator rng)
+	/// <summary>Текущий интервал спавна со случайным разбросом ±20% и полом для позднего роста.</summary>
+	public static float SpawnInterval(float runTime, int score, RandomNumberGenerator rng)
 	{
 		float t = Progress(runTime);
-		return Mathf.Lerp(InitialSpawnInterval, MinSpawnInterval, t) * rng.RandfRange(0.8f, 1.2f);
+		float interval = Mathf.Lerp(InitialSpawnInterval, MinSpawnInterval, t) / ScoreFactor(score);
+		return Mathf.Max(interval, SpawnIntervalFloor) * rng.RandfRange(0.8f, 1.2f);
 	}
 
 	/// <summary>Текущая базовая скорость падения (разброс применяет спавн).</summary>
-	public static float FallSpeed(float runTime)
+	public static float FallSpeed(float runTime, int score)
 	{
-		return Mathf.Lerp(InitialFallSpeed, MaxFallSpeed, Progress(runTime));
+		return Mathf.Lerp(InitialFallSpeed, MaxFallSpeed, Progress(runTime)) * ScoreFactor(score);
 	}
 
-	/// <summary>Текущий шанс выпадения мусора, 0..1.</summary>
-	public static float TrashChance(float runTime)
+	/// <summary>Текущий шанс выпадения мусора, 0..1, с потолком для позднего роста.</summary>
+	public static float TrashChance(float runTime, int score)
 	{
-		return Mathf.Lerp(InitialTrashChance, MaxTrashChance, Progress(runTime));
+		return Mathf.Min(Mathf.Lerp(InitialTrashChance, MaxTrashChance, Progress(runTime)) * ScoreFactor(score), TrashChanceCap);
 	}
 }

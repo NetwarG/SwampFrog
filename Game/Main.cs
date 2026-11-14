@@ -634,7 +634,7 @@ public partial class Main : Node2D
 		var item = new FallingItem();
 		Vector2 size = ViewSize;
 
-		float trashWeight = Difficulty.TrashChance(_runTime) * SubPerkEffects.TrashChanceMultiplier(_subPerkPlayer.State);
+		float trashWeight = Difficulty.TrashChance(_runTime, _score) * SubPerkEffects.TrashChanceMultiplier(_subPerkPlayer.State);
 		float goldenChance = Mathf.Min(0.34f, _perkPlayer.GoldenSpawnChance());
 		bool guaranteedGolden = _perkPlayer.IsGoldenGuaranteed();
 
@@ -671,7 +671,7 @@ public partial class Main : Node2D
 			}
 		}
 
-		float speed = Difficulty.FallSpeed(_runTime) + _rng.RandfRange(-25f, 25f);
+		float speed = Difficulty.FallSpeed(_runTime, _score) + _rng.RandfRange(-25f, 25f);
 		// «Голод»: субперк ускоряет падение всех предметов.
 		speed *= SubPerkEffects.FallSpeedMultiplier(_subPerkPlayer.State);
 		// «Замедление»: постоянное улучшение замедляет падение.
@@ -706,7 +706,7 @@ public partial class Main : Node2D
 		{
 			return;
 		}
-		_spawnTimer.WaitTime = Difficulty.SpawnInterval(_runTime, _rng) / SubPerkEffects.SpawnRateMultiplier(_subPerkPlayer.State);
+		_spawnTimer.WaitTime = Difficulty.SpawnInterval(_runTime, _score, _rng) / SubPerkEffects.SpawnRateMultiplier(_subPerkPlayer.State);
 	}
 
 	// ---------- Игровой цикл ----------
