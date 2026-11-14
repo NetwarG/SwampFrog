@@ -56,8 +56,8 @@ public partial class Main : Node2D
 	private float _runTime;
 	/// <summary>Поймано фруктов в текущем забеге: используется для начисления слизи.</summary>
 	private int _runCaught;
-	/// <summary>Остаток рероллов предложения перков (постоянное улучшение «Реролл»).</summary>
-	private int _perkRerolls;
+	/// <summary>Остаток рероллов предложения перков: базовый заряд плюс бонус улучшения «Реролл».</summary>
+	private int _perkRerolls = MetaUpgradeEffects.BasePerkRerolls;
 	private int _lives = 3;
 	private int _highScore;
 	private GameState _state = GameState.Menu;
@@ -801,15 +801,17 @@ public partial class Main : Node2D
 		ShowUpgrades();
 	}
 
-	/// <summary>Реролл предложения перков из окна выбора: тратит заряд улучшения «Реролл».</summary>
+	/// <summary>Реролл предложения перков из окна выбора: тратит базовый заряд или заряд улучшения «Реролл».</summary>
 	private void OnPerkReroll()
 	{
 		if (_perkRerolls <= 0)
 		{
 			return;
 		}
-		if (_perkPlayer.RerollOffers())
-			_perkRerolls--;
+		// Заряд списывается до пересборки предложения: окно сразу показывает новый остаток.
+		_perkRerolls--;
+		if (!_perkPlayer.RerollOffers())
+			_perkRerolls++;
 	}
 
 	/// <summary>Открывает магазин скинов с текущими состояниями карточек.</summary>

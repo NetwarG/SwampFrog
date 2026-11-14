@@ -28,8 +28,11 @@ public static class MetaUpgradeEffects
 	public static int StartLivesBonus(int level) => level;
 	public static int StartLivesBonus(MetaProfile profile) => StartLivesBonus(profile.UpgradeLevel(UpgradeId.Vitality));
 
-	/// <summary>Рероллы предложения перков за забег.</summary>
-	public static int PerkRerolls(int level) => level;
+	/// <summary>Базовый реролл предложения перков: доступен в любом забеге без улучшений.</summary>
+	public const int BasePerkRerolls = 1;
+
+	/// <summary>Рероллы предложения перков за забег: базовый запас плюс уровень «Реролла».</summary>
+	public static int PerkRerolls(int level) => BasePerkRerolls + level;
 	public static int PerkRerolls(MetaProfile profile) => PerkRerolls(profile.UpgradeLevel(UpgradeId.Reroll));
 
 	/// <summary>Цена скина с учётом скидки «Торговца».</summary>
