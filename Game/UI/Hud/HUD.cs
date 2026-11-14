@@ -18,6 +18,9 @@ public partial class HUD : Control
 	/// <summary>Зазор между счётом и жизнями в одной строке.</summary>
 	private const float CounterGap = 24f;
 
+	/// <summary>Отступ кнопки языка от верхнего левого угла меню.</summary>
+	private const float LanguageMargin = 16f;
+
 	private Label? _scoreLabel;
 	private HealthDisplay? _healthDisplay;
 	private int _lives = 3;
@@ -39,6 +42,10 @@ public partial class HUD : Control
 	private PerkBar? _perkBar;
 	private Label? _hint;
 	private Control? _popups;
+	/// <summary>Вырезы камеры в единицах интерфейса: верхние элементы расходятся по сторонам от выреза.</summary>
+	private Rect2[] _cutouts = System.Array.Empty<Rect2>();
+	private SoundControls? _soundControls;
+	private LanguageButton? _languageButton;
 
 	private int _score;
 	private Label? _startSub;
@@ -186,11 +193,25 @@ public partial class HUD : Control
 	{
 		// Обновляем адаптивные размеры HUD-элементов.
 		float ui = UiScale;
+		// Кнопка паузы встаёт первой: по её левому краю ограничивается строка счёта.
+		_pauseMenu?.SetCameraCutouts(_cutouts);
 		UpdateCounterPositions();
+		LayoutLanguageButton();
 		_xpBar?.SetUiScale(ui);
 		_perkBar?.SetUiScale(ui);
 		_perkOverlay?.RecenterIfVisible();
 		UpdatePopupTransform();
+	}
+
+	/// <summary>Передаёт вырезы камеры от GameScreen и пересчитывает раскладку верхнего интерфейса.</summary>
+	public void SetCameraCutouts(Rect2[] cutouts)
+	{
+		_cutouts = cutouts ?? System.Array.Empty<Rect2>();
+		// Кнопка паузы встаёт первой: по её левому краю ограничивается строка счёта.
+		_pauseMenu?.SetCameraCutouts(_cutouts);
+		UpdateCounterPositions();
+		LayoutLanguageButton();
+		_soundControls?.SetCameraCutouts(_cutouts);
 	}
 
 	public void UpdatePopupTransform()
@@ -279,8 +300,27 @@ public partial class HUD : Control
 		_scoreLabel.ResetSize();
 		_healthDisplay.SetLives(_lives, _maxLives);
 		// Счёт и жизни держатся в одной строке слева: HP встаёт сразу за счётом.
-		_scoreLabel.Position = new Vector2(CounterMarginX, CounterMarginY);
-		_healthDisplay.Position = new Vector2(_scoreLabel.Position.X + _scoreLabel.Size.X + CounterGap, CounterMarginY);
+		// Вырез камеры строку не опускает, а сдвигает её вправо — до блока паузы у правого края.
+		float width = _scoreLabel.Size.X + CounterGap + _healthDisplay.Size.X;
+		float height = Mathf.Max(_scoreLabel.Size.Y, _healthDisplay.Size.Y);
+		float limit = _pauseMenu?.ButtonLeft ?? 0f;
+		if (limit <= CounterMarginX)
+			limit = Size.X;
+		float maxX = Mathf.Max(CounterMarginX, limit - CounterGap - width);
+		float x = ScreenCutouts.Avoid(new Rect2(CounterMarginX, CounterMarginY, width, height), _cutouts,
+			CounterMarginX, maxX).X;
+		_scoreLabel.Position = new Vector2(x, CounterMarginY);
+		_healthDisplay.Position = new Vector2(x + _scoreLabel.Size.X + CounterGap, CounterMarginY);
+	}
+
+	/// <summary>Кнопка языка стоит у верхнего левого края меню: вырез камеры отодвигает её вправо.</summary>
+	private void LayoutLanguageButton()
+	{
+		if (_languageButton == null) return;
+		float size = LanguageButton.ButtonSize.X;
+		float x = ScreenCutouts.Avoid(new Rect2(LanguageMargin, CounterMarginY, size, size), _cutouts,
+			LanguageMargin, Mathf.Max(LanguageMargin, Size.X * 0.5f - size)).X;
+		_languageButton.Position = new Vector2(x, CounterMarginY);
 	}
 
 	private void UpdateHp()
@@ -367,10 +407,13 @@ public partial class HUD : Control
 
 		// Управление звуком и языком показывается вместе с меню и скрывается вместе с ним:
 		// в партии, Suika и оверлеях их нет (см. SoundControls, LanguageButton).
-		_startRoot.AddChild(new SoundControls { ZIndex = 20 });
-		var language = new LanguageButton { ZIndex = 20 };
-		_startRoot.AddChild(language);
-		language.Position = new Vector2(16f * ui, 16f * ui);
+		_soundControls = new SoundControls { ZIndex = 20 };
+		_startRoot.AddChild(_soundControls);
+		_languageButton = new LanguageButton { ZIndex = 20 };
+		_startRoot.AddChild(_languageButton);
+		// Кнопки меню расходятся по сторонам от выреза камеры вместе с игровым HUD.
+		_soundControls.SetCameraCutouts(_cutouts);
+		LayoutLanguageButton();
 	}
 
 	/// <summary>

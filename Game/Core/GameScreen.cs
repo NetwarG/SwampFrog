@@ -10,6 +10,10 @@ public partial class GameScreen : Control
 	private Control _ui = null!;
 	private Rect2 _lastScreen;
 	private Vector2 _lastPixelScale;
+	/// <summary>Вырезы экрана в координатах канваса: нужны для отслеживания изменений.</summary>
+	private Rect2[] _cutouts = System.Array.Empty<Rect2>();
+	/// <summary>Те же вырезы в единицах интерфейса: их получает HUD и интерфейс Suika.</summary>
+	private Rect2[] _localCutouts = System.Array.Empty<Rect2>();
 	private Vector2 _worldSize = Playfield.Size;
 	public Main Game { get; private set; } = null!;
 	/// <summary>Общая колонка HUD и игрового поля: вся высота экрана.</summary>
@@ -51,6 +55,8 @@ public partial class GameScreen : Control
 		Game.WorldToUi = WorldToUi;
 		Game.ProcessMode = ProcessModeEnum.Pausable;
 		_world.AddChild(Game);
+		// Вырезы камеры передаются интерфейсу после создания игры: HUD и Suika уже в дереве.
+		Game.SetCameraCutouts(_localCutouts);
 	}
 
 	public Vector2 ScreenToWorld(Vector2 point) => (point - FieldRect.Position) * _worldSize / FieldRect.Size;
@@ -63,11 +69,15 @@ public partial class GameScreen : Control
 	{
 		Rect2 screen = new(Vector2.Zero, Size);
 		if (!screen.HasArea() || _world == null) return;
+		Rect2[] cutouts = ScreenCutouts.ForViewport(GetViewport());
 		Transform2D transform = GetScreenTransform();
 		Vector2 pixelScale = new(transform.X.Length(), transform.Y.Length());
-		if (screen == _lastScreen && pixelScale == _lastPixelScale) return;
+		// Вырезы камеры меняются отдельно от размера экрана: их появление тоже пересобирает раскладку.
+		bool cutoutsChanged = !ScreenCutouts.Same(cutouts, _cutouts);
+		if (screen == _lastScreen && pixelScale == _lastPixelScale && !cutoutsChanged) return;
 		_lastScreen = screen;
 		_lastPixelScale = pixelScale;
+		_cutouts = cutouts;
 		// Поле и HUD занимают одну колонку во всю высоту экрана: сверху и снизу
 		// неигровых полос нет, на широких экранах по бокам остаётся декоративный фон.
 		ArenaRect = Playfield.ColumnFor(screen);
@@ -84,8 +94,12 @@ public partial class GameScreen : Control
 		_ui.Position = ArenaRect.Position;
 		_ui.Scale = Vector2.One * uiScale;
 		_ui.Size = ArenaRect.Size / uiScale;
+		// Вырезы камеры не опускают элементы, а разводят их по сторонам: интерфейс получает
+		// те же прямоугольники, но в своих единицах.
+		_localCutouts = ScreenCutouts.InLocal(cutouts, ArenaRect, uiScale);
 		Game?.ConfigureViewSize(_worldSize);
 		Game?.HudNode?.UpdatePopupTransform();
+		Game?.SetCameraCutouts(_localCutouts);
 		QueueRedraw();
 	}
 

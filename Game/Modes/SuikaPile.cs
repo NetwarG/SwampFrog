@@ -127,6 +127,8 @@ public partial class SuikaGame
 			// Питч по уровню фрукта: слияния звучат как лестница вверх.
 			Sfx.Play(SfxId.SuikaMerge, 0.9f + (int)mergedKind * 0.08f);
 			_scoreLabel!.Text = Loc.T(L.SuikaScore, _score);
+			// Широкая подпись счёта остаётся в стороне от выреза камеры.
+			LayoutTopUi();
 		}
 	}
 

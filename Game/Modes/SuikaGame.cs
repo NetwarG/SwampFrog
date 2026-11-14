@@ -141,6 +141,7 @@ public partial class SuikaGame : Node2D
 		// Фон считается от размера поля: окно могло измениться без сдвига кувшина.
 		QueueRedraw();
 		UpdateFrog(0f);
+		LayoutTopUi();
 		UpdateVisuals();
 		UpdateHelpButtonPosition();
 	}
@@ -399,7 +400,8 @@ public partial class SuikaGame : Node2D
 		_heldFruit.QueueRedraw();
 		_nextFruit.Kind = _nextKind;
 		_nextFruit.QueueRedraw();
-		_nextFruit.Position = new Vector2(_uiRoot!.Size.X - 90f, 67f);
+		// Превью «следующий» держится в правом верхнем блоке: вырез камеры отодвигает его влево.
+		_nextFruit.Position = new Vector2(_uiRoot!.Size.X - 90f + _rightShift, 67f);
 	}
 
 	/// <summary>Случайный фрукт из текущего запаса (только виды с остатком &gt; 0).</summary>
@@ -578,6 +580,7 @@ public partial class SuikaGame : Node2D
 		}
 		Game?.OnSuikaRoundFinished(_score, _roundMerges);
 		_bestLabel!.Text = Loc.T(L.SuikaBest, _bestScore);
+		LayoutTopUi();
 		_gameOverScore!.Text = Loc.T(L.SuikaGameOverScore, _score);
 		_gameOverRoot!.Visible = true;
 		UpdateStockLabel();

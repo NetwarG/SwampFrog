@@ -38,6 +38,10 @@ public partial class SoundControls : Control
 	private bool _expanded;
 	private float _expandedY;
 	private float _collapsedY;
+	/// <summary>Вырезы камеры в единицах интерфейса: блок кнопок и ползунков отходит влево от выреза.</summary>
+	private Rect2[] _cutouts = System.Array.Empty<Rect2>();
+	/// <summary>Сдвиг блока от правого края поля.</summary>
+	private float _shift;
 
 	public override void _Ready()
 	{
@@ -138,13 +142,29 @@ public partial class SoundControls : Control
 		LayoutPanel();
 
 		float top = Margin;
-		_mute.Position = new Vector2(Size.X - Margin - _mute.Size.X, top);
-		_handle.Position = new Vector2(_mute.Position.X - Gap - _handle.Size.X, top);
+		// Номинальное место блока: кнопка mute прижата к правому краю, рычажок — слева от неё.
+		float nominal = Size.X - Margin - _mute.Size.X;
+		float groupLeft = nominal - Gap - _handle.Size.X;
+		float groupWidth = _mute.Size.X + Gap + _handle.Size.X;
+		// Вырез камеры не опускает блок, а отодвигает его влево от выреза.
+		float left = ScreenCutouts.Avoid(new Rect2(groupLeft, top, groupWidth, _mute.Size.Y), _cutouts,
+			Size.X * 0.5f, groupLeft).X;
+		float x = left + Gap + _handle.Size.X;
+		_shift = x - nominal;
+		_mute.Position = new Vector2(x, top);
+		_handle.Position = new Vector2(left, top);
 
-		float panelX = Size.X - Margin - _panel.Size.X;
+		float panelX = Size.X - Margin - _panel.Size.X + _shift;
 		_expandedY = top + _mute.Size.Y + Gap;
 		_collapsedY = _expandedY - HiddenOffset;
 		_panel.Position = new Vector2(panelX, _expanded ? _expandedY : _collapsedY);
+	}
+
+	/// <summary>Передаёт вырезы камеры от HUD: блок управления звуком отходит влево от выреза.</summary>
+	public void SetCameraCutouts(Rect2[] cutouts)
+	{
+		_cutouts = cutouts ?? System.Array.Empty<Rect2>();
+		UpdatePositions();
 	}
 
 	/// <summary>Две колонки внутри блока: иконка сверху, ползунок под ней.</summary>

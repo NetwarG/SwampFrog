@@ -295,6 +295,17 @@ public partial class Main : Node2D
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
 	public Rect2 ViewBounds => new(Vector2.Zero, ViewSize);
 
+	/// <summary>Вырезы камеры в единицах интерфейса: верхние элементы расходятся по сторонам от выреза.</summary>
+	public Rect2[] CameraCutouts { get; private set; } = System.Array.Empty<Rect2>();
+
+	/// <summary>Принимает вырезы камеры от GameScreen и передаёт их интерфейсу.</summary>
+	public void SetCameraCutouts(Rect2[] cutouts)
+	{
+		CameraCutouts = cutouts ?? System.Array.Empty<Rect2>();
+		_hud?.SetCameraCutouts(CameraCutouts);
+		_suika?.SetCameraCutouts(CameraCutouts);
+	}
+
 	public override void _EnterTree()
 	{
 		_hud = GetNode<HUD>("HUD");

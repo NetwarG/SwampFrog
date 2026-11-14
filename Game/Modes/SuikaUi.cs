@@ -9,6 +9,27 @@ namespace SwampFrog;
 /// </summary>
 public partial class SuikaGame
 {
+	/// <summary>Отступы верхних подписей: счёт, рекорд и запас идут столбцом слева.</summary>
+	private const float ScoreX = 18f;
+	private const float ScoreY = 16f;
+	private const float BestX = 20f;
+	private const float BestY = 50f;
+	private const float StockX = 20f;
+	private const float StockY = 78f;
+	private const float BackX = 16f;
+	private const float BackY = 112f;
+
+	/// <summary>Отступ и ширина подписи «Дальше»: блок стоит у правого верхнего края поля.</summary>
+	private const float NextRight = 18f;
+	private const float NextWidth = 144f;
+
+	/// <summary>Вырезы камеры в единицах интерфейса: верхние блоки расходятся по сторонам от выреза.</summary>
+	private Rect2[] _cutouts = System.Array.Empty<Rect2>();
+
+	/// <summary>Сдвиги верхних блоков от вырезов камеры: левый вправо, правый влево.</summary>
+	private float _leftShift;
+	private float _rightShift;
+
 	private void BuildUi()
 	{
 		var root = new Control { Name = "SuikaUI", MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -24,14 +45,14 @@ public partial class SuikaGame
 		root.Resized += UpdateVisuals;
 
 		_scoreLabel = MakeLabel(Loc.T(L.SuikaScore, 0), 26, new Color("ffffff"));
-		_scoreLabel.Position = new Vector2(18f, 16f);
+		_scoreLabel.Position = new Vector2(ScoreX, ScoreY);
 		root.AddChild(_scoreLabel);
 		_bestLabel = MakeLabel(Loc.T(L.SuikaBest, _bestScore), 20, new Color(1f, 1f, 1f, 0.62f));
-		_bestLabel.Position = new Vector2(20f, 50f);
+		_bestLabel.Position = new Vector2(BestX, BestY);
 		root.AddChild(_bestLabel);
 
 		_stockLabel = MakeLabel(Loc.T(L.SuikaStock, 0), 20, new Color("ffd45e"));
-		_stockLabel.Position = new Vector2(20f, 78f);
+		_stockLabel.Position = new Vector2(StockX, StockY);
 		root.AddChild(_stockLabel);
 
 		_nextLabel = MakeLabel(Loc.T(L.SuikaNext), 22, new Color("b4e863"));
@@ -39,13 +60,13 @@ public partial class SuikaGame
 		_nextLabel.SetAnchorsPreset(Control.LayoutPreset.TopRight);
 		_nextLabel.AnchorLeft = 1f;
 		_nextLabel.AnchorRight = 1f;
-		_nextLabel.OffsetLeft = -162f;
-		_nextLabel.OffsetRight = -18f;
+		_nextLabel.OffsetLeft = -(NextRight + NextWidth);
+		_nextLabel.OffsetRight = -NextRight;
 		_nextLabel.HorizontalAlignment = HorizontalAlignment.Center;
 		root.AddChild(_nextLabel);
 
 		_backButton = MakeButton(Loc.T(L.ToMenu), 24, new Color("ffd45e"), new Vector2(138f, 80f));
-		_backButton.Position = new Vector2(16f, 112f);
+		_backButton.Position = new Vector2(BackX, BackY);
 		_backButton.Pressed += () => ExitRequested?.Invoke();
 		root.AddChild(_backButton);
 
@@ -61,6 +82,54 @@ public partial class SuikaGame
 		BuildStockDialog(root);
 		BuildGameOver(root);
 		BuildHelp(root);
+		LayoutTopUi();
+	}
+
+	/// <summary>Передаёт вырезы камеры от Main: верхние блоки расходятся по сторонам от выреза.</summary>
+	public void SetCameraCutouts(Rect2[] cutouts)
+	{
+		_cutouts = cutouts ?? System.Array.Empty<Rect2>();
+		LayoutTopUi();
+	}
+
+	/// <summary>
+	/// Раскладывает верхний ряд: блок слева (счёт, рекорд, запас и «В меню») отходит вправо от
+	/// выреза камеры, блок справа («Дальше» с превью и «?») — влево. Высоты подписей не меняются.
+	/// </summary>
+	private void LayoutTopUi()
+	{
+		if (_scoreLabel == null || _backButton == null) return;
+
+		float width = Mathf.Max(_backButton.Size.X,
+			Mathf.Max(LabelWidth(_scoreLabel), Mathf.Max(LabelWidth(_bestLabel), LabelWidth(_stockLabel))));
+		float bottom = _backButton.Position.Y + Mathf.Max(_backButton.Size.Y, 1f);
+		float leftX = ScreenCutouts.Avoid(new Rect2(BackX, ScoreY, Mathf.Max(width, 1f), bottom - ScoreY),
+			_cutouts, BackX, Mathf.Max(BackX, ViewSize.X * 0.5f - width)).X;
+		_leftShift = leftX - BackX;
+
+		float nextX = ViewSize.X - NextRight - NextWidth;
+		float nextBottom = HelpButtonTop + HelpCircleButton.Diameter;
+		float rightX = ScreenCutouts.Avoid(new Rect2(nextX, ScoreY, NextWidth, nextBottom - ScoreY),
+			_cutouts, Mathf.Min(ViewSize.X * 0.5f, nextX), nextX).X;
+		_rightShift = rightX - nextX;
+
+		_scoreLabel.Position = new Vector2(ScoreX + _leftShift, ScoreY);
+		if (_bestLabel != null) _bestLabel.Position = new Vector2(BestX + _leftShift, BestY);
+		if (_stockLabel != null) _stockLabel.Position = new Vector2(StockX + _leftShift, StockY);
+		_backButton.Position = new Vector2(BackX + _leftShift, BackY);
+		if (_nextLabel != null)
+		{
+			_nextLabel.OffsetLeft = -(NextRight + NextWidth) + _rightShift;
+			_nextLabel.OffsetRight = -NextRight + _rightShift;
+		}
+	}
+
+	/// <summary>Ширина подписи по её тексту: нужна, чтобы блок не пересекался с вырезом.</summary>
+	private static float LabelWidth(Label? label)
+	{
+		if (label == null) return 0f;
+		label.ResetSize();
+		return label.Size.X;
 	}
 
 	private void BuildGameOver(Control parent)
@@ -178,6 +247,7 @@ public partial class SuikaGame
 		if (_stockLabel == null) return;
 		int total = Game?.TotalFruitStock() ?? 0;
 		_stockLabel.Text = Loc.T(L.SuikaStock, total);
+		LayoutTopUi();
 	}
 
 	/// <summary>

@@ -17,6 +17,10 @@ public partial class PauseMenu : Control
 	private PausePanel? _panel;
 	private bool _available;
 	private bool _open;
+	/// <summary>Вырезы камеры в единицах интерфейса: кнопка и панель отходят влево от выреза.</summary>
+	private Rect2[] _cutouts = System.Array.Empty<Rect2>();
+	/// <summary>Сдвиг кнопки и панели от правого края поля.</summary>
+	private float _shift;
 
 	/// <summary>Игрок нажал круглую кнопку паузы.</summary>
 	public event Action? PausePressed;
@@ -57,7 +61,18 @@ public partial class PauseMenu : Control
 		UpdateButtonVisibility();
 	}
 
-	private float RightEdge => Size.X;
+	/// <summary>Передаёт вырезы камеры от HUD: кнопка и панель отходят влево от выреза.</summary>
+	public void SetCameraCutouts(Rect2[] cutouts)
+	{
+		_cutouts = cutouts ?? System.Array.Empty<Rect2>();
+		UpdatePositions();
+	}
+
+	/// <summary>Левый край кнопки паузы: по нему строка счёта упирается в блок у правого края.</summary>
+	public float ButtonLeft { get; private set; }
+
+	/// <summary>Правый край поля со сдвигом от выреза камеры: панель выезжает именно из-за него.</summary>
+	private float RightEdge => Size.X + _shift;
 
 	private void OpenPanel()
 	{
@@ -74,7 +89,13 @@ public partial class PauseMenu : Control
 		_button.ResetSize();
 		Vector2 buttonSize = _button.Size;
 		// Кнопка утоплена в правый край на четверть: видимая часть прижата к кромке поля.
-		_button.Position = new Vector2(RightEdge + PauseDotsButton.EdgeSink - buttonSize.X, MarginY);
+		float nominal = Size.X + PauseDotsButton.EdgeSink - buttonSize.X;
+		// Вырез камеры не опускает кнопку, а отодвигает её влево от выреза.
+		float x = ScreenCutouts.Avoid(new Rect2(nominal, MarginY, buttonSize.X, buttonSize.Y), _cutouts,
+			Size.X * 0.5f, nominal).X;
+		_shift = x - nominal;
+		ButtonLeft = x;
+		_button.Position = new Vector2(x, MarginY);
 
 		// Панель выезжает из-за края, поэтому в закрытом состоянии прячется за ним,
 		// а в открытом выравнивается по верхнему краю кнопки.

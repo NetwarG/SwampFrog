@@ -111,7 +111,8 @@ public partial class SuikaGame
 	{
 		if (_helpButton == null) return;
 		_helpButton.ResetSize();
+		// Кнопка «?» держится в правом верхнем блоке: вырез камеры отодвигает её влево.
 		_helpButton.Position = new Vector2(
-			ViewSize.X - HelpCircleButton.MarginRight - HelpCircleButton.Diameter, HelpButtonTop);
+			ViewSize.X - HelpCircleButton.MarginRight - HelpCircleButton.Diameter + _rightShift, HelpButtonTop);
 	}
 }
