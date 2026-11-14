@@ -25,6 +25,16 @@ public sealed class PerkPlayer
 	private float _goldFreezeCooldown;
 	/// <summary>Текущая заморозка «Взгляда василиска».</summary>
 	private float _gazeFreezeTimer;
+	/// <summary>Сколько фруктов одновременно удерживает магнит одной ладони.</summary>
+	public const int MagnetFruitsPerHand = 6;
+
+	/// <summary>Скорость притягивания фрукта магнитом, px/сек.</summary>
+	private const float MagnetPullSpeed = 220f;
+
+	/// <summary>Цели магнита на кадр: до шести фруктов на каждую ладонь, порядок — по близости.</summary>
+	private readonly FallingItem?[] _magnetTargets = new FallingItem?[2 * MagnetFruitsPerHand];
+	private readonly int[] _magnetTargetCounts = new int[2];
+
 	/// <summary>Неуязвимость («Панцирь» ур. 5, возрождение).</summary>
 	private float _invulnTimer;
 	/// <summary>Очки комбо текущей серии.</summary>
@@ -213,6 +223,8 @@ public sealed class PerkPlayer
 			frog.RetractSpeedMultiplier = PerkEffects.RetractSpeedMultiplier(_perks);
 			frog.MultiCatch = PerkEffects.MultiCatch(_perks);
 		}
+		// Магнит набирает цели до перебора предметов в Main: по шесть фруктов на ладонь.
+		SyncMagnetTargets(frog);
 
 		if (_invulnTimer > 0f)
 		{
@@ -931,10 +943,44 @@ public sealed class PerkPlayer
 		item.Velocity = new Vector2(item.Velocity.X, Mathf.Lerp(item.Velocity.Y, targetY, t));
 	}
 
-	/// <summary>«Липкие ладони»: фрукты в радиусе магнита тянутся к ладони.</summary>
+	/// <summary>
+	/// «Липкие ладони»: фрукт тянется к своей ладони, если магнит взял его в цели кадра.
+	/// Больше <see cref="MagnetFruitsPerHand"/> фруктов на ладонь магнит не держит —
+	/// остальные падают как обычно.
+	/// </summary>
 	private void ApplyMagnet(FallingItem item, Vector2[]? hands)
 	{
-		if (hands == null || item.ItemType != ItemType.Fruit)
+		if (hands == null)
+		{
+			return;
+		}
+		int hand = MagnetHandOf(item);
+		if (hand < 0 || hand >= hands.Length)
+		{
+			return;
+		}
+		if (Game?.FrogNode?.IsHandCatching(hand) != true)
+		{
+			return;
+		}
+		Vector2 toHand = hands[hand] - item.GlobalPosition;
+		float distSq = toHand.LengthSquared();
+		if (distSq <= 0.0001f)
+		{
+			return;
+		}
+		item.Velocity = toHand * (MagnetPullSpeed / Mathf.Sqrt(distSq));
+	}
+
+	/// <summary>
+	/// Набирает цели магнита на кадр: каждая тянущаяся ладонь берёт до
+	/// <see cref="MagnetFruitsPerHand"/> ближайших фруктов в своём радиусе.
+	/// </summary>
+	private void SyncMagnetTargets(Frog? frog)
+	{
+		_magnetTargetCounts[0] = 0;
+		_magnetTargetCounts[1] = 0;
+		if (frog == null || !frog.IsCatching || Game?.ItemsNode == null)
 		{
 			return;
 		}
@@ -943,22 +989,53 @@ public sealed class PerkPlayer
 		{
 			return;
 		}
-		for (int i = 0; i < hands.Length; i++)
+		Vector2[] hands = frog.GetHandPositions();
+		for (int hand = 0; hand < _magnetTargetCounts.Length && hand < hands.Length; hand++)
 		{
-			if (Game?.FrogNode?.IsHandCatching(i) != true) continue;
-			Vector2 hand = hands[i];
-			Vector2 toHand = hand - item.GlobalPosition;
-			float distSq = toHand.LengthSquared();
-			if (distSq > radius * radius)
-			{
-				continue;
-			}
-			if (distSq <= 0.0001f)
-			{
-				return;
-			}
-			item.Velocity = toHand * (220f / Mathf.Sqrt(distSq));
-			return;
+			if (frog.IsHandCatching(hand))
+				FillMagnetTargets(hand, hands[hand], radius);
 		}
+	}
+
+	/// <summary>Шесть ближайших фруктов в радиусе ладони: каждый шаг — ближайший из ещё не занятых.</summary>
+	private void FillMagnetTargets(int hand, Vector2 handPosition, float radius)
+	{
+		float radiusSq = radius * radius;
+		for (int slot = 0; slot < MagnetFruitsPerHand; slot++)
+		{
+			FallingItem? nearest = null;
+			float nearestSq = radiusSq;
+			foreach (Node child in Game!.ItemsNode!.GetChildren())
+			{
+				if (child is not FallingItem item || item.ItemType != ItemType.Fruit)
+					continue;
+				if (item.IsCaught || item.IsQueuedForDeletion() || MagnetHandOf(item) >= 0)
+					continue;
+				float distSq = item.GlobalPosition.DistanceSquaredTo(handPosition);
+				if (distSq < nearestSq)
+				{
+					nearestSq = distSq;
+					nearest = item;
+				}
+			}
+			if (nearest == null)
+				return;
+			_magnetTargets[hand * MagnetFruitsPerHand + _magnetTargetCounts[hand]] = nearest;
+			_magnetTargetCounts[hand]++;
+		}
+	}
+
+	/// <summary>Ладонь, чей магнит держит фрукт (−1 — магнит его не тронул).</summary>
+	private int MagnetHandOf(FallingItem item)
+	{
+		for (int hand = 0; hand < _magnetTargetCounts.Length; hand++)
+		{
+			for (int slot = 0; slot < _magnetTargetCounts[hand]; slot++)
+			{
+				if (_magnetTargets[hand * MagnetFruitsPerHand + slot] == item)
+					return hand;
+			}
+		}
+		return -1;
 	}
 }
