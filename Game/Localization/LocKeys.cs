@@ -72,6 +72,8 @@ public static class L
 	public const string PopBonusHp = "popup.bonusHp";
 	public const string PopExplosion = "popup.explosion";
 	public const string PopGaze = "popup.gaze";
+	public const string PopRotten = "popup.rotten";
+	public const string PopFly = "popup.fly";
 
 	// ---------- Профиль игрока ----------
 	public const string MenuProfile = "menu.profile";
@@ -84,6 +86,7 @@ public static class L
 	public const string ProfileCaught = "profile.caught";
 	public const string ProfileGolden = "profile.golden";
 	public const string ProfileMerges = "profile.merges";
+	public const string ProfileFlies = "profile.flies";
 	public const string SlimeLabel = "slime.label";
 
 	// ---------- Скины ----------

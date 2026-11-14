@@ -26,6 +26,7 @@ public partial class ProfilePanel : Control
 	private Label? _caught;
 	private Label? _golden;
 	private Label? _merges;
+	private Label? _flies;
 	private AchievementWall? _wall;
 	private AchievementEntry[] _achievements = Array.Empty<AchievementEntry>();
 	private Button? _backButton;
@@ -77,6 +78,7 @@ public partial class ProfilePanel : Control
 		_caught = MakeRow(_statsBox, ui);
 		_golden = MakeRow(_statsBox, ui);
 		_merges = MakeRow(_statsBox, ui);
+		_flies = MakeRow(_statsBox, ui);
 
 		_achievementsBox = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		_content.AddChild(_achievementsBox);
@@ -174,6 +176,7 @@ public partial class ProfilePanel : Control
 		if (_caught != null) _caught.Text = Loc.T(L.ProfileCaught, _snapshot.FruitsCaught);
 		if (_golden != null) _golden.Text = Loc.T(L.ProfileGolden, _snapshot.GoldenCaught);
 		if (_merges != null) _merges.Text = Loc.T(L.ProfileMerges, _snapshot.SuikaMerges);
+		if (_flies != null) _flies.Text = Loc.T(L.ProfileFlies, _snapshot.FliesCaught);
 		RefreshTabs();
 		_wall?.RefreshTiles();
 		if (_backButton != null) _backButton.Text = Loc.T(L.ProfileBack);

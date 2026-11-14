@@ -44,4 +44,7 @@ public enum SfxId
 
 	/// <summary>Нажатие кнопки интерфейса.</summary>
 	UiTap,
+
+	/// <summary>Поимка мухи.</summary>
+	FlyCatch,
 }

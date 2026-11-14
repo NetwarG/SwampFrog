@@ -80,6 +80,27 @@ public partial class FallingItem : Node2D
 		}
 	}
 
+	/// <summary>
+	/// Фрукт протух от мухи: считается мусором (см. <see cref="CountsAsTrash"/>).
+	/// Вид остаётся спрайтом исходного фрукта, поверх него ложится налёт порчи.
+	/// </summary>
+	public bool Rotten
+	{
+		get => _rotten;
+		set
+		{
+			if (_rotten == value) return;
+			_rotten = value;
+			RefreshRotten();
+		}
+	}
+
+	/// <summary>
+	/// Предмет ведёт себя как мусор: касание рукой наносит урон, промах безопасен.
+	/// Один ответ на вопрос «это мусор?» — и для самого мусора, и для протухшего фрукта.
+	/// </summary>
+	public bool CountsAsTrash => ItemType == ItemType.Trash || (ItemType == ItemType.Fruit && Rotten);
+
 	/// <summary>Текущая скорость движения в мировых единицах в секунду.</summary>
 	public Vector2 Velocity
 	{
@@ -139,6 +160,7 @@ public partial class FallingItem : Node2D
 	private bool _isCaught;
 	private bool _frozen;
 	private bool _roundFrozen;
+	private bool _rotten;
 	private bool _despawning;
 	private RigidBody2D? _physicsBody;
 
@@ -151,6 +173,9 @@ public partial class FallingItem : Node2D
 	/// <summary>Ледяная или каменная корочка обездвиженного предмета.</summary>
 	private FrostCrust? _crust;
 	private ItemFrost _frost = ItemFrost.None;
+
+	/// <summary>Налёт порчи поверх спрайта протухшего фрукта.</summary>
+	private RottenLook? _rot;
 
 	private static readonly Dictionary<string, Texture2D> TextureCache = new();
 
@@ -185,6 +210,8 @@ public partial class FallingItem : Node2D
 		_sprite = new Sprite2D { Name = "Icon", Centered = true };
 		AddChild(_sprite);
 		RefreshSprite();
+		// Протухший фрукт мог быть помечен до добавления в дерево: налёт включается здесь.
+		if (_rotten) RefreshRotten();
 
 		// Золотой отблеск добавляется узлом поверх спрайта (ассета для золота нет).
 		if (IsGolden)
@@ -339,6 +366,26 @@ public partial class FallingItem : Node2D
 		_crust.QueueRedraw();
 	}
 
+	/// <summary>Показывает или прячет налёт порчи и приглушает краски протухшего фрукта.</summary>
+	private void RefreshRotten()
+	{
+		if (_sprite != null)
+			_sprite.Modulate = _rotten ? new Color(0.74f, 0.84f, 0.58f) : Colors.White;
+		if (!_rotten)
+		{
+			if (_rot != null) _rot.Visible = false;
+			return;
+		}
+		if (_rot == null || !IsInstanceValid(_rot))
+		{
+			_rot = new RottenLook { Name = "Rotten" };
+			AddChild(_rot);
+		}
+		_rot.Radius = BaseRadius;
+		_rot.Visible = true;
+		_rot.QueueRedraw();
+	}
+
 	/// <summary>Текстура предмета из Game/assets.</summary>
 	private Texture2D? LoadItemTexture()
 	{
@@ -377,8 +424,29 @@ public partial class FallingItem : Node2D
 		}
 	}
 
+	/// <summary>Налёт порчи протухшего фрукта: зелёная дымка, пятна плесени и «испарения».</summary>
+	private sealed partial class RottenLook : Node2D
+	{
+		/// <summary>Радиус предмета в локальных единицах.</summary>
+		public float Radius { get; set; }
 
-		/// <summary>Корочка обездвиженного предмета: изморозь заморозки или трещины камня.</summary>
+		public override void _Draw()
+		{
+			DrawCircle(Vector2.Zero, Radius, new Color(FlyStyle.Mold, 0.30f));
+			DrawCircle(Vector2.Zero, Radius + 1f, new Color(EffectStyle.Outline, 0.45f), false, 3f);
+			// Пятна плесени: тёмные круги со смещениями от центра.
+			DrawCircle(new Vector2(-Radius * 0.34f, -Radius * 0.28f), Radius * 0.26f, new Color(FlyStyle.Stain, 0.55f));
+			DrawCircle(new Vector2(Radius * 0.30f, Radius * 0.10f), Radius * 0.20f, new Color(FlyStyle.Stain, 0.5f));
+			DrawCircle(new Vector2(Radius * 0.04f, Radius * 0.40f), Radius * 0.16f, new Color(FlyStyle.Stain, 0.5f));
+			// Два коротких «испарения» вверх: видно, что фрукт испорчен.
+			DrawLine(new Vector2(-Radius * 0.22f, -Radius * 0.9f), new Vector2(-Radius * 0.30f, -Radius * 1.35f),
+				new Color(FlyStyle.Mold, 0.75f), 3f);
+			DrawLine(new Vector2(Radius * 0.24f, -Radius * 0.9f), new Vector2(Radius * 0.34f, -Radius * 1.35f),
+				new Color(FlyStyle.Mold, 0.75f), 3f);
+		}
+	}
+
+	/// <summary>Корочка обездвиженного предмета: изморозь заморозки или трещины камня.</summary>
 	private sealed partial class FrostCrust : Node2D
 	{
 		/// <summary>Радиус предмета в локальных единицах.</summary>

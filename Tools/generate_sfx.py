@@ -80,6 +80,19 @@ def tick(duration, cutoff, gain=1.0, seed=2):
     return result
 
 
+def buzz(duration, freq=190.0, rate=110.0, gain=0.75):
+    """Жужжание: тон с быстрой амплитудной модуляцией и быстрым спадом."""
+    result = array("f")
+    count = int(duration * SAMPLE_RATE)
+    for i in range(count):
+        t = i / SAMPLE_RATE
+        envelope = min(1.0, t / 0.005) * math.exp(-6.0 * (t / duration))
+        wobble = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(TAU * rate * t))
+        carrier = math.sin(TAU * freq * t) + 0.3 * math.sin(TAU * freq * 2.0 * t)
+        result.append(carrier * wobble * envelope * gain)
+    return result
+
+
 def mix(*parts):
     """Складывает несколько фрагментов, выравнивая их по началу."""
     length = max(len(part) for part in parts)
@@ -162,6 +175,9 @@ def build():
 
     # Кнопки интерфейса: очень тихий щелчок.
     write("ui_tap", tick(0.045, 0.8, 0.5, seed=7))
+
+    # Поимка мухи: жужжание, обрывающееся коротким шлепком.
+    write("fly_catch", mix(buzz(0.12), tick(0.035, 0.7, 0.6, seed=13)))
 
 
 if __name__ == "__main__":

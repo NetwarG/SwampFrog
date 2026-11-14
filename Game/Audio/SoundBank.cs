@@ -26,6 +26,7 @@ public static class SoundBank
 		[SfxId.SuikaThrow] = new(Dir + "suika_throw.wav", -11f, 0.96f, 1.06f, 0.08f),
 		[SfxId.SuikaMerge] = new(Dir + "suika_merge.wav", -9f, 0.97f, 1.03f, 0.04f),
 		[SfxId.UiTap] = new(Dir + "ui_tap.wav", -14f, 0.98f, 1.03f, 0.06f),
+		[SfxId.FlyCatch] = new(Dir + "fly_catch.wav", -11f, 0.97f, 1.05f, 0.06f),
 	};
 
 	/// <summary>Все идентификаторы эффектов с описаниями (для проверок и прогрева).</summary>

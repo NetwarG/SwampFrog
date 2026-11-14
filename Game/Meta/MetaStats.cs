@@ -21,6 +21,9 @@ public sealed class MetaStats
 	/// <summary>Сколько слияний произошло в мини-игре Suika за всё время.</summary>
 	public int SuikaMerges { get; private set; }
 
+	/// <summary>Сколько мух поймано ладонью за всё время.</summary>
+	public int FliesCaught { get; private set; }
+
 	/// <summary>Партия завершена.</summary>
 	public void OnRunFinished() => RunsPlayed++;
 
@@ -35,10 +38,13 @@ public sealed class MetaStats
 	/// <summary>В Suika слились два фрукта.</summary>
 	public void OnSuikaMerge() => SuikaMerges++;
 
-	/// <summary>Компактная строка для save.cfg: «runs:0,caught:0,golden:0,merges:0».</summary>
+	/// <summary>Ладонь поймала муху.</summary>
+	public void OnFlyCaught() => FliesCaught++;
+
+	/// <summary>Компактная строка для save.cfg: «runs:0,caught:0,golden:0,merges:0,flies:0».</summary>
 	public string ToSaveString()
 	{
-		return $"runs:{RunsPlayed},caught:{FruitsCaught},golden:{GoldenCaught},merges:{SuikaMerges}";
+		return $"runs:{RunsPlayed},caught:{FruitsCaught},golden:{GoldenCaught},merges:{SuikaMerges},flies:{FliesCaught}";
 	}
 
 	/// <summary>
@@ -79,6 +85,9 @@ public sealed class MetaStats
 				break;
 			case "merges":
 				SuikaMerges = value;
+				break;
+			case "flies":
+				FliesCaught = value;
 				break;
 		}
 	}

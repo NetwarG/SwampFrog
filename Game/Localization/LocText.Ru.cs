@@ -67,6 +67,8 @@ internal static partial class LocText
 		[L.PopBonusHp] = "+1 HP",
 		[L.PopExplosion] = "Взрыв +{0}",
 		[L.PopGaze] = "Взгляд василиска!",
+		[L.PopRotten] = "Протухло!",
+		[L.PopFly] = "Муха! +{0}",
 
 		[L.MenuProfile] = "Профиль",
 		[L.ProfileTitle] = "Профиль",
@@ -78,6 +80,7 @@ internal static partial class LocText
 		[L.ProfileCaught] = "Поймано фруктов: {0}",
 		[L.ProfileGolden] = "Золотых фруктов: {0}",
 		[L.ProfileMerges] = "Слияний в Suika: {0}",
+		[L.ProfileFlies] = "Поймано мух: {0}",
 		[L.SlimeLabel] = "Слизь: {0}",
 
 		[L.SkinsTitle] = "Скины",

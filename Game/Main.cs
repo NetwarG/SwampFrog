@@ -38,6 +38,7 @@ public partial class Main : Node2D
 	private ComboAuraView? _comboAura;
 	private HUD? _hud;
 	private SuikaGame? _suika;
+	private FlySwarm? _flies;
 	private Timer? _spawnTimer;
 
 	/// <summary>Остаток интервала спавна на момент паузы или заморозки перков.</summary>
@@ -88,6 +89,9 @@ public partial class Main : Node2D
 	public Frog? FrogNode => _frog;
 	public Node2D? ItemsNode => _items;
 	public HUD? HudNode => _hud;
+
+	/// <summary>Рой мух классического режима: спавн, полёт и ловля (см. Game/Flies/).</summary>
+	public FlySwarm? FliesNode => _flies;
 
 	/// <summary>Слой эффектов перков: сюда пишут моменты срабатывания.</summary>
 	public EffectLayer? Effects => _effects;
@@ -255,6 +259,9 @@ public partial class Main : Node2D
 	/// <summary>Учитывает слияние фруктов в Suika для статистики профиля.</summary>
 	public void RegisterSuikaMerge() => _meta.Stats.OnSuikaMerge();
 
+	/// <summary>Учитывает пойманную муху для статистики профиля.</summary>
+	public void RegisterFlyCaught() => _meta.Stats.OnFlyCaught();
+
 	/// <summary>Начисляет слизь за завершённый раунд Suika.</summary>
 	public void OnSuikaRoundFinished(int roundScore, int roundMerges)
 	{
@@ -392,6 +399,10 @@ public partial class Main : Node2D
 		AddChild(_comboAura);
 		_effects = new EffectLayer { Name = "Effects", ZIndex = 5 };
 		AddChild(_effects);
+		// Рой мух летает поверх фруктов, но под аурой комбо и слоем эффектов.
+		_flies = new FlySwarm { Name = "Flies", ZIndex = 3 };
+		_flies.Game = this;
+		AddChild(_flies);
 	}
 
 	private void BuildClassicWalls()
@@ -493,6 +504,9 @@ public partial class Main : Node2D
 		Vector2[]? hands = _frog.IsCatching ? _frog.GetHandPositions() : null;
 		CircleHitbox[]? handHitboxes = _frog.IsCatching ? _frog.GetHandHitboxes() : null;
 
+		// Рой мух: выпуск, полёт, порча фруктов и ловля ладонями.
+		_flies?.Update(dt, _score, viewSize, handHitboxes, _perkPlayer.IsWorldFrozen);
+
 		foreach (Node child in _items.GetChildren())
 		{
 			if (_state != GameState.Playing) break;
@@ -568,8 +582,8 @@ public partial class Main : Node2D
 
 	private void CatchItem(FallingItem item, int handIndex)
 	{
-		// Мусор нельзя нести в руках: отскок/камень либо урон и исчезновение.
-		if (item.ItemType == ItemType.Trash)
+		// Мусор и протухший фрукт нельзя нести в руках: отскок/камень либо урон и исчезновение.
+		if (item.CountsAsTrash)
 		{
 			_perkPlayer.HandleTrashTouch(item);
 			return;
@@ -926,6 +940,7 @@ public partial class Main : Node2D
 			}
 		}
 		_frog?.ClearCaughtItems();
+		_flies?.Clear();
 		ClearEffects();
 	}
 
@@ -967,6 +982,7 @@ public partial class Main : Node2D
 				if (child is FallingItem item) item.FreezeForRoundEnd();
 			}
 		}
+		_flies?.Clear();
 		// На случай завершения во время паузы выбора перка (теоретически невозможно).
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();

@@ -387,7 +387,7 @@ public sealed class PerkPlayer
 	/// <summary>Фрукт/золотой упал мимо: штраф за промах и сброс комбо.</summary>
 	public void OnItemMissed(FallingItem item)
 	{
-		if (item.ItemType == ItemType.Fruit)
+		if (item.ItemType == ItemType.Fruit && !item.Rotten)
 		{
 			Game?.HudNode?.SpawnPopup(item.GlobalPosition, Loc.T(L.PopMiss));
 			TakeDamage();
@@ -459,7 +459,7 @@ public sealed class PerkPlayer
 		}
 		foreach (Node child in items.GetChildren())
 		{
-			if (child is FallingItem item && item.ItemType == ItemType.Trash)
+			if (child is FallingItem item && item.CountsAsTrash)
 			{
 				Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Stone, 8, 200f, 0.45f);
 				item.Despawn();
@@ -730,9 +730,9 @@ public sealed class PerkPlayer
 					continue;
 				}
 
-				if (item.ItemType == ItemType.Trash)
+				if (item.CountsAsTrash)
 				{
-					// lvl4+: взрыв уничтожает мусор рядом.
+					// lvl4+: взрыв уничтожает мусор и протухшие фрукты рядом.
 					if (PerkEffects.ExplosionDestroysTrash(_perks))
 					{
 						Effects?.SpawnSparks(item.GlobalPosition, EffectStyle.Stone, 10, 220f, 0.5f);
@@ -814,7 +814,7 @@ public sealed class PerkPlayer
 			float bestDist = float.PositiveInfinity;
 			foreach (Node child in items.GetChildren())
 			{
-				if (child is not FallingItem item || item.ItemType != ItemType.Trash || item.IsCaught || item.IsQueuedForDeletion() || item.ManualPhysics || !IsInField(item))
+				if (child is not FallingItem item || !item.CountsAsTrash || item.IsCaught || item.IsQueuedForDeletion() || item.ManualPhysics || !IsInField(item))
 				{
 					continue;
 				}
@@ -846,7 +846,7 @@ public sealed class PerkPlayer
 		{
 			return false;
 		}
-		return item.ItemType == ItemType.Fruit;
+		return item.ItemType == ItemType.Fruit && !item.Rotten;
 	}
 
 	/// <summary>Предмет уже влетел в поле: «Язык-молния» не бьёт по невидимой цели за верхней границей.</summary>
@@ -874,19 +874,19 @@ public sealed class PerkPlayer
 		}
 		if (_gazeFreezeTimer > 0f)
 		{
-			if (item.ItemType == ItemType.Fruit)
+			if (item.ItemType == ItemType.Fruit && !item.Rotten)
 			{
 				return true;
 			}
-			// lvl3+: мусор «каменеет» и становится безопасным.
-			return item.ItemType == ItemType.Trash && PerkEffects.GazeStonesTrash(_perks);
+			// lvl3+: мусор и протухшие фрукты «каменеют» и становятся безопасными.
+			return item.CountsAsTrash && PerkEffects.GazeStonesTrash(_perks);
 		}
 		return false;
 	}
 
 	/// <summary>Вид корочки обездвиженного предмета: камень для мусора, лёд для фруктов.</summary>
 	private ItemFrost FrostLook(FallingItem item) =>
-		item.ItemType == ItemType.Trash && _gazeFreezeTimer > 0f && PerkEffects.GazeStonesTrash(_perks)
+		item.CountsAsTrash && _gazeFreezeTimer > 0f && PerkEffects.GazeStonesTrash(_perks)
 			? ItemFrost.Stone
 			: ItemFrost.Ice;
 
@@ -928,7 +928,7 @@ public sealed class PerkPlayer
 	/// <summary>«Зона замедления»: плавно замедляет падение предметов в нижней зоне экрана.</summary>
 	private void ApplySlowZone(FallingItem item, Vector2 viewSize, float dt)
 	{
-		float factor = PerkEffects.FallSlowFactor(_perks, item.ItemType);
+		float factor = PerkEffects.FallSlowFactor(_perks, item.CountsAsTrash ? ItemType.Trash : item.ItemType);
 		if (factor >= 1f)
 		{
 			return;
@@ -1007,7 +1007,7 @@ public sealed class PerkPlayer
 			float nearestSq = radiusSq;
 			foreach (Node child in Game!.ItemsNode!.GetChildren())
 			{
-				if (child is not FallingItem item || item.ItemType != ItemType.Fruit)
+				if (child is not FallingItem item || item.ItemType != ItemType.Fruit || item.Rotten)
 					continue;
 				if (item.IsCaught || item.IsQueuedForDeletion() || MagnetHandOf(item) >= 0)
 					continue;

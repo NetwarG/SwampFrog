@@ -67,6 +67,8 @@ internal static partial class LocText
 		[L.PopBonusHp] = "+1 HP",
 		[L.PopExplosion] = "Blast +{0}",
 		[L.PopGaze] = "Basilisk gaze!",
+		[L.PopRotten] = "Rotten!",
+		[L.PopFly] = "Fly! +{0}",
 
 		[L.MenuProfile] = "Profile",
 		[L.ProfileTitle] = "Profile",
@@ -78,6 +80,7 @@ internal static partial class LocText
 		[L.ProfileCaught] = "Fruits caught: {0}",
 		[L.ProfileGolden] = "Golden fruits: {0}",
 		[L.ProfileMerges] = "Suika merges: {0}",
+		[L.ProfileFlies] = "Flies caught: {0}",
 		[L.SlimeLabel] = "Slime: {0}",
 
 		[L.SkinsTitle] = "Skins",

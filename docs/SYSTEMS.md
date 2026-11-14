@@ -11,7 +11,7 @@
 | `score` | `high` | рекорд классического режима |
 | `suika` | `high` | рекорд мини-игры |
 | `collection` | `fruits` | запас фруктов в формате `Вид:Количество,...` |
-| `meta` | `stats` | пожизненная статистика профиля: `runs:…,caught:…,golden:…,merges:…` |
+| `meta` | `stats` | пожизненная статистика профиля: `runs:…,caught:…,golden:…,merges:…,flies:…` |
 | `meta` | `coins` | баланс валюты «Слизь» |
 | `meta` | `skins` | купленные/открытые скины `SkinId,...` |
 | `meta` | `upgrades` | уровни постоянных улучшений `UpgradeId:Level,...` |

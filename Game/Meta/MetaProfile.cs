@@ -139,7 +139,7 @@ public sealed class MetaProfile
 	public ProfileSnapshot Snapshot(int bestClassic, int bestSuika, int stockTotal)
 	{
 		return new ProfileSnapshot(
-			Stats.RunsPlayed, Stats.FruitsCaught, Stats.GoldenCaught, Stats.SuikaMerges,
+			Stats.RunsPlayed, Stats.FruitsCaught, Stats.GoldenCaught, Stats.SuikaMerges, Stats.FliesCaught,
 			bestClassic, bestSuika, stockTotal, Wallet.Balance);
 	}
 }
@@ -150,6 +150,7 @@ public readonly record struct ProfileSnapshot(
 	int FruitsCaught,
 	int GoldenCaught,
 	int SuikaMerges,
+	int FliesCaught,
 	int BestClassic,
 	int BestSuika,
 	int StockTotal,

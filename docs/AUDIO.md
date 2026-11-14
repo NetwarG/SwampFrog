@@ -42,6 +42,7 @@ python Tools/generate_music.py
 | Бросок в Suika | `suika_throw.wav` | «плюх» |
 | Слияние фруктов в Suika | `suika_merge.wav` | питч по уровню фрукта: лестница вверх |
 | Кнопки меню | `ui_tap.wav` | очень тихий щелчок |
+| Поимка мухи | `fly_catch.wav` | жужжание, обрывающееся шлепком |
 
 Звуки лежат в `Game/assets/audio/sfx/*.wav` (моно, 22 050 Гц, 16 бит). Для повторной генерации:
 
