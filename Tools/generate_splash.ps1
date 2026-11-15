@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 # Загрузочная заставка игры (PNG 540x960) в том же стикер-стиле, что generate_icons.ps1:
 # толстый коричневый контур, диагональный градиент заливки. Фон — вода пруда,
 # по центру улыбающаяся лягушка, снизу надпись «SwampFrog». Файл подключается
-# ключом boot_splash/image в project.godot.
+# ключом boot_splash/image в project.godot, растяжение задаёт boot_splash/stretch_mode (4 = Cover).
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $outline = [System.Drawing.ColorTranslator]::FromHtml('#2b170f')

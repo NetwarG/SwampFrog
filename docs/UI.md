@@ -83,8 +83,11 @@ Suika этих кнопок нет.
 `Game/assets/ui/splash.png` (пруд, улыбающаяся лягушка и надпись «SwampFrog») на сплошном фоне в
 тон воды. Картинка рисуется тем же стикер-стилем, что иконки и кнопки, генератор —
 `Tools/generate_splash.ps1` (PNG 540×960). Настройки заставки — в `project.godot`
-(`boot_splash/image`, `boot_splash/bg_color`, `boot_splash/fullsize`); она же показывается при
-запуске экспортированных сборок.
+(`boot_splash/image`, `boot_splash/bg_color`, `boot_splash/stretch_mode`); она же показывается при
+запуске экспортированных сборок. Значение `boot_splash/stretch_mode=4` (Cover) растягивает картинку
+на весь экран с сохранением пропорций: на вытянутых телефонах (выше 9:16) фоновых полос нет,
+лишние края пруда подрезаются, а лягушка и надпись «SwampFrog» остаются в кадре. Ключа
+`boot_splash/fullsize` в Godot 4.6 и новее нет — его заменил `stretch_mode`.
 
 ## Экран мини-игры Suika
 
