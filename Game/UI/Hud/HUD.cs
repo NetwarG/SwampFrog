@@ -47,6 +47,16 @@ public partial class HUD : Control
 	private SoundControls? _soundControls;
 	private LanguageButton? _languageButton;
 
+	/// <summary>Полоса рекламы внизу меню и сервис, который ей управляет.</summary>
+	private AdBannerService? _ads;
+	private AdBannerSlot? _adBanner;
+
+	/// <summary>Область меню: её низ поднят над полосой рекламы.</summary>
+	private Control? _menuArea;
+
+	/// <summary>Подпись авторов внизу меню: тоже поднимается над полосой рекламы.</summary>
+	private Label? _madeByText;
+
 	private int _score;
 	private Label? _startSub;
 	private Label? _startSub2;
@@ -201,6 +211,7 @@ public partial class HUD : Control
 		_perkBar?.SetUiScale(ui);
 		_perkOverlay?.RecenterIfVisible();
 		UpdatePopupTransform();
+		LayoutAdBanner();
 	}
 
 	/// <summary>Передаёт вырезы камеры от GameScreen и пересчитывает раскладку верхнего интерфейса.</summary>
@@ -363,9 +374,20 @@ public partial class HUD : Control
 
 		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.AddThemeConstantOverride("separation", 14);
-		ModalContent.Mount(_startRoot, box);
-
 		float ui = UiScale;
+
+		// Полоса рекламы у нижней кромки экрана: своё место под баннер рекламной сети
+		// и дом-баннер, пока настоящего объявления нет (см. docs/ADS.md).
+		_ads = new AdBannerService();
+		_adBanner = new AdBannerSlot { Name = "AdBanner", ZIndex = 20 };
+		_adBanner.Bind(_ads);
+		_startRoot.AddChild(_adBanner);
+
+		// Меню монтируется в область над полосой, поэтому кнопки на баннер не наезжают.
+		_menuArea = new Control { Name = "MenuArea", MouseFilter = Control.MouseFilterEnum.Ignore };
+		_menuArea.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+		_startRoot.AddChild(_menuArea);
+		ModalContent.Mount(_menuArea, box);
 
 		Label title = UiStyle.MakeLabel("Swamp Frog", (int)Mathf.Round(50f * ui), new Color("ffe066"));
 		_startSub = UiStyle.MakeLabel(Loc.T(L.MenuSubtitle1), (int)Mathf.Round(24f * ui), new Color("ffffff"));
@@ -396,14 +418,14 @@ public partial class HUD : Control
 
 		var madeByText = UiStyle.MakeLabel("Made by NetwarG and anmiha321", (int)Mathf.Round(20f * ui), new Color(1f, 1f, 1f));
 		AddMenuTextShadow(madeByText, ui);
-		// Текст по центру в самом низу стартового экрана (вне центрируемого меню).
+		// Текст по центру в самом низу стартового экрана (вне центрируемого меню):
+		// отступы над полосой рекламы расставляет LayoutAdBanner.
 		madeByText.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
 		madeByText.AnchorTop = 1f;
 		madeByText.AnchorBottom = 1f;
-		madeByText.OffsetTop = -(int)Mathf.Round(42f * ui);
-		madeByText.OffsetBottom = -(int)Mathf.Round(10f * ui);
 		madeByText.HorizontalAlignment = HorizontalAlignment.Center;
 		_startRoot.AddChild(madeByText);
+		_madeByText = madeByText;
 
 		// Управление звуком и языком показывается вместе с меню и скрывается вместе с ним:
 		// в партии, Suika и оверлеях их нет (см. SoundControls, LanguageButton).
@@ -414,6 +436,29 @@ public partial class HUD : Control
 		// Кнопки меню расходятся по сторонам от выреза камеры вместе с игровым HUD.
 		_soundControls.SetCameraCutouts(_cutouts);
 		LayoutLanguageButton();
+		// Полоса рекламы считается последней: к этому моменту собраны все элементы меню.
+		LayoutAdBanner();
+		// Точный масштаб окна известен после входа меню в дерево: уточняем раскладку.
+		Callable.From(LayoutAdBanner).CallDeferred();
+	}
+
+	/// <summary>
+	/// Пересобирает низ меню: высота полосы рекламы, граница области меню и подпись авторов.
+	/// Вызывается при сборке меню и при смене размера экрана.
+	/// </summary>
+	private void LayoutAdBanner()
+	{
+		if (_adBanner == null)
+			return;
+		float ui = UiScale;
+		float reserved = _adBanner.Refresh();
+		if (_menuArea != null)
+			_menuArea.OffsetBottom = -reserved;
+		if (_madeByText != null)
+		{
+			_madeByText.OffsetTop = -(int)Mathf.Round(reserved + 42f * ui);
+			_madeByText.OffsetBottom = -(int)Mathf.Round(reserved + 14f * ui);
+		}
 	}
 
 	/// <summary>
@@ -436,6 +481,10 @@ public partial class HUD : Control
 		{
 			_startRoot.Visible = true;
 		}
+		// Меню открылось: высота полосы могла измениться вместе с экраном.
+		LayoutAdBanner();
+		// Полоса рекламы запрашивает объявление только в меню: в партии и Suika её нет.
+		_ads?.Require();
 		SetGameplayVisible(false);
 	}
 
@@ -446,6 +495,7 @@ public partial class HUD : Control
 		{
 			_startRoot.Visible = false;
 		}
+		_ads?.Release();
 	}
 
 	/// <summary>Показывает экран профиля поверх главного меню.</summary>

@@ -14,6 +14,8 @@ public static class L
 	public const string MenuExit = "menu.exit";
 	public const string MenuMiniGame = "menu.minigame";
 	public const string MenuUp = "menu.up";
+	public const string MenuAdLabel = "menu.adLabel";
+	public const string MenuAdClaim = "menu.adClaim";
 	public const string HintTouch = "hud.hintTouch";
 	public const string NeedFruits = "hud.needFruits";
 	public const string Score = "hud.score";

@@ -13,6 +13,8 @@ internal static partial class LocText
 		[L.MenuExit] = "Выйти",
 		[L.MenuMiniGame] = "Мини-игра: Suika",
 		[L.MenuUp] = "Up",
+		[L.MenuAdLabel] = "Реклама",
+		[L.MenuAdClaim] = "Лови фрукты руками-липучками!",
 		[L.HintTouch] = "Держи палец на экране — руки тянутся к нему",
 		[L.NeedFruits] = "Сначала собери фрукты в основном режиме!",
 		[L.Score] = "Счёт: {0}",
