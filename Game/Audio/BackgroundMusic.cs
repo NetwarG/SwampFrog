@@ -5,7 +5,7 @@ namespace SwampFrog;
 /// <summary>Общая фоновая тема меню и игровых режимов.</summary>
 public partial class BackgroundMusic : AudioStreamPlayer
 {
-	private const string MusicPath = "res://Game/assets/audio/music/swamp_groove.wav";
+	private const string MusicPath = "res://Game/assets/audio/music/main_theme.wav";
 
 	public override void _Ready()
 	{

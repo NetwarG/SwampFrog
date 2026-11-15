@@ -13,7 +13,7 @@ Game/
 ├── FrogPose.cs          — позы тела лягушки и пути их спрайтов
 ├── FallingItem.cs       — падающий объект на спрайте (фрукт/мусор/хилка; любой фрукт может быть золотым)
 ├── assets/
-│   ├── audio/music/     — фоновая тема swamp_groove.wav
+│   ├── audio/music/     — фоновая тема main_theme.wav
 │   ├── audio/sfx/       — короткие звуковые эффекты ({name}.wav)
 │   ├── frogs/           — позы лягушки (idle/catching/eating/angry)
 │   ├── fruits/          — фрукты, мусор и хилка ({Kind}.png, trash.png, healing.png)
@@ -166,8 +166,6 @@ Tools/
 ├── build_android.ps1    — сборка Android-APK, установка на эмулятор/телефон и запуск
 ├── apk_report.ps1       — разбор состава APK: что занимает место в сборке
 ├── keystore.ps1         — поиск и создание release-keystore для подписи APK
-├── generate_music.py    — генератор фоновой темы Swamp Groove
-├── generate_sfx.py      — генератор коротких звуковых эффектов
 ├── generate_icons.ps1   — генератор иконок HP, хилки, перков и фона пруда (PNG 512×512)
 ├── generate_skins.ps1   — генератор иконок скинов лягушки (PNG 512×512 в Game/assets/skins)
 ├── generate_achievements.ps1 — генератор иконок достижений (PNG 512×512 в Game/assets/achievements)
