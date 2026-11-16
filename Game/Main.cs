@@ -170,6 +170,12 @@ public partial class Main : Node2D
 		if (frame == _lastBackRequestFrame) return;
 		_lastBackRequestFrame = frame;
 
+		if (_hud?.IsRewardedAdOpen == true)
+		{
+			_hud.HideRewardedAd();
+			return;
+		}
+
 		if (_state == GameState.Menu && _hud?.IsUpgradesOpen == true)
 		{
 			_hud.HideUpgrades();
@@ -363,6 +369,8 @@ public partial class Main : Node2D
 		_hud.SkinPurchased += OnSkinPurchased;
 		_hud.UpgradesPressed += OpenUpgrades;
 		_hud.UpgradePurchased += OnUpgradePurchased;
+		_hud.RewardAdPressed += OpenRewardedAd;
+		_hud.RewardedAdWatched += OnRewardedAdWatched;
 		_hud.PerkRerollPressed += OnPerkReroll;
 		_hud.ExitPressed += QuitGame;
 		_hud.RestartPressed += Restart;
@@ -939,6 +947,17 @@ public partial class Main : Node2D
 	}
 
 	private void QuitGame() => GetTree().Quit();
+
+	/// <summary>Кнопка рекламы в меню: ролик с наградой — ролик сети или дом-ролик.</summary>
+	private void OpenRewardedAd() => _hud?.ShowRewardedAd();
+
+	/// <summary>Ролик досмотрен: начисляет слизь за просмотр рекламы.</summary>
+	private void OnRewardedAdWatched()
+	{
+		_meta.Wallet.Add(SlimeReward.AdWatched);
+		_meta.Save();
+		CheckAchievements();
+	}
 
 	private void ClearMainRound()
 	{

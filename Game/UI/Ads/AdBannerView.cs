@@ -14,6 +14,9 @@ public partial class AdBannerView : Control
 	/// <summary>Акцент полосы: приглушённое золото, чтобы блок не спорил с кнопками меню.</summary>
 	private static readonly Color Accent = new("e0c05a");
 
+	/// <summary>Заполнять родителя: false — размером управляет контейнер (окно ролика).</summary>
+	public bool FillParent { get; set; } = true;
+
 	private Label? _title;
 	private Label? _claim;
 	private Label? _tag;
@@ -30,7 +33,8 @@ public partial class AdBannerView : Control
 	public override void _Ready()
 	{
 		MouseFilter = MouseFilterEnum.Ignore;
-		SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+		if (FillParent)
+			SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 		AddChild(new StickerBackground
 		{
 			Name = "AdPanel",

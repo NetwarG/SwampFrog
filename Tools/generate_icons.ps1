@@ -559,6 +559,14 @@ Draw-Path $g $arrow (Get-Color '#8ce0b6') (Get-Color '#3fae8a') 26
 Save-Icon $canvas 'Game/assets/ui/icon_upgrade.png'
 }
 
+# Иконка рекламы в меню: экран с кнопкой воспроизведения.
+function Draw-AdIcon {
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-Path $g (New-Polygon @(@(84, 120), @(428, 120), @(428, 392), @(84, 392))) (Get-Color '#f6ffe9') (Get-Color '#bfe3d6') 26
+Draw-Path $g (New-Polygon @(@(220, 188), @(340, 256), @(220, 324))) (Get-Color '#e0554b') (Get-Color '#b83a3a') 18
+Save-Icon $canvas 'Game/assets/ui/icon_ad.png'
+}
+
 # Иконки постоянных улучшений (экран «Up»).
 function Draw-UpgradeIcons {
 # Копилка: мешочек с монетой.
@@ -620,7 +628,8 @@ Draw-LilyFlower
 Draw-ProfileIcon
 Draw-ShopIcon
 Draw-UpIcon
+Draw-AdIcon
 Draw-UpgradeIcons
 
 
-Write-Host '25 icons generated.'
+Write-Host '26 icons generated.'

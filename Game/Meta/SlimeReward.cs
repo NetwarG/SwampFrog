@@ -9,6 +9,9 @@ public static class SlimeReward
 	/// <summary>Бонус за новый рекорд классического режима.</summary>
 	public const int RecordBonus = 10;
 
+	/// <summary>Слизь за просмотр рекламы с наградой в меню (см. docs/ADS.md).</summary>
+	public const int AdWatched = 40;
+
 	/// <summary>Слизь за классический забег: счёт, пойманные фрукты и бонус за рекорд.</summary>
 	public static int Run(int score, int caught, bool newRecord)
 	{

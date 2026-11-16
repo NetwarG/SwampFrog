@@ -16,6 +16,10 @@ public static class L
 	public const string MenuUp = "menu.up";
 	public const string MenuAdLabel = "menu.adLabel";
 	public const string MenuAdClaim = "menu.adClaim";
+	public const string AdRewardWait = "ad.rewardWait";
+	public const string AdRewardDone = "ad.rewardDone";
+	public const string AdRewardClose = "ad.rewardClose";
+	public const string AdUnavailable = "ad.unavailable";
 	public const string HintTouch = "hud.hintTouch";
 	public const string NeedFruits = "hud.needFruits";
 	public const string Score = "hud.score";

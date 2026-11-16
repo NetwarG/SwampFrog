@@ -27,6 +27,9 @@ public static class AdConfig
 	/// <summary>Общий выключатель: false полностью убирает блок рекламы из меню.</summary>
 	public static bool Enabled { get; set; } = true;
 
+	/// <summary>Сколько секунд идёт дом-ролик перед выдачей слизи (рекламной сети нет).</summary>
+	public static float RewardAdSeconds { get; set; } = 5f;
+
 	/// <summary>В отладочной сборке и в редакторе всегда показываются тестовые объявления.</summary>
 	public static bool UseTestUnits => OS.IsDebugBuild() || OS.HasFeature("editor");
 

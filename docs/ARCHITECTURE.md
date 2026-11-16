@@ -27,7 +27,10 @@ Game/
 │   ├── AdPlatform.cs      — доступность рекламы: платформа и наличие SDK
 │   ├── IAdBannerAdapter.cs — контракт адаптера рекламной сети
 │   ├── MockBannerAdapter.cs — заглушка адаптера без нативных вызовов
-│   └── AdBannerService.cs — фасад рекламы для интерфейса
+│   ├── AdBannerService.cs — фасад рекламы для интерфейса
+│   ├── IRewardedAdAdapter.cs — контракт ролика рекламной сети с наградой
+│   ├── MockRewardedAdapter.cs — заглушка ролика без нативных вызовов
+│   └── AdRewardService.cs — фасад ролика с наградой
 ├── Audio/
 │   ├── AudioBuses.cs     — шины Music и SFX поверх Master
 │   ├── BackgroundMusic.cs — запуск и зацикливание общей фоновой темы (шина Music)
@@ -121,7 +124,9 @@ Game/
 └── UI/
     ├── Ads/             — блок рекламы в меню
     │   ├── AdBannerSlot.cs — полоса у нижней кромки меню: высота, фон, состояния
-    │   └── AdBannerView.cs — дом-баннер: название игры, призыв и подпись «Реклама»
+    │   ├── AdBannerView.cs — дом-баннер: название игры, призыв и подпись «Реклама»
+    │   ├── AdRewardButton.cs — кнопка ролика с наградой под кнопкой языка
+    │   └── RewardedAdOverlay.cs — дом-ролик: счётчик просмотра, награда и «Закрыть»
     ├── Common/          — общие базовые типы и утилиты интерфейса
     │   ├── TouchArea.cs        — область интерфейса: поглощение нажатия и защита от дублей
     │   ├── UiStyle.cs          — общие стили кнопок и подписей
@@ -233,9 +238,9 @@ UI и логика выбора перка при этом не меняются
 
 ## Как изменить начисление слизи
 
-Формулы — в `Game/Meta/SlimeReward.cs` (`Run` для забега, `Suika` для раунда мини-игры); вызовы — в
-`Main` (`GameOver` и `OnSuikaRoundFinished`). Трата — `Wallet.Spend`. Схема сохранения (`meta/coins`)
-при этом не меняется.
+Формулы — в `Game/Meta/SlimeReward.cs` (`Run` для забега, `Suika` для раунда мини-игры, `AdWatched`
+для ролика с наградой); вызовы — в `Main` (`GameOver`, `OnSuikaRoundFinished` и `OnRewardedAdWatched`).
+Трата — `Wallet.Spend`. Схема сохранения (`meta/coins`) при этом не меняется.
 
 ## Как добавить скин лягушки
 
@@ -273,9 +278,11 @@ UI и логика выбора перка при этом не меняются
 Слот внизу меню уже готов: `Game/UI/Ads/AdBannerSlot.cs` держит высоту под баннер и показывает
 дом-баннер, а `AdBannerService` собирает состояние из адаптера.
 
-1. Добавить реализацию `IAdBannerAdapter` для рекламной сети (`Game/Ads/AdMobBannerAdapter.cs`).
+1. Добавить реализации `IAdBannerAdapter` и `IRewardedAdAdapter` для рекламной сети
+   (`Game/Ads/AdMobBannerAdapter.cs`, `Game/Ads/AdMobRewardedAdapter.cs`).
 2. Вернуть `true` из `AdPlatform.HasSdk` для нужных платформ.
-3. Создать сервис с новым адаптером в `HUD.BuildStart` (`new AdBannerService(new AdMobBannerAdapter())`).
+3. Создать сервисы с новыми адаптерами в `HUD.BuildStart` (`new AdBannerService(new AdMobBannerAdapter())`
+   и `new AdRewardService(new AdMobRewardedAdapter())`).
 4. Заполнить рабочие unit id в `AdConfig`; в отладке остаются тестовые.
 
 Интерфейс, высота полосы и раскладка меню при этом не меняются. Подробности — в [ADS.md](ADS.md).

@@ -21,6 +21,9 @@ public partial class HUD : Control
 	/// <summary>Отступ кнопки языка от верхнего левого угла меню.</summary>
 	private const float LanguageMargin = 16f;
 
+	/// <summary>Зазор между кнопкой языка и кнопкой рекламы под ней.</summary>
+	private const float AdRewardGap = 12f;
+
 	private Label? _scoreLabel;
 	private HealthDisplay? _healthDisplay;
 	private int _lives = 3;
@@ -56,6 +59,11 @@ public partial class HUD : Control
 
 	/// <summary>Подпись авторов внизу меню: тоже поднимается над полосой рекламы.</summary>
 	private Label? _madeByText;
+
+	/// <summary>Кнопка рекламы с наградой, сервис и ролик, который она открывает.</summary>
+	private AdRewardService? _rewardAd;
+	private AdRewardButton? _adRewardButton;
+	private RewardedAdOverlay? _rewardOverlay;
 
 	private int _score;
 	private Label? _startSub;
@@ -98,6 +106,12 @@ public partial class HUD : Control
 
 	/// <summary>Игрок купил уровень постоянного улучшения.</summary>
 	public event Action<UpgradeId>? UpgradePurchased;
+
+	/// <summary>Игрок нажал кнопку рекламы в меню: запускается ролик с наградой.</summary>
+	public event Action? RewardAdPressed;
+
+	/// <summary>Ролик досмотрен: награду начисляет Main.</summary>
+	public event Action? RewardedAdWatched;
 
 	/// <summary>Игрок запросил реролл предложения перков.</summary>
 	public event Action? PerkRerollPressed;
@@ -158,6 +172,12 @@ public partial class HUD : Control
 		_upgradePanel = new UpgradePanel { ZIndex = 77 };
 		AddChild(_upgradePanel);
 		_upgradePanel.UpgradePurchased += id => UpgradePurchased?.Invoke(id);
+
+		// Ролик рекламы с наградой: дом-ролик, пока рекламная сеть не подключена (docs/ADS.md).
+		_rewardAd = new AdRewardService();
+		_rewardOverlay = new RewardedAdOverlay { ZIndex = 90 };
+		AddChild(_rewardOverlay);
+		_rewardOverlay.Watched += () => RewardedAdWatched?.Invoke();
 
 		Loc.Changed += Localize;
 	}
@@ -332,6 +352,8 @@ public partial class HUD : Control
 		float x = ScreenCutouts.Avoid(new Rect2(LanguageMargin, CounterMarginY, size, size), _cutouts,
 			LanguageMargin, Mathf.Max(LanguageMargin, Size.X * 0.5f - size)).X;
 		_languageButton.Position = new Vector2(x, CounterMarginY);
+		// Кнопка рекламы повторяет сдвиг кнопки языка и стоит сразу под ней.
+		LayoutAdRewardButton();
 	}
 
 	private void UpdateHp()
@@ -433,6 +455,10 @@ public partial class HUD : Control
 		_startRoot.AddChild(_soundControls);
 		_languageButton = new LanguageButton { ZIndex = 20 };
 		_startRoot.AddChild(_languageButton);
+		// Кнопка рекламы с наградой встаёт столбиком под кнопкой языка.
+		_adRewardButton = new AdRewardButton { Name = "AdRewardButton", ZIndex = 20 };
+		_adRewardButton.Pressed += () => RewardAdPressed?.Invoke();
+		_startRoot.AddChild(_adRewardButton);
 		// Кнопки меню расходятся по сторонам от выреза камеры вместе с игровым HUD.
 		_soundControls.SetCameraCutouts(_cutouts);
 		LayoutLanguageButton();
@@ -462,6 +488,45 @@ public partial class HUD : Control
 	}
 
 	/// <summary>
+	/// Кнопка рекламы с наградой встаёт столбиком под кнопкой языка и повторяет её сдвиг
+	/// вырезом камеры. Выключенная реклама кнопку убирает.
+	/// </summary>
+	private void LayoutAdRewardButton()
+	{
+		if (_adRewardButton == null)
+			return;
+		_adRewardButton.Visible = AdConfig.Enabled;
+		if (_languageButton == null || !AdConfig.Enabled)
+			return;
+		_adRewardButton.Position = new Vector2(_languageButton.Position.X,
+			_languageButton.Position.Y + LanguageButton.ButtonSize.Y + AdRewardGap);
+	}
+
+	/// <summary>Открыт ли ролик с наградой: Escape и «Назад» закрывают его первыми.</summary>
+	public bool IsRewardedAdOpen => _rewardOverlay?.Visible ?? false;
+
+	/// <summary>
+	/// Показывает ролик с наградой: сначала ролик рекламной сети, а без неё — дом-ролик.
+	/// </summary>
+	public void ShowRewardedAd()
+	{
+		if (_rewardAd == null)
+			return;
+		if (_rewardAd.UsesHouseAd)
+		{
+			_rewardOverlay?.ShowAd();
+			return;
+		}
+		_rewardAd.Show(() => RewardedAdWatched?.Invoke(), ShowAdUnavailable);
+	}
+
+	/// <summary>Закрывает ролик с наградой, не начисляя слизь.</summary>
+	public void HideRewardedAd() => _rewardOverlay?.HideAd();
+
+	/// <summary>Сеть не выдала ролик: подсказка у кнопки рекламы.</summary>
+	private void ShowAdUnavailable() => _adRewardButton?.ShowHint(Loc.T(L.AdUnavailable));
+
+	/// <summary>
 	/// Тень и обводка надписи меню: на светлом фоне сохраняется контраст.
 	/// Общие стили не меняются — только метки стартового экрана.
 	/// </summary>
@@ -481,8 +546,9 @@ public partial class HUD : Control
 		{
 			_startRoot.Visible = true;
 		}
-		// Меню открылось: высота полосы могла измениться вместе с экраном.
+		// Меню открылось: высота полосы и кнопка рекламы могли измениться вместе с экраном.
 		LayoutAdBanner();
+		LayoutAdRewardButton();
 		// Полоса рекламы запрашивает объявление только в меню: в партии и Suika её нет.
 		_ads?.Require();
 		SetGameplayVisible(false);
