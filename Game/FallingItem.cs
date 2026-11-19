@@ -119,6 +119,9 @@ public partial class FallingItem : Node2D
 	public float HitRadiusX { get; set; }
 	public float HitRadiusY { get; set; }
 
+	/// <summary>Радиус ограничивающей окружности силуэта для быстрого отсева далёких ладоней.</summary>
+	public float HitBoundingRadius { get; private set; }
+
 	/// <summary>
 	/// Хитбокс предмета: силуэт иконки в мировых координатах. Ловля срабатывает
 	/// только при пересечении силуэта с хитбоксом ладони.
@@ -206,6 +209,7 @@ public partial class FallingItem : Node2D
 		Vector2 fractions = shape == null ? Vector2.One : new Vector2(shape.HitX, shape.HitY);
 		HitRadiusX = BaseRadius * fractions.X * scale;
 		HitRadiusY = BaseRadius * fractions.Y * scale;
+		HitBoundingRadius = Mathf.Sqrt(HitRadiusX * HitRadiusX + HitRadiusY * HitRadiusY);
 
 		_sprite = new Sprite2D { Name = "Icon", Centered = true };
 		AddChild(_sprite);
@@ -403,11 +407,6 @@ public partial class FallingItem : Node2D
 		Texture2D loaded = GD.Load<Texture2D>(path);
 		TextureCache[path] = loaded;
 		return loaded;
-	}
-
-	public override void _Process(double delta)
-	{
-		SyncFromPhysics();
 	}
 
 	/// <summary>Золотое кольцо поверх спрайта золотого фрукта.</summary>

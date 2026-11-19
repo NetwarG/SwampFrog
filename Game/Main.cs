@@ -30,6 +30,9 @@ public partial class Main : Node2D
 	/// <summary>Дистанция спавна предмета выше верхней кромки экрана (в мировых единицах).</summary>
 	private const float SpawnAboveScreen = 70f;
 
+	/// <summary>Максимальная задержка записи изменившегося запаса фруктов, секунды.</summary>
+	private const float StockSaveDelay = 0.75f;
+
 	private Frog? _frog;
 	private Node2D? _items;
 	private EffectLayer? _effects;
@@ -40,6 +43,8 @@ public partial class Main : Node2D
 	private SuikaGame? _suika;
 	private FlySwarm? _flies;
 	private Timer? _spawnTimer;
+	private Timer? _fruitStockSaveTimer;
+	private bool _fruitStockDirty;
 
 	/// <summary>Остаток интервала спавна на момент паузы или заморозки перков.</summary>
 	private float _spawnTimerLeft;
@@ -135,6 +140,7 @@ public partial class Main : Node2D
 			return;
 		}
 		CancelGameInput();
+		FlushFruitStock();
 		_state = GameState.Paused;
 		// Остаток интервала спавна сохраняем: пауза не должна его «съедать».
 		_spawnTimerLeft = (float)(_spawnTimer?.TimeLeft ?? 0.0);
@@ -339,6 +345,9 @@ public partial class Main : Node2D
 		_suika?.CancelInput();
 	}
 
+	/// <summary>Сразу записывает запас фруктов, если в нём есть несохранённые изменения.</summary>
+	public void FlushPendingSave() => FlushFruitStock();
+
 	public override void _ExitTree()
 	{
 		if (UiHost != null && IsInstanceValid(_hud)) _hud!.QueueFree();
@@ -392,6 +401,15 @@ public partial class Main : Node2D
 		_spawnTimer.WaitTime = Difficulty.InitialSpawnInterval;
 		_spawnTimer.Timeout += OnSpawnTimerTimeout;
 		// Не запускаем: стартовая кнопка управляет запуском партии.
+
+		_fruitStockSaveTimer = new Timer
+		{
+			WaitTime = StockSaveDelay,
+			OneShot = true,
+			ProcessMode = ProcessModeEnum.Always
+		};
+		AddChild(_fruitStockSaveTimer);
+		_fruitStockSaveTimer.Timeout += FlushFruitStock;
 
 		PositionFrog();
 		_hud.SetScore(0);
@@ -562,7 +580,7 @@ public partial class Main : Node2D
 				continue;
 			}
 
-			ItemHitbox itemHitbox = item.GetHitbox();
+			ItemHitbox? itemHitbox = null;
 			for (int i = 0; i < handHitboxes.Length; i++)
 			{
 				// Рука может держать один предмет (или два — перк «Липкие ладони»); занятую пропускаем.
@@ -570,8 +588,14 @@ public partial class Main : Node2D
 				{
 					continue;
 				}
+				CircleHitbox hand = handHitboxes[i];
+				float broadRadius = item.HitBoundingRadius + hand.Radius;
+				if (item.GlobalPosition.DistanceSquaredTo(hand.Center) > broadRadius * broadRadius)
+					continue;
+				// Точный силуэт строится только для ладони, которая уже рядом с предметом.
+				itemHitbox ??= item.GetHitbox();
 				// Ловим только при реальном касании хитбоксов ладони и предмета.
-				if (itemHitbox.Overlaps(handHitboxes[i]))
+				if (itemHitbox.Overlaps(hand))
 				{
 					CatchItem(item, i);
 					break;
@@ -915,6 +939,7 @@ public partial class Main : Node2D
 
 	private void CloseSuika()
 	{
+		FlushFruitStock();
 		_meta.Save();
 		_suika?.Close();
 		GetTree().Paused = false;
@@ -933,6 +958,7 @@ public partial class Main : Node2D
 	public void GoToMenu()
 	{
 		_spawnTimer?.Stop();
+		FlushFruitStock();
 		_meta.Save();
 		GetTree().Paused = false;
 		_hud?.HidePerkSelection();
@@ -946,7 +972,11 @@ public partial class Main : Node2D
 		_hud?.ShowStart();
 	}
 
-	private void QuitGame() => GetTree().Quit();
+	private void QuitGame()
+	{
+		FlushFruitStock();
+		GetTree().Quit();
+	}
 
 	/// <summary>Кнопка рекламы в меню: ролик с наградой — ролик сети или дом-ролик.</summary>
 	private void OpenRewardedAd() => _hud?.ShowRewardedAd();
@@ -1004,6 +1034,7 @@ public partial class Main : Node2D
 	{
 		_state = GameState.GameOver;
 		Sfx.Play(SfxId.GameOver);
+		FlushFruitStock();
 		ClearEffects();
 		if (_items != null)
 		{
@@ -1086,7 +1117,7 @@ public partial class Main : Node2D
 		float doubleChance = SubPerkEffects.StockDoubleChance(_subPerkPlayer.State) + MetaUpgradeEffects.StockDoubleChance(_meta);
 		if (_rng.Randf() < doubleChance)
 			_fruitStock[kind] = StockOf(kind) + 1;
-		SaveCollectedFruits();
+		ScheduleFruitStockSave();
 		UpdateSuikaButton();
 	}
 
@@ -1109,7 +1140,7 @@ public partial class Main : Node2D
 
 	/// <summary>
 	/// Списывает одну единицу фрукта из запаса. Возвращает false, если такого фрукта нет.
-	/// Вызывается из Suika в момент броска, поэтому расход сохраняется сразу.
+	/// Вызывается из Suika в момент броска: изменение сразу видно в памяти, запись идёт по таймеру.
 	/// </summary>
 	public bool ConsumeFruit(FruitKind kind)
 	{
@@ -1126,7 +1157,7 @@ public partial class Main : Node2D
 		{
 			_fruitStock.Remove(kind);
 		}
-		SaveCollectedFruits();
+		ScheduleFruitStockSave();
 		return true;
 	}
 
@@ -1152,6 +1183,29 @@ public partial class Main : Node2D
 				_fruitStock[savedKind] = StockOf(savedKind) + amount;
 			}
 		}
+	}
+
+	private void ScheduleFruitStockSave()
+	{
+		_fruitStockDirty = true;
+		if (_fruitStockSaveTimer == null)
+		{
+			SaveCollectedFruits();
+			_fruitStockDirty = false;
+			return;
+		}
+		// Уже запущенный таймер не перезапускаем: задержка записи остаётся ограниченной.
+		if (_fruitStockSaveTimer.IsStopped())
+			_fruitStockSaveTimer.Start();
+	}
+
+	private void FlushFruitStock()
+	{
+		if (!_fruitStockDirty)
+			return;
+		_fruitStockSaveTimer?.Stop();
+		SaveCollectedFruits();
+		_fruitStockDirty = false;
 	}
 
 	private void SaveCollectedFruits()

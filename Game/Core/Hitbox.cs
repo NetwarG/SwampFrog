@@ -92,10 +92,11 @@ public record PolygonHitbox(Vector2 Center, float Rotation, float Radius, Vector
 		// Круг переводится в локальные единицы силуэта: там единица измерения — Radius.
 		Vector2 local = (circle.Center - Center).Rotated(-Rotation) / Radius;
 		float reach = circle.Radius / Radius;
+		float reachSq = reach * reach;
 		if (IsInside(local)) return true;
 		for (int i = 0; i < Outline.Length; i++)
 		{
-			if (DistanceToSegment(local, Outline[i], Outline[(i + 1) % Outline.Length]) <= reach) return true;
+			if (DistanceToSegmentSquared(local, Outline[i], Outline[(i + 1) % Outline.Length]) <= reachSq) return true;
 		}
 		return false;
 	}
@@ -118,12 +119,12 @@ public record PolygonHitbox(Vector2 Center, float Rotation, float Radius, Vector
 	private static float Cross(Vector2 a, Vector2 b, Vector2 c) =>
 		(b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
 
-	private static float DistanceToSegment(Vector2 point, Vector2 a, Vector2 b)
+	private static float DistanceToSegmentSquared(Vector2 point, Vector2 a, Vector2 b)
 	{
 		Vector2 edge = b - a;
 		float length = edge.LengthSquared();
-		if (length < 0.0000001f) return point.DistanceTo(a);
+		if (length < 0.0000001f) return point.DistanceSquaredTo(a);
 		float t = Mathf.Clamp((point - a).Dot(edge) / length, 0f, 1f);
-		return point.DistanceTo(a + edge * t);
+		return point.DistanceSquaredTo(a + edge * t);
 	}
 }

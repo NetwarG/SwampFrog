@@ -5,11 +5,15 @@ namespace SwampFrog;
 /// <summary>Отображение мира в игровой колонке экрана. Масштабируется изображение, не физические тела.</summary>
 public partial class GameScreen : Control
 {
+	/// <summary>Интервал редкой проверки вырезов камеры, секунды.</summary>
+	private const float CutoutPollInterval = 0.5f;
+
 	private SubViewport _world = null!;
 	private TextureRect _image = null!;
 	private Control _ui = null!;
 	private Rect2 _lastScreen;
 	private Vector2 _lastPixelScale;
+	private float _cutoutPoll;
 	/// <summary>Вырезы экрана в координатах канваса: нужны для отслеживания изменений.</summary>
 	private Rect2[] _cutouts = System.Array.Empty<Rect2>();
 	/// <summary>Те же вырезы в единицах интерфейса: их получает HUD и интерфейс Suika.</summary>
@@ -48,6 +52,7 @@ public partial class GameScreen : Control
 		AddChild(new BackgroundMusic { Name = "BackgroundMusic" });
 		// Пул звуковых эффектов: шина SFX, работает и на паузе (звуки кнопок меню).
 		AddChild(new SfxPlayer { Name = "Sfx" });
+		GetViewport().SizeChanged += RefreshLayout;
 		RefreshLayout();
 		Game = GD.Load<PackedScene>("res://Scenes/Main.tscn").Instantiate<Main>();
 		Game.ConfigureViewSize(_worldSize);
@@ -63,7 +68,16 @@ public partial class GameScreen : Control
 	public Vector2 WorldToScreen(Vector2 point) => FieldRect.Position + point * FieldRect.Size / _worldSize;
 	public Vector2 WorldToUi(Vector2 point) => (WorldToScreen(point) - _ui.Position) / _ui.Scale;
 
-	public override void _Process(double delta) => RefreshLayout();
+	public override void _ExitTree() => GetViewport().SizeChanged -= RefreshLayout;
+
+	public override void _Process(double delta)
+	{
+		_cutoutPoll -= (float)delta;
+		if (_cutoutPoll > 0f)
+			return;
+		_cutoutPoll = CutoutPollInterval;
+		RefreshLayout();
+	}
 
 	public void RefreshLayout()
 	{
@@ -133,7 +147,14 @@ public partial class GameScreen : Control
 	public override void _Notification(int what)
 	{
 		if (what == NotificationApplicationFocusOut || what == NotificationWMWindowFocusOut)
+		{
 			Game?.CancelGameInput();
+			Game?.FlushPendingSave();
+		}
+		else if (what == NotificationWMCloseRequest)
+		{
+			Game?.FlushPendingSave();
+		}
 		else if (what == NotificationWMGoBackRequest)
 			Game?.HandleBackRequest();
 	}

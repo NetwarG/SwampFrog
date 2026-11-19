@@ -34,6 +34,8 @@ public sealed class PerkPlayer
 	/// <summary>Цели магнита на кадр: до шести фруктов на каждую ладонь, порядок — по близости.</summary>
 	private readonly FallingItem?[] _magnetTargets = new FallingItem?[2 * MagnetFruitsPerHand];
 	private readonly int[] _magnetTargetCounts = new int[2];
+	private readonly float[] _magnetDistances = new float[2 * MagnetFruitsPerHand];
+	private readonly Dictionary<FallingItem, int> _magnetHandByItem = new();
 
 	/// <summary>Неуязвимость («Панцирь» ур. 5, возрождение).</summary>
 	private float _invulnTimer;
@@ -980,6 +982,7 @@ public sealed class PerkPlayer
 	{
 		_magnetTargetCounts[0] = 0;
 		_magnetTargetCounts[1] = 0;
+		_magnetHandByItem.Clear();
 		if (frog == null || !frog.IsCatching || Game?.ItemsNode == null)
 		{
 			return;
@@ -997,45 +1000,51 @@ public sealed class PerkPlayer
 		}
 	}
 
-	/// <summary>Шесть ближайших фруктов в радиусе ладони: каждый шаг — ближайший из ещё не занятых.</summary>
+	/// <summary>Шесть ближайших фруктов в радиусе ладони: один проход с заменой самого дальнего.</summary>
 	private void FillMagnetTargets(int hand, Vector2 handPosition, float radius)
 	{
+		int offset = hand * MagnetFruitsPerHand;
 		float radiusSq = radius * radius;
-		for (int slot = 0; slot < MagnetFruitsPerHand; slot++)
+		foreach (Node child in Game!.ItemsNode!.GetChildren())
 		{
-			FallingItem? nearest = null;
-			float nearestSq = radiusSq;
-			foreach (Node child in Game!.ItemsNode!.GetChildren())
+			if (child is not FallingItem item || item.ItemType != ItemType.Fruit || item.Rotten)
+				continue;
+			if (item.IsCaught || item.IsQueuedForDeletion() || _magnetHandByItem.ContainsKey(item))
+				continue;
+
+			float distanceSq = item.GlobalPosition.DistanceSquaredTo(handPosition);
+			if (distanceSq >= radiusSq)
+				continue;
+
+			int count = _magnetTargetCounts[hand];
+			int slot = count;
+			if (count == MagnetFruitsPerHand)
 			{
-				if (child is not FallingItem item || item.ItemType != ItemType.Fruit || item.Rotten)
-					continue;
-				if (item.IsCaught || item.IsQueuedForDeletion() || MagnetHandOf(item) >= 0)
-					continue;
-				float distSq = item.GlobalPosition.DistanceSquaredTo(handPosition);
-				if (distSq < nearestSq)
+				// Новый фрукт занимает место самого дальнего, если он ближе.
+				slot = 0;
+				for (int i = 1; i < MagnetFruitsPerHand; i++)
 				{
-					nearestSq = distSq;
-					nearest = item;
+					if (_magnetDistances[offset + i] > _magnetDistances[offset + slot])
+						slot = i;
 				}
+				if (distanceSq >= _magnetDistances[offset + slot])
+					continue;
+				_magnetHandByItem.Remove(_magnetTargets[offset + slot]!);
 			}
-			if (nearest == null)
-				return;
-			_magnetTargets[hand * MagnetFruitsPerHand + _magnetTargetCounts[hand]] = nearest;
-			_magnetTargetCounts[hand]++;
+			else
+			{
+				_magnetTargetCounts[hand]++;
+			}
+
+			_magnetTargets[offset + slot] = item;
+			_magnetDistances[offset + slot] = distanceSq;
+			_magnetHandByItem[item] = hand;
 		}
 	}
 
 	/// <summary>Ладонь, чей магнит держит фрукт (−1 — магнит его не тронул).</summary>
 	private int MagnetHandOf(FallingItem item)
 	{
-		for (int hand = 0; hand < _magnetTargetCounts.Length; hand++)
-		{
-			for (int slot = 0; slot < _magnetTargetCounts[hand]; slot++)
-			{
-				if (_magnetTargets[hand * MagnetFruitsPerHand + slot] == item)
-					return hand;
-			}
-		}
-		return -1;
+		return _magnetHandByItem.TryGetValue(item, out int hand) ? hand : -1;
 	}
 }
