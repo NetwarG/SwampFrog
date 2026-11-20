@@ -186,7 +186,7 @@ public partial class Frog : Node2D
 		ConstrainMovement();
 	}
 
-	/// <summary>Удерживает тело на игровом поле и отражает движение от краёв.</summary>
+	/// <summary>Удерживает тело в игровой полосе и отражает движение от её краёв.</summary>
 	public void ConstrainMovement()
 	{
 		if (Game == null || DecorativeOnly)
@@ -196,20 +196,19 @@ public partial class Frog : Node2D
 		Vector2 size = Game.ViewSize;
 		// Размер тела задаёт только родитель; запас учитывает также Pulse.
 		float bodyMargin = BodyVisualHeight * 0.7f * _currentUiScale;
-		Vector2 margin = new(bodyMargin, bodyMargin + 90f * _currentUiScale);
-		margin.X = Mathf.Min(margin.X, size.X * 0.5f);
-		margin.Y = Mathf.Min(margin.Y, size.Y * 0.5f);
-		Vector2 end = size - margin;
+		float halfBody = BodyVisualHeight * 0.5f * _currentUiScale;
+		Vector2 min = new(Mathf.Min(bodyMargin, size.X * 0.5f), FrogBounds.MinY(size.Y, halfBody));
+		Vector2 max = new(size.X - min.X, FrogBounds.MaxY(size.Y, halfBody));
 		Vector2 position = Position;
-		if ((position.X <= margin.X && _moveDirection.X < 0f) || (position.X >= end.X && _moveDirection.X > 0f))
+		if ((position.X <= min.X && _moveDirection.X < 0f) || (position.X >= max.X && _moveDirection.X > 0f))
 		{
 			_moveDirection.X = -_moveDirection.X;
 		}
-		if ((position.Y <= margin.Y && _moveDirection.Y < 0f) || (position.Y >= end.Y && _moveDirection.Y > 0f))
+		if ((position.Y <= min.Y && _moveDirection.Y < 0f) || (position.Y >= max.Y && _moveDirection.Y > 0f))
 		{
 			_moveDirection.Y = -_moveDirection.Y;
 		}
-		Position = new Vector2(Mathf.Clamp(position.X, margin.X, end.X), Mathf.Clamp(position.Y, margin.Y, end.Y));
+		Position = new Vector2(Mathf.Clamp(position.X, min.X, max.X), Mathf.Clamp(position.Y, min.Y, max.Y));
 		if (_holding)
 		{
 			// Палец может стоять на месте, пока лягушка движется под ним.

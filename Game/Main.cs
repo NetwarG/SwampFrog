@@ -477,7 +477,9 @@ public partial class Main : Node2D
 			return;
 		}
 		Vector2 size = ViewSize;
-		_frog.Position = new Vector2(Mathf.Min(180f * ScreenScale, size.X * 0.30f), size.Y * 0.56f);
+		float halfBody = _frog.VisualHeight * 0.5f;
+		float y = Mathf.Clamp(size.Y * 0.56f, FrogBounds.MinY(size.Y, halfBody), FrogBounds.MaxY(size.Y, halfBody));
+		_frog.Position = new Vector2(Mathf.Min(180f * ScreenScale, size.X * 0.30f), y);
 	}
 
 	/// <summary>Совместимость с API предметов: масштаб мира всегда единичный.</summary>
