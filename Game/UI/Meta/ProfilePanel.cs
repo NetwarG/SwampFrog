@@ -67,7 +67,7 @@ public partial class ProfilePanel : Control
 		box.AddChild(_content);
 
 		_statsBox = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-		_statsBox.AddThemeConstantOverride("separation", 8);
+		_statsBox.AddThemeConstantOverride("separation", 10);
 		_content.AddChild(_statsBox);
 
 		_bestClassic = MakeRow(_statsBox, ui);
@@ -185,7 +185,7 @@ public partial class ProfilePanel : Control
 	/// <summary>Строка показателя: одна метка по центру, текст задаётся при обновлении.</summary>
 	private static Label MakeRow(Control box, float ui)
 	{
-		var label = UiStyle.MakeLabel(string.Empty, (int)Mathf.Round(22f * ui), new Color(1f, 1f, 1f, 0.92f));
+		var label = UiStyle.MakeLabel(string.Empty, (int)Mathf.Round(26f * ui), new Color(1f, 1f, 1f, 0.92f));
 		label.CustomMinimumSize = new Vector2(ContentWidth * ui, 0f);
 		box.AddChild(label);
 		return label;

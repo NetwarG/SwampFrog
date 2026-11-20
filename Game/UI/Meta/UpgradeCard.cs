@@ -10,9 +10,9 @@ namespace SwampFrog;
 public partial class UpgradeCard : Control
 {
 	public const float CardWidth = 480f;
-	public const float CardHeight = 96f;
+	public const float CardHeight = 116f;
 
-	private const float IconSize = 74f;
+	private const float IconSize = 84f;
 
 	private UpgradeEntry? _entry;
 	private StickerBackground? _background;
@@ -41,27 +41,27 @@ public partial class UpgradeCard : Control
 		_background = new StickerBackground { CornerRadius = 18f };
 		AddChild(_background);
 
-		_nameLabel = UiStyle.MakeLabel(string.Empty, 22, new Color("173c34"));
+		_nameLabel = UiStyle.MakeLabel(string.Empty, 26, new Color("173c34"));
 		_nameLabel.HorizontalAlignment = HorizontalAlignment.Left;
-		_nameLabel.Position = new Vector2(104f, 10f);
-		_nameLabel.Size = new Vector2(236f, 30f);
+		_nameLabel.Position = new Vector2(104f, 8f);
+		_nameLabel.Size = new Vector2(366f, 38f);
 		AddChild(_nameLabel);
 
-		_effectLabel = UiStyle.MakeLabel(string.Empty, 15, new Color("3a2a12"));
+		_effectLabel = UiStyle.MakeLabel(string.Empty, 18, new Color("3a2a12"));
 		_effectLabel.HorizontalAlignment = HorizontalAlignment.Left;
 		_effectLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		_effectLabel.Position = new Vector2(104f, 42f);
-		_effectLabel.Size = new Vector2(236f, 46f);
+		_effectLabel.Position = new Vector2(104f, 46f);
+		_effectLabel.Size = new Vector2(226f, 62f);
 		AddChild(_effectLabel);
 
-		_maxLabel = UiStyle.MakeLabel(string.Empty, 18, new Color("3a2a12"));
-		_maxLabel.Position = new Vector2(348f, 32f);
-		_maxLabel.Size = new Vector2(120f, 30f);
+		_maxLabel = UiStyle.MakeLabel(string.Empty, 22, new Color("3a2a12"));
+		_maxLabel.Position = new Vector2(334f, 66f);
+		_maxLabel.Size = new Vector2(140f, 32f);
 		AddChild(_maxLabel);
 
-		_buyButton = (StickerButton)UiStyle.MakeButton(string.Empty, 0.72f, new Color("7fd6f2"),
-			new Vector2(120f, 52f));
-		_buyButton.Position = new Vector2(348f, 22f);
+		_buyButton = (StickerButton)UiStyle.MakeButton(string.Empty, 0.78f, new Color("7fd6f2"),
+			new Vector2(140f, 56f));
+		_buyButton.Position = new Vector2(334f, 54f);
 		_buyButton.Pressed += OnAction;
 		AddChild(_buyButton);
 
