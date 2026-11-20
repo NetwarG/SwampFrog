@@ -4,8 +4,8 @@ namespace SwampFrog;
 
 /// <summary>
 /// Пределы вылета руки: максимальная длина до дальнего угла поля и предел в конкретном
-/// направлении. Рука отсчитывается от своего плеча, поэтому все замеры идут от переданного
-/// якоря, а не от центра тела.
+/// направлении по кромкам экрана. Рука отсчитывается от своего плеча, поэтому все замеры
+/// идут от переданного якоря, а не от центра тела.
 /// </summary>
 public static class ArmReach
 {
@@ -20,15 +20,14 @@ public static class ArmReach
 	}
 
 	/// <summary>
-	/// Предел длины руки в направлении: срез по боковой кромке плюс подгонка по высоте
-	/// с учётом провиса (ладонь опускается тем сильнее, чем длиннее рука).
+	/// Предел длины руки в направлении: срез по боковым кромкам и по верхней/нижней,
+	/// чтобы ладонь на любом вылете оставалась внутри поля.
 	/// </summary>
-	public static float LimitInDirection(Vector2 origin, Vector2 direction, Vector2 viewSize,
-		float margin, float cap, in ArmSag.Profile sag, Vector2 down)
+	public static float LimitInDirection(Vector2 origin, Vector2 direction, Vector2 viewSize, float margin, float cap)
 	{
-		// Провис вертикальный: на предел по горизонтали он не влияет.
 		float limit = Mathf.Min(MaxAlongX(origin, direction, viewSize, margin), cap);
-		return sag.FitLengthInsideHeight(origin, direction, down, margin, viewSize.Y - margin, limit);
+		limit = Mathf.Min(limit, MaxAlongY(origin, direction, viewSize, margin));
+		return Mathf.Max(0f, limit);
 	}
 
 	/// <summary>Предел длины руки по горизонтали: дальше ладонь вышла бы за боковую кромку.</summary>
@@ -38,6 +37,16 @@ public static class ArmReach
 			return (viewSize.X - margin - origin.X) / direction.X;
 		if (direction.X < -0.0001f)
 			return (margin - origin.X) / direction.X;
+		return float.PositiveInfinity;
+	}
+
+	/// <summary>Предел длины руки по вертикали: дальше ладонь вышла бы за верхнюю или нижнюю кромку.</summary>
+	private static float MaxAlongY(Vector2 origin, Vector2 direction, Vector2 viewSize, float margin)
+	{
+		if (direction.Y > 0.0001f)
+			return (viewSize.Y - margin - origin.Y) / direction.Y;
+		if (direction.Y < -0.0001f)
+			return (margin - origin.Y) / direction.Y;
 		return float.PositiveInfinity;
 	}
 }

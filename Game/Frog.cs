@@ -11,7 +11,9 @@ namespace SwampFrog;
 /// Тело — спрайт из Game/assets/frogs (позы idle/catching/eating/angry), а руки и ладони
 /// рисуются процедурно: они динамически следуют за пальцем и задают хитбоксы ловли.
 /// Вся геометрия рук хранится в «мировых» единицах (как и границы экрана), поэтому руки
-/// дотягиваются до любого угла экрана на любом разрешении.
+/// дотягиваются до любого угла экрана на любом разрешении, а ладонь встаёт ровно в точку
+/// касания. Провис виден изгибом нарисованной руки и наклоном кисти, но не уводит ладонь
+/// от пальца.
 /// </summary>
 public partial class Frog : Node2D
 {
@@ -365,7 +367,7 @@ public partial class Frog : Node2D
 
 	/// <summary>
 	/// Обе руки обновляются на физическом такте до проверки ловли в Main. Вылет задаёт палец:
-	/// каждая рука стремится к расстоянию от своего плеча до точки удержания и стоит на пальце.
+	/// каждая рука стремится к расстоянию от своего плеча до точки прицела и стоит на пальце.
 	/// </summary>
 	public void UpdateArms(float dt)
 	{
@@ -374,8 +376,8 @@ public partial class Frog : Node2D
 		UpdateArmLengths(_sag.MaxArmLength);
 		for (int i = 0; i < _armLengthsWorld.Length; i++)
 		{
-			// Длину задаёт палец: каждая рука тянется к точке касания от своего плеча.
-			float reach = _holding ? HandOriginWorld(i).DistanceTo(_aimTarget) : 0f;
+			// Длину задаёт палец: каждая рука тянется к точке прицела от своего плеча.
+			float reach = _holding ? HandOriginWorld(i).DistanceTo(AimPointWorld(i)) : 0f;
 			// Палец ближе — рука втягивается быстрее, чем растёт.
 			float speed = _armLengthsWorld[i] < reach ? _armGrowSpeedWorld : _armRetractSpeedWorld;
 			_armLengthsWorld[i] = Mathf.MoveToward(_armLengthsWorld[i], reach, speed * dt);
@@ -443,14 +445,12 @@ public partial class Frog : Node2D
 
 	/// <summary>
 	/// Предел длины одной руки от её плеча до края с запасом под пальцы и увеличенный хитбокс перка.
-	/// Провис опускает ладонь тем сильнее, чем длиннее рука, поэтому предел по высоте
-	/// считается вместе с ним.
 	/// </summary>
 	private float MaxArmLengthInDirection(Vector2 viewSize, int handIndex)
 	{
 		float margin = Mathf.Max(HandScreenMargin * _currentUiScale, HandHitRadiusWorld);
 		return ArmReach.LimitInDirection(HandOriginWorld(handIndex), HandDirection(handIndex),
-			viewSize, margin, _sag.MaxArmLength, _sag, DownWorld);
+			viewSize, margin, _sag.MaxArmLength);
 	}
 
 	/// <summary>Текущий вылет руки в мировых единицах (0 — левая от плеча, 1 — правая).</summary>
@@ -493,18 +493,16 @@ public partial class Frog : Node2D
 	/// <summary>Мировая точка плеча руки (0 — левая, 1 — правая): руки растут из боков тела.</summary>
 	public Vector2 HandOriginWorld(int handIndex) => ArmAnchor.World(GlobalPosition, GlobalRotation, handIndex);
 
+	/// <summary>Мировая точка прицела руки: палец с веером ладоней, растущим с вылетом.</summary>
+	private Vector2 AimPointWorld(int handIndex) =>
+		ArmAnchor.AimPoint(GlobalPosition, GlobalRotation, _aimTarget, handIndex);
+
 	/// <summary>
-	/// Мировая позиция ладони (0 — левая, 1 — правая): от плеча по направлению руки плюс провис.
+	/// Мировая позиция ладони (0 — левая, 1 — правая): от плеча по направлению руки на длину вылета.
 	/// Общая для ловли, «прилипших» фруктов и магнита перка.
 	/// </summary>
-	private Vector2 HandPositionWorld(int handIndex) => HandPositionWorld(handIndex, _armLengthsWorld[handIndex]);
-
-	/// <summary>Мировая позиция ладони при заданной длине руки — нужна для поиска предела у кромок.</summary>
-	private Vector2 HandPositionWorld(int handIndex, float armLength) =>
-		_sag.HandPosition(HandOriginWorld(handIndex), HandDirection(handIndex), DownWorld, armLength);
-
-	/// <summary>Направление, в которое провисают ладони (вниз по экрану).</summary>
-	private Vector2 DownWorld => Vector2.Down.Rotated(GlobalRotation);
+	private Vector2 HandPositionWorld(int handIndex) =>
+		HandOriginWorld(handIndex) + HandDirection(handIndex) * _armLengthsWorld[handIndex];
 
 	/// <summary>
 	/// Направление руки: от своего плеча к пальцу с лёгким веером (боевая) либо веер от взгляда (декоративная).
@@ -655,8 +653,8 @@ public partial class Frog : Node2D
 	}
 
 	/// <summary>
-	/// Рука рисуется изогнутой ломаной: чем дальше вытянута, тем сильнее провисает.
-	/// Концом кривой остаётся ладонь, поэтому рисунок и хитбокс ловли совпадают.
+	/// Рука рисуется изогнутой ломаной: чем дальше вытянута, тем сильнее провисает её середина.
+	/// Концом кривой остаётся ладонь в точке прицела, поэтому рисунок и хитбокс ловли совпадают.
 	/// </summary>
 	private void DrawArm(int handIndex, float unit)
 	{
