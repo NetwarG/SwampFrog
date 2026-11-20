@@ -61,6 +61,7 @@ Game/
 │   ├── MetaStats.cs        — пожизненная статистика: партии, пойманные и золотые фрукты, слияния Suika
 │   ├── Wallet.cs           — кошелёк валюты «Слизь»: начисление, трата, событие изменения
 │   ├── SlimeReward.cs      — формулы начисления слизи за забег и за раунд Suika
+│   ├── FruitReward.cs      — случайный набор фруктов в запас за ролик с рекламой
 │   ├── SkinDefinition.cs   — слоты и данные скинов лягушки (шляпа, перчатки, подставка)
 │   ├── SkinCatalog.cs      — каталог скинов и скины по умолчанию
 │   ├── SkinUnlockRules.cs  — доступность: покупка за слизь и открытие по рекорду
@@ -240,8 +241,9 @@ UI и логика выбора перка при этом не меняются
 ## Как изменить начисление слизи
 
 Формулы — в `Game/Meta/SlimeReward.cs` (`Run` для забега, `Suika` для раунда мини-игры, `AdWatched`
-для ролика с наградой); вызовы — в `Main` (`GameOver`, `OnSuikaRoundFinished` и `OnRewardedAdWatched`).
-Трата — `Wallet.Spend`. Схема сохранения (`meta/coins`) при этом не меняется.
+для ролика с наградой), случайные фрукты за ролик — в `Game/Meta/FruitReward.cs`
+(`FruitReward.AdCount` и `RandomBag`); вызовы — в `Main` (`GameOver`, `OnSuikaRoundFinished` и
+`OnRewardedAdWatched`). Трата — `Wallet.Spend`. Схема сохранения (`meta/coins`) при этом не меняется.
 
 ## Как добавить скин лягушки
 

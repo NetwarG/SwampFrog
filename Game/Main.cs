@@ -983,10 +983,12 @@ public partial class Main : Node2D
 	/// <summary>Кнопка рекламы в меню: ролик с наградой — ролик сети или дом-ролик.</summary>
 	private void OpenRewardedAd() => _hud?.ShowRewardedAd();
 
-	/// <summary>Ролик досмотрен: начисляет слизь за просмотр рекламы.</summary>
+	/// <summary>Ролик досмотрен: начисляет слизь и случайные фрукты в запас.</summary>
 	private void OnRewardedAdWatched()
 	{
 		_meta.Wallet.Add(SlimeReward.AdWatched);
+		AddFruitsToStock(FruitReward.RandomBag(FruitReward.AdCount, _rng));
+		FlushFruitStock();
 		_meta.Save();
 		CheckAchievements();
 	}
@@ -1125,6 +1127,18 @@ public partial class Main : Node2D
 
 	/// <summary>Остаток фруктов данного вида в запасе.</summary>
 	public int FruitStock(FruitKind kind) => StockOf(kind);
+
+	/// <summary>Добавляет набор фруктов в запас и запускает обновление кнопки Suika.</summary>
+	private void AddFruitsToStock(IReadOnlyDictionary<FruitKind, int> fruits)
+	{
+		foreach (KeyValuePair<FruitKind, int> entry in fruits)
+		{
+			if (entry.Value <= 0) continue;
+			_fruitStock[entry.Key] = StockOf(entry.Key) + entry.Value;
+		}
+		ScheduleFruitStockSave();
+		UpdateSuikaButton();
+	}
 
 	/// <summary>Внутренний хелпер чтения счётчика без исключений по отсутствующему ключу.</summary>
 	private int StockOf(FruitKind kind)

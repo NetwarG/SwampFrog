@@ -520,7 +520,7 @@ public partial class HUD : Control
 		_rewardAd.Show(() => RewardedAdWatched?.Invoke(), ShowAdUnavailable);
 	}
 
-	/// <summary>Закрывает ролик с наградой, не начисляя слизь.</summary>
+	/// <summary>Закрывает ролик с наградой, не начисляя награду.</summary>
 	public void HideRewardedAd() => _rewardOverlay?.HideAd();
 
 	/// <summary>Сеть не выдала ролик: подсказка у кнопки рекламы.</summary>

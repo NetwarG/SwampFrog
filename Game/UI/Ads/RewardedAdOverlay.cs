@@ -110,7 +110,7 @@ public partial class RewardedAdOverlay : Control
 		if (_statusLabel == null)
 			return;
 		_statusLabel.Text = _granted
-			? Loc.T(L.AdRewardDone, SlimeReward.AdWatched)
+			? Loc.T(L.AdRewardDone, SlimeReward.AdWatched, FruitReward.AdCount)
 			: Loc.T(L.AdRewardWait, Mathf.Max(0, Mathf.CeilToInt(_left)));
 	}
 }

@@ -16,7 +16,7 @@ internal static partial class LocText
 		[L.MenuAdLabel] = "Ad",
 		[L.MenuAdClaim] = "Catch fruit with sticky arms!",
 		[L.AdRewardWait] = "Reward in {0} s",
-		[L.AdRewardDone] = "Reward received: +{0} slime",
+		[L.AdRewardDone] = "Reward: +{0} slime and +{1} fruits",
 		[L.AdRewardClose] = "Close",
 		[L.AdUnavailable] = "Ad is not available",
 		[L.HintTouch] = "Hold your finger on the screen — the arms reach for it",

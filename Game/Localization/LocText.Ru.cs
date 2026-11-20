@@ -16,7 +16,7 @@ internal static partial class LocText
 		[L.MenuAdLabel] = "Реклама",
 		[L.MenuAdClaim] = "Лови фрукты руками-липучками!",
 		[L.AdRewardWait] = "Награда через {0} с",
-		[L.AdRewardDone] = "Награда получена: +{0} слизи",
+		[L.AdRewardDone] = "Награда: +{0} слизи и +{1} фруктов",
 		[L.AdRewardClose] = "Закрыть",
 		[L.AdUnavailable] = "Реклама недоступна",
 		[L.HintTouch] = "Держи палец на экране — руки тянутся к нему",
