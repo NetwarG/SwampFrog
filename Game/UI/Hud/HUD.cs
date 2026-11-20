@@ -571,7 +571,10 @@ public partial class HUD : Control
 	/// <summary>Показывает баланс валюты «Слизь» в меню.</summary>
 	public void SetWallet(int amount) => _walletBadge?.SetAmount(amount);
 
-	/// <summary>Строка иконочных кнопок меню: профиль, магазин скинов и улучшения («Up»).</summary>
+	/// <summary>
+	/// Строка иконочных кнопок меню: профиль, магазин скинов и улучшения («Up»).
+	/// Ряд шире подзаголовков и задаёт ширину меню, поэтому совпадает с остальными кнопками.
+	/// </summary>
 	private void BuildMenuIcons(float ui)
 	{
 		_profileButton = MakeIconButton("res://Game/assets/ui/icon_profile.png", new Color("7fd6f2"), ui, "ProfileButton");
@@ -592,7 +595,9 @@ public partial class HUD : Control
 	/// <summary>Квадратная иконочная кнопка меню в общем стиле кнопок.</summary>
 	private static IconStickerButton MakeIconButton(string iconPath, Color accent, float ui, string name)
 	{
-		const float size = 100f;
+		// Три квадрата и зазоры между ними шире подзаголовков, поэтому ряд задаёт ширину VBox:
+		// «Играть», Suika и «Выйти» растягиваются ровно до ряда и все кнопки совпадают по ширине.
+		const float size = 124f;
 		var button = new IconStickerButton
 		{
 			Name = name,
