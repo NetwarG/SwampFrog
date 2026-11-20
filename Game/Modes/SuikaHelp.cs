@@ -17,7 +17,10 @@ public partial class SuikaGame
 	private const float HelpBoxWidth = 460f;
 
 	/// <summary>Порядок строк правил в окне: используется при переводе на другой язык.</summary>
-	private static readonly string[] HelpRuleKeys = { L.SuikaRule1, L.SuikaRule2, L.SuikaRule3, L.SuikaRule4 };
+	private static readonly string[] HelpRuleKeys =
+	{
+		L.SuikaRule1, L.SuikaRule2, L.SuikaRule3, L.SuikaRule4, L.SuikaRule5
+	};
 
 	private Label? _helpTitle;
 	private Label? _helpChain;
@@ -89,6 +92,7 @@ public partial class SuikaGame
 		CancelInput();
 		_helpRoot.Visible = true;
 		UpdateHelpButton();
+		UpdateAbilityButtons();
 	}
 
 	private void CloseHelp()
@@ -97,6 +101,7 @@ public partial class SuikaGame
 		_helpOpen = false;
 		if (_helpRoot != null) _helpRoot.Visible = false;
 		UpdateHelpButton();
+		UpdateAbilityButtons();
 	}
 
 	/// <summary>Кнопка «?» нужна только в идущем раунде: окна поверх поля её вытесняют.</summary>

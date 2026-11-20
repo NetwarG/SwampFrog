@@ -28,9 +28,9 @@ public partial class SuikaGame : Node2D
 	/// <summary>Ширина кувшина в долях от ширины экрана.</summary>
 	private const float BowlWidthRatio = 0.8f;
 	/// <summary>Высота кувшина в долях от высоты экрана.</summary>
-	private const float BowlHeightRatio = 0.70f;
-	/// <summary>Отступ кувшина от нижнего края экрана.</summary>
-	private const float BowlBottom = 88f;
+	private const float BowlHeightRatio = 0.66f;
+	/// <summary>Отступ кувшина от нижнего края экрана: полоса под кнопки способностей.</summary>
+	private const float BowlBottom = 132f;
 	/// <summary>Минимальные размеры кувшина, чтобы корзина оставалась играбельной на узких окнах.</summary>
 	private const float BowlMinWidth = 160f;
 	private const float BowlMinHeight = 200f;
@@ -162,6 +162,7 @@ public partial class SuikaGame : Node2D
 		_nextFruit = CreateVisualFruit(FruitKind.Cherry, 15f);
 		_nextFruit.Reparent(_uiRoot!, false);
 		_nextFruit.ZIndex = 4;
+		BuildBombVisual();
 		UpdateBowl();
 		if (_uiRoot != null) _uiRoot.Visible = false;
 		Visible = false;
@@ -188,6 +189,7 @@ public partial class SuikaGame : Node2D
 		_throwTimer = 0f;
 		_aimX = ViewSize.X * 0.5f;
 		ClearPieces();
+		ResetMechanics();
 		UpdateBowl();
 		_currentKind = PickStartFruit();
 		_nextKind = PickStartFruit();
@@ -203,6 +205,7 @@ public partial class SuikaGame : Node2D
 		_active = false;
 		ShowStockDialog();
 		UpdateHelpButton();
+		UpdateAbilityButtons();
 	}
 
 	public void Close()
@@ -214,6 +217,7 @@ public partial class SuikaGame : Node2D
 		_settleTime = 0f;
 		_completionTimer = 0f;
 		ClearPieces();
+		CancelMechanics();
 		if (_gameOverRoot != null) _gameOverRoot.Visible = false;
 		if (_stockRoot != null) _stockRoot.Visible = false;
 		CloseHelp();
@@ -226,6 +230,7 @@ public partial class SuikaGame : Node2D
 		if (!_active) return;
 		float dt = (float)delta;
 		_throwTimer = Mathf.Max(0f, _throwTimer - dt);
+		UpdateAbilityHint(dt);
 		UpdateFrog(dt);
 	}
 
@@ -235,6 +240,12 @@ public partial class SuikaGame : Node2D
 		float dt = (float)delta;
 		_dropCooldown = Mathf.Max(0f, _dropCooldown - dt);
 		foreach (Piece piece in _pieces) piece.Age += dt;
+		// Способности открываются по очкам, затем тикают жест, толчки, бомбы и предохранитель.
+		SyncAbilities();
+		UpdateShake(dt);
+		UpdateShakeJolts(dt);
+		UpdateBombs(dt);
+		UpdateGuard(dt);
 		// Сигналы контакта только ставят слияния в очередь. Меняем тела вне callback физики.
 		MergeContactingPieces();
 		CheckOverflow(dt);
@@ -248,6 +259,12 @@ public partial class SuikaGame : Node2D
 	public void HandleGameInput(InputEvent input)
 	{
 		if (!_active || _gameOver || _helpOpen) return;
+		// Пока ждём встряхивание, поле служит для свайпа, а не для броска.
+		if (_shakeInput.Armed)
+		{
+			HandleShakeGesture(input);
+			return;
+		}
 		if (input is InputEventScreenTouch touch)
 		{
 			if (touch.Canceled)
@@ -391,6 +408,7 @@ public partial class SuikaGame : Node2D
 		_frog.SetLookTarget(new Vector2(x, _bowl.Position.Y));
 		if (_heldFruit != null)
 			_heldFruit.Position = new Vector2(x, _bowl.Position.Y - ReleaseAboveRim);
+		UpdateHeldBomb(x);
 	}
 
 	private void UpdateVisuals()
@@ -398,6 +416,8 @@ public partial class SuikaGame : Node2D
 		if (_heldFruit == null || _nextFruit == null) return;
 		_heldFruit.Kind = _currentKind;
 		_heldFruit.QueueRedraw();
+		// В режиме бомбы в лапе видна бомба, а не фрукт.
+		_heldFruit.Visible = !_bombArmed && !_stockExhausted;
 		_nextFruit.Kind = _nextKind;
 		_nextFruit.QueueRedraw();
 		// Превью «следующий» держится в правом верхнем блоке: вырез камеры отодвигает его влево.
@@ -428,6 +448,12 @@ public partial class SuikaGame : Node2D
 	private void DropFruit()
 	{
 		if (!_active || _gameOver || _dropCooldown > 0f || _stockExhausted) return;
+		// В режиме бомбы отпускание бросает бомбу, а не фрукт.
+		if (_bombArmed)
+		{
+			DropBomb();
+			return;
+		}
 
 		// Если текущий вид уже израсходован (например, совпадал со «следующим»),
 		// перекидываем его на доступный. Если бросать нечего — завершаем раунд.
@@ -457,7 +483,8 @@ public partial class SuikaGame : Node2D
 		_nextKind = PickStartFruit();
 		_dropCooldown = 0.3f;
 		Sfx.Play(SfxId.SuikaThrow);
-		_hintLabel!.Visible = false;
+		_hintDismissed = true;
+		UpdateHint();
 		UpdateVisuals();
 
 		// Запас закончился — больше бросать нечего, но даём последнему фрукту
@@ -485,6 +512,10 @@ public partial class SuikaGame : Node2D
 		_stockExhausted = true;
 		_settleTime = 0f;
 		_completionTimer = 0f;
+		_shakeInput.Cancel();
+		_bombArmed = false;
+		UpdateBombVisuals();
+		UpdateAbilityButtons();
 		if (_heldFruit != null) _heldFruit.Visible = false;
 		if (_nextFruit != null) _nextFruit.Visible = false;
 		if (_hintLabel != null) _hintLabel.Visible = false;
@@ -541,10 +572,18 @@ public partial class SuikaGame : Node2D
 
 	private void CheckOverflow(float dt)
 	{
+		// Пока действует предохранитель способности, переполнение не наказывает игрока.
+		if (_abilityGuard > 0f)
+		{
+			_overflowTime = 0f;
+			return;
+		}
 		bool overflowing = false;
 		float danger = _bowl.Position.Y + OverflowRimOffset;
 		foreach (Piece piece in _pieces)
 		{
+			// Бомбы временные: их верх не должен завершать раунд.
+			if (piece.IsBomb) continue;
 			// Новый фрукт пересекает линию по пути вниз, поэтому учитываем только
 			// объект, который уже пробыл в кувшине заметное время.
 			Vector2 position = piece.Body.Position;
@@ -569,6 +608,7 @@ public partial class SuikaGame : Node2D
 		CloseHelp();
 		UpdateHelpButton();
 		_pendingMerges.Clear();
+		CancelMechanics();
 		foreach (Piece piece in _pieces)
 		{
 			piece.Body.Freeze = true;

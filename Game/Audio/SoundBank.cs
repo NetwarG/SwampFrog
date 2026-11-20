@@ -25,6 +25,9 @@ public static class SoundBank
 		[SfxId.GameOver] = new(Dir + "game_over.wav", -8f, 0.99f, 1.01f, 1.00f),
 		[SfxId.SuikaThrow] = new(Dir + "suika_throw.wav", -11f, 0.96f, 1.06f, 0.08f),
 		[SfxId.SuikaMerge] = new(Dir + "suika_merge.wav", -9f, 0.97f, 1.03f, 0.04f),
+		[SfxId.SuikaShake] = new(Dir + "damage.wav", -10f, 0.72f, 0.86f, 0.20f),
+		[SfxId.SuikaBlast] = new(Dir + "damage.wav", -6f, 0.55f, 0.68f, 0.30f),
+		[SfxId.SuikaShrink] = new(Dir + "level_up.wav", -9f, 0.92f, 1.02f, 0.40f),
 		[SfxId.UiTap] = new(Dir + "ui_tap.wav", -14f, 0.98f, 1.03f, 0.06f),
 		[SfxId.FlyCatch] = new(Dir + "fly_catch.wav", -11f, 0.97f, 1.05f, 0.06f),
 	};

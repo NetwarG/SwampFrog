@@ -65,8 +65,16 @@ public static class L
 	public const string SuikaRule2 = "suika.rule2";
 	public const string SuikaRule3 = "suika.rule3";
 	public const string SuikaRule4 = "suika.rule4";
+	public const string SuikaRule5 = "suika.rule5";
 	public const string SuikaChain = "suika.chain";
 	public const string SuikaGotIt = "suika.gotIt";
+	public const string SuikaShake = "suika.shake";
+	public const string SuikaBomb = "suika.bomb";
+	public const string SuikaShrink = "suika.shrink";
+	public const string SuikaShakeHint = "suika.shakeHint";
+	public const string SuikaBombHint = "suika.bombHint";
+	public const string SuikaAbilityReady = "suika.abilityReady";
+	public const string SuikaAbilitiesReady = "suika.abilitiesReady";
 
 	// ---------- Всплывающие подписи ----------
 	public const string PopStone = "popup.stone";

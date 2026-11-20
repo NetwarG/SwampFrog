@@ -42,6 +42,15 @@ public enum SfxId
 	/// <summary>Слияние фруктов в Suika.</summary>
 	SuikaMerge,
 
+	/// <summary>Встряхивание кувшина.</summary>
+	SuikaShake,
+
+	/// <summary>Взрыв бомбы в кувшине.</summary>
+	SuikaBlast,
+
+	/// <summary>Уменьшение фруктов.</summary>
+	SuikaShrink,
+
 	/// <summary>Нажатие кнопки интерфейса.</summary>
 	UiTap,
 

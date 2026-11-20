@@ -19,6 +19,17 @@ public partial class SuikaGame
 	private const float BackX = 16f;
 	private const float BackY = 112f;
 
+	/// <summary>Нижний отступ ряда кнопок способностей под кувшином.</summary>
+	private const float AbilityBottomMargin = 14f;
+
+	/// <summary>Зазор между круглыми кнопками способностей.</summary>
+	private const float AbilityGap = 10f;
+
+	/// <summary>Круглые кнопки способностей: тряска, бомба и уменьшение.</summary>
+	private ChargeCircleButton? _shakeButton;
+	private ChargeCircleButton? _bombButton;
+	private ChargeCircleButton? _shrinkButton;
+
 	/// <summary>Отступ и ширина подписи «Дальше»: блок стоит у правого верхнего края поля.</summary>
 	private const float NextRight = 18f;
 	private const float NextWidth = 144f;
@@ -65,6 +76,8 @@ public partial class SuikaGame
 		_nextLabel.HorizontalAlignment = HorizontalAlignment.Center;
 		root.AddChild(_nextLabel);
 
+		BuildAbilityButtons(root);
+
 		_backButton = MakeButton(Loc.T(L.ToMenu), 24, new Color("ffd45e"), new Vector2(138f, 80f));
 		_backButton.Position = new Vector2(BackX, BackY);
 		_backButton.Pressed += () => ExitRequested?.Invoke();
@@ -74,8 +87,8 @@ public partial class SuikaGame
 		_hintLabel.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
 		_hintLabel.AnchorTop = 1f;
 		_hintLabel.AnchorBottom = 1f;
-		_hintLabel.OffsetTop = -50f;
-		_hintLabel.OffsetBottom = -18f;
+		_hintLabel.OffsetTop = -114f;
+		_hintLabel.OffsetBottom = -86f;
 		_hintLabel.HorizontalAlignment = HorizontalAlignment.Center;
 		root.AddChild(_hintLabel);
 
@@ -83,6 +96,44 @@ public partial class SuikaGame
 		BuildGameOver(root);
 		BuildHelp(root);
 		LayoutTopUi();
+		UpdateAbilityButtons();
+	}
+
+	/// <summary>Три кнопки способностей под верхними подписями.</summary>
+	private void BuildAbilityButtons(Control parent)
+	{
+		_shakeButton = MakeAbilityButton(ChargeGlyph.Waves, new Color("b4e863"));
+		_shakeButton.Pressed += ToggleShake;
+		parent.AddChild(_shakeButton);
+
+		_bombButton = MakeAbilityButton(ChargeGlyph.Bomb, new Color("ff9a3c"));
+		_bombButton.Pressed += ToggleBomb;
+		parent.AddChild(_bombButton);
+
+		_shrinkButton = MakeAbilityButton(ChargeGlyph.Shrink, new Color("ffd45e"));
+		_shrinkButton.Pressed += UseShrink;
+		parent.AddChild(_shrinkButton);
+	}
+
+	private static ChargeCircleButton MakeAbilityButton(ChargeGlyph glyph, Color accent) =>
+		new() { Glyph = glyph, Accent = accent, ZIndex = 35 };
+
+	/// <summary>Ряд из трёх кнопок в нижней полосе под кувшином, по центру.</summary>
+	private void LayoutAbilityButtons()
+	{
+		float step = ChargeCircleButton.Diameter + AbilityGap;
+		float left = (ViewSize.X - (step * 3f - AbilityGap)) * 0.5f;
+		float y = ViewSize.Y - ChargeCircleButton.Diameter - AbilityBottomMargin;
+		// Порядок кнопок: сначала бомба, затем тряска; уменьшение остаётся справа.
+		PlaceAbility(_bombButton, left, y);
+		PlaceAbility(_shakeButton, left + step, y);
+		PlaceAbility(_shrinkButton, left + step * 2f, y);
+	}
+
+	private static void PlaceAbility(ChargeCircleButton? button, float x, float y)
+	{
+		if (button == null) return;
+		button.Position = new Vector2(x, y);
 	}
 
 	/// <summary>Передаёт вырезы камеры от Main: верхние блоки расходятся по сторонам от выреза.</summary>
@@ -122,6 +173,7 @@ public partial class SuikaGame
 			_nextLabel.OffsetLeft = -(NextRight + NextWidth) + _rightShift;
 			_nextLabel.OffsetRight = -NextRight + _rightShift;
 		}
+		LayoutAbilityButtons();
 	}
 
 	/// <summary>Ширина подписи по её тексту: нужна, чтобы блок не пересекался с вырезом.</summary>
@@ -220,6 +272,7 @@ public partial class SuikaGame
 		// Небольшая пауза, чтобы клик по кнопке случайно не бросил фрукт.
 		_dropCooldown = Mathf.Max(_dropCooldown, 0.35f);
 		UpdateHelpButton();
+		UpdateAbilityButtons();
 	}
 
 	private Label MakeLabel(string text, int size, Color color)
@@ -269,5 +322,6 @@ public partial class SuikaGame
 		if (_startButton != null) _startButton.Text = Loc.T(L.SuikaStart);
 		UpdateStockLabel();
 		LocalizeHelp();
+		UpdateHint();
 	}
 }

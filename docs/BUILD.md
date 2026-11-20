@@ -7,6 +7,13 @@
 - Godot **4.7.2 Mono** (C#);
 - .NET **8.0** SDK (для Android — .NET **9** SDK: в `SwampFrog.csproj` под Android указан `net9.0`).
 
+## Датчики телефона
+
+Тряска в Suika читает гироскоп и акселерометр. В `project.godot` включены
+`input_devices/sensors/enable_gyroscope` и `input_devices/sensors/enable_accelerometer` — без них
+Godot на Android возвращает нули. В редакторе и на ПК датчиков нет, поэтому там работает быстрый
+свайп по полю; на телефоне приоритет у гироскопа.
+
 ## Запуск
 
 1. Открыть проект в редакторе Godot и нажать Play, либо

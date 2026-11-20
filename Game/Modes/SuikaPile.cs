@@ -16,6 +16,14 @@ public partial class SuikaGame
 		public float Radius;
 		/// <summary>Силуэт иконки: задаёт и форму тела, и её проекции.</summary>
 		public FruitShape Shape = null!;
+		/// <summary>Тело формы: пересоздаётся при уменьшении фруктов.</summary>
+		public CollisionShape2D Collider = null!;
+		/// <summary>Картинка куска: фрукт или бомба, масштабируется вместе с радиусом.</summary>
+		public Node2D? Visual;
+		/// <summary>Кусок — бомба: не сливается и не считается в линии переполнения.</summary>
+		public bool IsBomb;
+		/// <summary>Сколько секунд бомба неподвижна: по этому времени она взрывается.</summary>
+		public float RestTime;
 		public float Age;
 		public bool Removed;
 	}
@@ -42,13 +50,15 @@ public partial class SuikaGame
 			LinearVelocity = velocity
 		};
 		var piece = new Piece { Body = body, Kind = kind, Radius = radius, Shape = shape };
-		body.AddChild(new CollisionShape2D { Shape = shape.Shape(radius) });
+		var collider = new CollisionShape2D { Shape = shape.Shape(radius) };
+		body.AddChild(collider);
+		piece.Collider = collider;
 		body.Position = FitPieceInsideBowl(piece, position);
 		body.BodyEntered += other => QueueMerge(piece, other);
 		_pieces.Add(piece);
 		_piecesByBody.Add(body.GetInstanceId(), piece);
 		AddChild(body);
-		CreateVisualFruit(kind, radius, body);
+		piece.Visual = CreateVisualFruit(kind, radius, body);
 		return piece;
 	}
 
@@ -71,7 +81,7 @@ public partial class SuikaGame
 
 	/// <summary>Проекция повёрнутой формы на ось: для линии переполнения и размещения новых тел.</summary>
 	private static float ShapeExtent(Piece piece, Vector2 axis) =>
-		piece.Shape.ExtentAlong(axis, piece.Body.Rotation, piece.Radius);
+		piece.IsBomb ? piece.Radius : piece.Shape.ExtentAlong(axis, piece.Body.Rotation, piece.Radius);
 
 	/// <summary>Размещение при создании/ресайзе; текущие столкновения решает только физический сервер.</summary>
 	private Vector2 FitPieceInsideBowl(Piece piece, Vector2 position)
@@ -98,9 +108,9 @@ public partial class SuikaGame
 
 	private void QueueMerge(Piece piece, Node other)
 	{
-		if (!_active || _gameOver || piece.Removed || piece.Kind == FruitKind.Watermelon) return;
+		if (!_active || _gameOver || piece.Removed || piece.IsBomb || piece.Kind == FruitKind.Watermelon) return;
 		if (!_piecesByBody.TryGetValue(other.GetInstanceId(), out Piece? partner)
-			|| partner.Removed || partner.Kind != piece.Kind) return;
+			|| partner.Removed || partner.IsBomb || partner.Kind != piece.Kind) return;
 
 		// Достаточно сигнала от любого тела. Повторные записи отсекаются флагом Removed.
 		_pendingMerges.Enqueue((piece, partner));
@@ -135,6 +145,7 @@ public partial class SuikaGame
 	private void RemovePiece(Piece piece)
 	{
 		piece.Removed = true;
+		_bombs.Remove(piece);
 		_pieces.Remove(piece);
 		_piecesByBody.Remove(piece.Body.GetInstanceId());
 		// QueueFree отложен до конца кадра: сразу исключаем старые тела из столкновений.
@@ -150,5 +161,6 @@ public partial class SuikaGame
 		for (int i = _pieces.Count - 1; i >= 0; i--) RemovePiece(_pieces[i]);
 		_pendingMerges.Clear();
 		_piecesByBody.Clear();
+		_bombs.Clear();
 	}
 }

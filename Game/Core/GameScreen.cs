@@ -20,6 +20,10 @@ public partial class GameScreen : Control
 	private Rect2[] _localCutouts = System.Array.Empty<Rect2>();
 	private Vector2 _worldSize = Playfield.Size;
 	public Main Game { get; private set; } = null!;
+
+	/// <summary>Тряска отрисовки мира: физика и ввод остаются на месте.</summary>
+	private readonly ScreenShake _shake = new();
+	public Vector2 ShakeOffset => _shake.Offset;
 	/// <summary>Общая колонка HUD и игрового поля: вся высота экрана.</summary>
 	public Rect2 ArenaRect { get; private set; }
 	public Rect2 FieldRect { get; private set; }
@@ -58,6 +62,7 @@ public partial class GameScreen : Control
 		Game.ConfigureViewSize(_worldSize);
 		Game.UiHost = _ui;
 		Game.WorldToUi = WorldToUi;
+		Game.ScreenShake = RequestScreenShake;
 		Game.ProcessMode = ProcessModeEnum.Pausable;
 		_world.AddChild(Game);
 		// Вырезы камеры передаются интерфейсу после создания игры: HUD и Suika уже в дереве.
@@ -72,11 +77,23 @@ public partial class GameScreen : Control
 
 	public override void _Process(double delta)
 	{
+		UpdateShake((float)delta);
 		_cutoutPoll -= (float)delta;
 		if (_cutoutPoll > 0f)
 			return;
 		_cutoutPoll = CutoutPollInterval;
 		RefreshLayout();
+	}
+
+	/// <summary>Запускает короткую тряску отрисовки мира.</summary>
+	public void RequestScreenShake(float strength, float duration) => _shake.Kick(strength, duration);
+
+	/// <summary>Смещает картинку мира по затухающей тряске и возвращает её на место.</summary>
+	private void UpdateShake(float dt)
+	{
+		if (!_shake.Active && _shake.Offset == Vector2.Zero) return;
+		Vector2 offset = _shake.Update(dt);
+		if (FieldRect.HasArea()) _image.Position = FieldRect.Position + offset;
 	}
 
 	public void RefreshLayout()

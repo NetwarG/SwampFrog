@@ -305,6 +305,12 @@ public partial class Main : Node2D
 
 	public Control? UiHost { get; set; }
 	public Func<Vector2, Vector2>? WorldToUi { get; set; }
+
+	/// <summary>Тряска отрисовки мира: назначается GameScreen, вызывается эффектами Suika.</summary>
+	public Action<float, float>? ScreenShake { get; set; }
+
+	/// <summary>Кратковременная тряска экрана без влияния на физику и ввод.</summary>
+	public void ShakeScreen(float strength, float duration) => ScreenShake?.Invoke(strength, duration);
 	public Rect2 ViewBounds => new(Vector2.Zero, ViewSize);
 
 	/// <summary>Вырезы камеры в единицах интерфейса: верхние элементы расходятся по сторонам от выреза.</summary>
