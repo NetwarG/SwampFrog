@@ -10,8 +10,11 @@ namespace SwampFrog;
 /// </summary>
 public static class ArmAnchor
 {
-	/// <summary>Смещение плеча от центра тела по горизонтали, локальные единицы.</summary>
-	public const float Side = 34f;
+	/// <summary>
+	/// Смещение плеча от центра тела по горизонтали, локальные единицы. Плечо лежит чуть
+	/// внутри силуэта, чтобы корень руки выходил из тела без зазора во всех позах.
+	/// </summary>
+	public const float Side = 25f;
 
 	/// <summary>Смещение плеча вниз от центра тела, локальные единицы.</summary>
 	public const float Drop = 6f;
