@@ -787,7 +787,7 @@ public partial class HUD : Control
 	}
 
 	/// <summary>Обновляет панель выбранных перков внизу экрана.</summary>
-	public void SetPickedPerks(PerkIconInfo[] perks) => _perkBar?.SetPerks(perks, PerkState.MaxDistinctPerks);
+	public void SetPickedPerks(PerkIconInfo[] perks, int maxSlots) => _perkBar?.SetPerks(perks, maxSlots);
 
 	/// <summary>Всплеск квадратика перка в панели: видно, что перк сработал.</summary>
 	public void PulsePerkIcon(PerkId id) => _perkBar?.Pulse(id);

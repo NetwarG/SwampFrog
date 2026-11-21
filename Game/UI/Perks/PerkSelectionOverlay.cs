@@ -23,7 +23,7 @@ public partial class PerkSelectionOverlay : Control
 	private PerkOffer[]? _cards;
 	private int _level;
 	private int _selectedCount;
-	private int _maxPerks = PerkState.MaxDistinctPerks;
+	private int _maxPerks = PerkState.BaseSlots;
 	private int _rerolls;
 	private bool _fitQueued;
 

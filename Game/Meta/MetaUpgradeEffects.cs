@@ -35,6 +35,10 @@ public static class MetaUpgradeEffects
 	public static int PerkRerolls(int level) => BasePerkRerolls + level;
 	public static int PerkRerolls(MetaProfile profile) => PerkRerolls(profile.UpgradeLevel(UpgradeId.Reroll));
 
+	/// <summary>Слоты перков за забег: базовые плюс уровень «Слотов перков», не выше предела.</summary>
+	public static int PerkSlots(int level) => Mathf.Min(PerkState.SlotLimit, PerkState.BaseSlots + level);
+	public static int PerkSlots(MetaProfile profile) => PerkSlots(profile.UpgradeLevel(UpgradeId.PerkSlots));
+
 	/// <summary>Цена скина с учётом скидки «Торговца».</summary>
 	public static int SkinPrice(SkinDefinition def, MetaProfile profile)
 	{

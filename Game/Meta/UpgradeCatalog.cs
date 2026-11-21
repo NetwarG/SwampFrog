@@ -30,6 +30,10 @@ public sealed class UpgradeCatalog
 		new(UpgradeId.Reroll, UpgradeKind.PerkReroll, "Реролл", "Reroll", 120, "upgrade_reroll",
 			new[] { "+1 реролл предложения перков за забег", "+2 реролла предложения перков за забег" },
 			new[] { "+1 perk offer reroll per run", "+2 perk offer rerolls per run" }),
+
+		new(UpgradeId.PerkSlots, UpgradeKind.PerkSlots, "Слоты перков", "Perk slots", 120, "upgrade_slots",
+			new[] { "3 слота перков за забег", "4 слота перков за забег", "5 слотов перков за забег", "6 слотов перков за забег" },
+			new[] { "3 perk slots per run", "4 perk slots per run", "5 perk slots per run", "6 perk slots per run" }),
 	};
 
 	/// <summary>Улучшение по идентификатору.</summary>

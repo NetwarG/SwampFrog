@@ -22,6 +22,9 @@ public enum UpgradeKind
 
 	/// <summary>Реролл предложения перков.</summary>
 	PerkReroll,
+
+	/// <summary>Слоты перков за забег.</summary>
+	PerkSlots,
 }
 
 /// <summary>Все постоянные улучшения.</summary>
@@ -33,6 +36,7 @@ public enum UpgradeId
 	Slow,
 	Vitality,
 	Reroll,
+	PerkSlots,
 }
 
 /// <summary>

@@ -608,6 +608,15 @@ $canvas = New-Canvas; $g = $canvas[1]
 Draw-ArcArrow $g @(96, 96, 320, 320) 200 130 (Get-Color '#7fd6f2') 34
 Draw-ArcArrow $g @(96, 96, 320, 320) 20 130 (Get-Color '#b4e863') 34
 Save-Icon $canvas 'Game/assets/ui/upgrade_reroll.png'
+
+# Слоты перков: квадратные слоты и плюс — покупка места под перк.
+$canvas = New-Canvas; $g = $canvas[1]
+Draw-Path $g (New-Polygon @(@(84, 84), @(232, 84), @(232, 232), @(84, 232))) (Get-Color '#7fd6f2') (Get-Color '#3f9ec4') 22
+Draw-Path $g (New-Polygon @(@(84, 280), @(232, 280), @(232, 428), @(84, 428))) (Get-Color '#7fd6f2') (Get-Color '#3f9ec4') 22
+Draw-Path $g (New-Polygon @(@(280, 84), @(428, 84), @(428, 232), @(280, 232))) (Get-Color '#7fd6f2') (Get-Color '#3f9ec4') 22
+Draw-Line $g @(354, 264) @(354, 414) (Get-Color '#b4e863') 34 14
+Draw-Line $g @(279, 339) @(429, 339) (Get-Color '#b4e863') 34 14
+Save-Icon $canvas 'Game/assets/ui/upgrade_slots.png'
 }
 
 Draw-HealthIcons
@@ -632,4 +641,4 @@ Draw-AdIcon
 Draw-UpgradeIcons
 
 
-Write-Host '26 icons generated.'
+Write-Host '27 icons generated.'

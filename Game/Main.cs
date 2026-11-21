@@ -1031,7 +1031,7 @@ public partial class Main : Node2D
 		_perkRerolls = MetaUpgradeEffects.PerkRerolls(_meta);
 		_frog?.ResetForRound();
 		PositionFrog();
-		_perkPlayer.Reset();
+		_perkPlayer.Reset(MetaUpgradeEffects.PerkSlots(_meta));
 		_subPerkPlayer.Reset();
 		_lives = MaxLives;
 		ResetXp();

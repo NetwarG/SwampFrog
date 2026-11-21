@@ -18,7 +18,7 @@ public partial class PerkBar : Control
 
 	private readonly List<PerkIcon> _icons = new();
 	private PerkIconInfo[] _perks = { };
-	private int _maxSlots = PerkState.MaxDistinctPerks;
+	private int _maxSlots = PerkState.BaseSlots;
 	private float _uiScale = 1f;
 
 	/// <summary>Есть ли хотя бы один отображаемый слот.</summary>

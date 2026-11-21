@@ -4,7 +4,8 @@ using Godot;
 namespace SwampFrog;
 
 /// <summary>
-/// Состояние перков текущего забега: уровни выбранных перков и число занятых мест.
+/// Состояние перков текущего забега: уровни выбранных перков, число занятых мест
+/// и лимит слотов из постоянных улучшений.
 /// Чистый C# класс (по образцу <see cref="XpSystem"/>), без привязки к Godot-нодам,
 /// чтобы логику выбора и лимитов можно было легко тестировать и менять.
 /// </summary>
@@ -13,16 +14,22 @@ public sealed class PerkState
 	/// <summary>Раз в сколько уровней жабы предлагается выбор перка.</summary>
 	public const int OfferEveryLevels = 3;
 
-	/// <summary>Сколько разных перков можно взять за один забег.</summary>
-	public const int MaxDistinctPerks = 6;
+	/// <summary>Сколько слотов перков доступно без улучшений.</summary>
+	public const int BaseSlots = 2;
+
+	/// <summary>Предел слотов перков: покупки в магазине доводят лимит до него.</summary>
+	public const int SlotLimit = 6;
 
 	private readonly Dictionary<PerkId, int> _levels = new();
+
+	/// <summary>Сколько разных перков можно взять за этот забег.</summary>
+	public int MaxSlots { get; private set; } = BaseSlots;
 
 	/// <summary>Сколько разных перков уже взято за забег.</summary>
 	public int SelectedCount => _levels.Count;
 
 	/// <summary>Есть ли место под новый (ещё не выбранный) перк.</summary>
-	public bool CanTakeNewPerk => SelectedCount < MaxDistinctPerks;
+	public bool CanTakeNewPerk => SelectedCount < MaxSlots;
 
 	/// <summary>Есть ли перк, который можно предложить в окне выбора.</summary>
 	public bool HasOfferablePerk
@@ -108,7 +115,7 @@ public sealed class PerkState
 		return result.ToArray();
 	}
 
-	/// <summary>Случайные перки для оверлея: пока выбрано меньше <see cref="MaxDistinctPerks"/> —
+	/// <summary>Случайные перки для оверлея: пока выбрано меньше <see cref="MaxSlots"/> —
 	/// любые доступные, после — только из уже выбранных (без повторов, не более count).</summary>
 	public PerkId[] OfferCandidates(int count, RandomNumberGenerator rng)
 	{
@@ -131,7 +138,13 @@ public sealed class PerkState
 		return result.ToArray();
 	}
 
-	/// <summary>Сброс на начало забега.</summary>
+	/// <summary>Задаёт лимит слотов забега из постоянных улучшений.</summary>
+	public void SetMaxSlots(int slots)
+	{
+		MaxSlots = Mathf.Clamp(slots, BaseSlots, SlotLimit);
+	}
+
+	/// <summary>Сброс на начало забега: лимит слотов сохраняется.</summary>
 	public void Reset()
 	{
 		_levels.Clear();

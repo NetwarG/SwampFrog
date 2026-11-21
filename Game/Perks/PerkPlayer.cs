@@ -56,8 +56,10 @@ public sealed class PerkPlayer
 
 	// ---------- Сброс забега ----------
 
-	public void Reset()
+	/// <summary>Сброс забега: лимит слотов из улучшений и пустой набор перков.</summary>
+	public void Reset(int maxSlots)
 	{
+		_perks.SetMaxSlots(maxSlots);
 		_perks.Reset();
 		_revivesLeft = PerkEffects.ReviveCount(_perks);
 		_combo = 0;
@@ -71,7 +73,7 @@ public sealed class PerkPlayer
 		_invulnTimer = 0f;
 
 		// Панель перков очищается вместе с состоянием.
-		Game?.HudNode?.SetPickedPerks(_perks.PickedSnapshot());
+		Game?.HudNode?.SetPickedPerks(_perks.PickedSnapshot(), _perks.MaxSlots);
 	}
 
 	// ---------- Выбор перка ----------
@@ -152,7 +154,7 @@ public sealed class PerkPlayer
 			cards.Add(new PerkOffer(id, def.Name, def.Tagline, lvl, def.LevelEffects[lvl], def.MaxLevel, def.Accent));
 		}
 		Game.HudNode?.ShowPerkSelection(level, cards.ToArray(), _perks.SelectedCount,
-			PerkState.MaxDistinctPerks, Game.PerkRerollsLeft);
+			_perks.MaxSlots, Game.PerkRerollsLeft);
 	}
 
 	/// <summary>Пересобирает предложение перков по запросу реролла. Возвращает false, если окно не открыто.</summary>
@@ -188,7 +190,7 @@ public sealed class PerkPlayer
 		}
 
 		// Панель выбранных перков обновляется сразу после выбора.
-		Game.HudNode?.SetPickedPerks(_perks.PickedSnapshot());
+		Game.HudNode?.SetPickedPerks(_perks.PickedSnapshot(), _perks.MaxSlots);
 		Sfx.Play(SfxId.PerkPick);
 
 		// «Панцирь» тут же даёт новую жизнь (до нового максимума).
